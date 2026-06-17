@@ -1,0 +1,23 @@
+[
+  {
+    "platform": "discord",
+    "label": "Discord",
+    "href": "https://discord.gg/lolmk",
+    "handle": "discord.gg/lolmk",
+    "description": "Voice rooms, in-house signups, LFG, the LCK watch-along channel."
+  },
+  {
+    "platform": "kakao",
+    "label": "KakaoTalk",
+    "href": "https://open.kakao.com/o/gIPbdi3e",
+    "handle": "open.kakao.com/o/lolmk",
+    "description": "The fastest way to reach admins and meet people in Seoul."
+  },
+  {
+    "platform": "instagram",
+    "label": "Instagram",
+    "href": "https://instagram.com/lolmeetupkorea",
+    "handle": "@lolmeetupkorea",
+    "description": "Event recaps, tournament highlights, photos from Gen.G GGX."
+  }
+]

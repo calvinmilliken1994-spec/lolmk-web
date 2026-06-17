@@ -1,0 +1,207 @@
+{
+  "tournament": {
+    "id": "preview-fall-2026",
+    "slug": "preview-16",
+    "name": "2026 LoLMK Fall Tournament",
+    "season": "Fall 2026",
+    "format": "double_elim",
+    "status": "completed",
+    "max_teams": 16,
+    "signup_deadline": "2026-09-20T23:59:00+09:00",
+    "start_date": "2026-10-03T18:00:00+09:00",
+    "end_date": "2026-11-08T22:00:00+09:00",
+    "description": "16-team preview using the integrated bracket-flow layout. Six rounds total: 4 upper + 2 lower-only stages plus the grand final.",
+    "prize_description": "1st: 1,000,000 KRW + GGX merch · 2nd: 600,000 KRW · 3rd: 300,000 KRW",
+    "champion_team_id": "team-apex"
+  },
+  "teams": [
+    { "id": "team-apex", "tournament_id": "preview-fall-2026", "name": "Seoul Apex", "tag": "APEX", "slug": "seoul-apex", "logo_url": null, "color": "#BA263C", "captain_discord_id": "111111111111111111", "status": "approved", "seed": 1,
+      "players": [
+        { "id": "p-apex-1", "team_id": "team-apex", "discord_id": "111111111111111101", "discord_username": "parktop", "ign": "ApexPark", "role": "TOP", "peak_rank": "GRANDMASTER", "current_rank": "MASTER", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-apex-2", "team_id": "team-apex", "discord_id": "111111111111111102", "discord_username": "evolvejg", "ign": "EvolveJG", "role": "JUNGLE", "peak_rank": "CHALLENGER", "current_rank": "GRANDMASTER", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-apex-3", "team_id": "team-apex", "discord_id": "111111111111111111", "discord_username": "midflame", "ign": "Midflame", "role": "MID", "peak_rank": "CHALLENGER", "current_rank": "CHALLENGER", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-apex-4", "team_id": "team-apex", "discord_id": "111111111111111104", "discord_username": "scopedown", "ign": "ScopeKR", "role": "ADC", "peak_rank": "GRANDMASTER", "current_rank": "MASTER", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-apex-5", "team_id": "team-apex", "discord_id": "111111111111111105", "discord_username": "wardking", "ign": "WardKing", "role": "SUPPORT", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-hrio", "tournament_id": "preview-fall-2026", "name": "Hongdae Riot", "tag": "HRIO", "slug": "hongdae-riot", "logo_url": null, "color": "#4A65A8", "captain_discord_id": "222222222222222222", "status": "approved", "seed": 2,
+      "players": [
+        { "id": "p-hrio-1", "team_id": "team-hrio", "discord_id": "222222222222222201", "discord_username": "stormtop", "ign": "Storm", "role": "TOP", "peak_rank": "GRANDMASTER", "current_rank": "MASTER", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-hrio-2", "team_id": "team-hrio", "discord_id": "222222222222222202", "discord_username": "lethal", "ign": "Lethal", "role": "JUNGLE", "peak_rank": "MASTER", "current_rank": "MASTER", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-hrio-3", "team_id": "team-hrio", "discord_id": "222222222222222222", "discord_username": "yujin", "ign": "Yujin", "role": "MID", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-hrio-4", "team_id": "team-hrio", "discord_id": "222222222222222204", "discord_username": "soolicious", "ign": "Soolicious", "role": "ADC", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-hrio-5", "team_id": "team-hrio", "discord_id": "222222222222222205", "discord_username": "voidsupp", "ign": "VoidSupp", "role": "SUPPORT", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-itwn", "tournament_id": "preview-fall-2026", "name": "Itaewon Esports", "tag": "ITWN", "slug": "itaewon-esports", "logo_url": null, "color": "#283D74", "captain_discord_id": "333333333333333333", "status": "approved", "seed": 3,
+      "players": [
+        { "id": "p-itwn-1", "team_id": "team-itwn", "discord_id": "333333333333333301", "discord_username": "ororo", "ign": "OrOrO", "role": "TOP", "peak_rank": "GRANDMASTER", "current_rank": "GRANDMASTER", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-itwn-2", "team_id": "team-itwn", "discord_id": "333333333333333333", "discord_username": "ridgejg", "ign": "RidgeJG", "role": "JUNGLE", "peak_rank": "GRANDMASTER", "current_rank": "MASTER", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-itwn-3", "team_id": "team-itwn", "discord_id": "333333333333333303", "discord_username": "shvm", "ign": "Shvm", "role": "MID", "peak_rank": "MASTER", "current_rank": "MASTER", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-itwn-4", "team_id": "team-itwn", "discord_id": "333333333333333304", "discord_username": "petey", "ign": "Petey", "role": "ADC", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-itwn-5", "team_id": "team-itwn", "discord_id": "333333333333333305", "discord_username": "halflane", "ign": "HalfLane", "role": "SUPPORT", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-gnj", "tournament_id": "preview-fall-2026", "name": "Gangnam Junglers", "tag": "GNJ", "slug": "gangnam-junglers", "logo_url": null, "color": "#22C55E", "captain_discord_id": "444444444444444444", "status": "approved", "seed": 4,
+      "players": [
+        { "id": "p-gnj-1", "team_id": "team-gnj", "discord_id": "444444444444444401", "discord_username": "rustop", "ign": "Rustop", "role": "TOP", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-gnj-2", "team_id": "team-gnj", "discord_id": "444444444444444444", "discord_username": "gankgod", "ign": "GankGod", "role": "JUNGLE", "peak_rank": "GRANDMASTER", "current_rank": "MASTER", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-gnj-3", "team_id": "team-gnj", "discord_id": "444444444444444403", "discord_username": "nimi", "ign": "Nimi", "role": "MID", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-gnj-4", "team_id": "team-gnj", "discord_id": "444444444444444404", "discord_username": "leerocks", "ign": "Lee", "role": "ADC", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-gnj-5", "team_id": "team-gnj", "discord_id": "444444444444444405", "discord_username": "engager", "ign": "Engager", "role": "SUPPORT", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-cbar", "tournament_id": "preview-fall-2026", "name": "CBAR", "tag": "CBAR", "slug": "cbar", "logo_url": null, "color": "#0EA5E9", "captain_discord_id": "555555555555555555", "status": "approved", "seed": 5,
+      "players": [
+        { "id": "p-cbar-1", "team_id": "team-cbar", "discord_id": "555555555555555501", "discord_username": "tinkerbar", "ign": "Tinker", "role": "TOP", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-cbar-2", "team_id": "team-cbar", "discord_id": "555555555555555502", "discord_username": "carrycarry", "ign": "Carry", "role": "JUNGLE", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-cbar-3", "team_id": "team-cbar", "discord_id": "555555555555555555", "discord_username": "barx", "ign": "BarX", "role": "MID", "peak_rank": "MASTER", "current_rank": "DIAMOND_II", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-cbar-4", "team_id": "team-cbar", "discord_id": "555555555555555504", "discord_username": "cbarx", "ign": "CBarX", "role": "ADC", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-cbar-5", "team_id": "team-cbar", "discord_id": "555555555555555505", "discord_username": "barsupp", "ign": "BarSupp", "role": "SUPPORT", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-anchovy", "tournament_id": "preview-fall-2026", "name": "AnChovy Pizza", "tag": "ANCH", "slug": "anchovy-pizza", "logo_url": null, "color": "#D63E54", "captain_discord_id": "666666666666666666", "status": "approved", "seed": 6,
+      "players": [
+        { "id": "p-anch-1", "team_id": "team-anchovy", "discord_id": "666666666666666601", "discord_username": "tomatoclassic", "ign": "Margherita", "role": "TOP", "peak_rank": "GRANDMASTER", "current_rank": "MASTER", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-anch-2", "team_id": "team-anchovy", "discord_id": "666666666666666602", "discord_username": "saltflick", "ign": "Saltflick", "role": "JUNGLE", "peak_rank": "CHALLENGER", "current_rank": "GRANDMASTER", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-anch-3", "team_id": "team-anchovy", "discord_id": "666666666666666666", "discord_username": "anchovymid", "ign": "Anchovy", "role": "MID", "peak_rank": "CHALLENGER", "current_rank": "GRANDMASTER", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-anch-4", "team_id": "team-anchovy", "discord_id": "666666666666666604", "discord_username": "pepperoni", "ign": "Pepperoni", "role": "ADC", "peak_rank": "GRANDMASTER", "current_rank": "MASTER", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-anch-5", "team_id": "team-anchovy", "discord_id": "666666666666666605", "discord_username": "olive", "ign": "Olive", "role": "SUPPORT", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-bsan", "tournament_id": "preview-fall-2026", "name": "Busan Beachheads", "tag": "BSAN", "slug": "busan-beachheads", "logo_url": null, "color": "#F59E0B", "captain_discord_id": "777777777777777777", "status": "approved", "seed": 7,
+      "players": [
+        { "id": "p-bsan-1", "team_id": "team-bsan", "discord_id": "777777777777777701", "discord_username": "wavecrash", "ign": "Wavecrash", "role": "TOP", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-bsan-2", "team_id": "team-bsan", "discord_id": "777777777777777777", "discord_username": "lowtide", "ign": "Lowtide", "role": "JUNGLE", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-bsan-3", "team_id": "team-bsan", "discord_id": "777777777777777703", "discord_username": "saltyboy", "ign": "Salty", "role": "MID", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-bsan-4", "team_id": "team-bsan", "discord_id": "777777777777777704", "discord_username": "harbinger", "ign": "Harbinger", "role": "ADC", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-bsan-5", "team_id": "team-bsan", "discord_id": "777777777777777705", "discord_username": "rockpool", "ign": "Rockpool", "role": "SUPPORT", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-templars", "tournament_id": "preview-fall-2026", "name": "Templars", "tag": "TMPL", "slug": "templars", "logo_url": null, "color": "#7F1D1D", "captain_discord_id": "888888888888888888", "status": "approved", "seed": 8,
+      "players": [
+        { "id": "p-tmpl-1", "team_id": "team-templars", "discord_id": "888888888888888801", "discord_username": "knight", "ign": "Knight", "role": "TOP", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-tmpl-2", "team_id": "team-templars", "discord_id": "888888888888888888", "discord_username": "paladin", "ign": "Paladin", "role": "JUNGLE", "peak_rank": "GRANDMASTER", "current_rank": "MASTER", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-tmpl-3", "team_id": "team-templars", "discord_id": "888888888888888803", "discord_username": "crusader", "ign": "Crusader", "role": "MID", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-tmpl-4", "team_id": "team-templars", "discord_id": "888888888888888804", "discord_username": "archer", "ign": "Archer", "role": "ADC", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-tmpl-5", "team_id": "team-templars", "discord_id": "888888888888888805", "discord_username": "cleric", "ign": "Cleric", "role": "SUPPORT", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-shrk", "tournament_id": "preview-fall-2026", "name": "Sinchon Sharks", "tag": "SHRK", "slug": "sinchon-sharks", "logo_url": null, "color": "#14B8A6", "captain_discord_id": "999999999999999999", "status": "approved", "seed": 9,
+      "players": [
+        { "id": "p-shrk-1", "team_id": "team-shrk", "discord_id": "999999999999999901", "discord_username": "biteback", "ign": "Biteback", "role": "TOP", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-shrk-2", "team_id": "team-shrk", "discord_id": "999999999999999902", "discord_username": "blackmane", "ign": "BlackMane", "role": "JUNGLE", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-shrk-3", "team_id": "team-shrk", "discord_id": "999999999999999999", "discord_username": "finflick", "ign": "Finflick", "role": "MID", "peak_rank": "MASTER", "current_rank": "DIAMOND_II", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-shrk-4", "team_id": "team-shrk", "discord_id": "999999999999999904", "discord_username": "frenzy", "ign": "Frenzy", "role": "ADC", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-shrk-5", "team_id": "team-shrk", "discord_id": "999999999999999905", "discord_username": "tidepool", "ign": "Tidepool", "role": "SUPPORT", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-joes", "tournament_id": "preview-fall-2026", "name": "Unaverage Joe's", "tag": "JOES", "slug": "unaverage-joes", "logo_url": null, "color": "#1A2547", "captain_discord_id": "101010101010101010", "status": "approved", "seed": 10,
+      "players": [
+        { "id": "p-joes-1", "team_id": "team-joes", "discord_id": "101010101010101001", "discord_username": "avgjoe", "ign": "AverageJoe", "role": "TOP", "peak_rank": "GRANDMASTER", "current_rank": "MASTER", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-joes-2", "team_id": "team-joes", "discord_id": "101010101010101010", "discord_username": "joejg", "ign": "JoeTheJG", "role": "JUNGLE", "peak_rank": "MASTER", "current_rank": "MASTER", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-joes-3", "team_id": "team-joes", "discord_id": "101010101010101003", "discord_username": "midjoe", "ign": "MidJoe", "role": "MID", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-joes-4", "team_id": "team-joes", "discord_id": "101010101010101004", "discord_username": "trickjoe", "ign": "TrickJoe", "role": "ADC", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-joes-5", "team_id": "team-joes", "discord_id": "101010101010101005", "discord_username": "babyjoe", "ign": "BabyJoe", "role": "SUPPORT", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-ysv", "tournament_id": "preview-fall-2026", "name": "Yongsan Vikings", "tag": "YSV", "slug": "yongsan-vikings", "logo_url": null, "color": "#8B5CF6", "captain_discord_id": "111100001111000011", "status": "approved", "seed": 11,
+      "players": [
+        { "id": "p-ysv-1", "team_id": "team-ysv", "discord_id": "111100001111000011", "discord_username": "ragnar", "ign": "Ragnar", "role": "TOP", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-ysv-2", "team_id": "team-ysv", "discord_id": "111100001111000002", "discord_username": "berserker", "ign": "Berserk", "role": "JUNGLE", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-ysv-3", "team_id": "team-ysv", "discord_id": "111100001111000003", "discord_username": "skadi", "ign": "Skadi", "role": "MID", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-ysv-4", "team_id": "team-ysv", "discord_id": "111100001111000004", "discord_username": "longboat", "ign": "Longboat", "role": "ADC", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-ysv-5", "team_id": "team-ysv", "discord_id": "111100001111000005", "discord_username": "shieldwall", "ign": "ShieldWall", "role": "SUPPORT", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-pof", "tournament_id": "preview-fall-2026", "name": "Power of Friendship", "tag": "POF", "slug": "power-of-friendship", "logo_url": null, "color": "#EC4899", "captain_discord_id": "121212121212121212", "status": "approved", "seed": 12,
+      "players": [
+        { "id": "p-pof-1", "team_id": "team-pof", "discord_id": "121212121212121201", "discord_username": "harmony", "ign": "Harmony", "role": "TOP", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-pof-2", "team_id": "team-pof", "discord_id": "121212121212121202", "discord_username": "bond", "ign": "Bond", "role": "JUNGLE", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-pof-3", "team_id": "team-pof", "discord_id": "121212121212121212", "discord_username": "trust", "ign": "Trust", "role": "MID", "peak_rank": "MASTER", "current_rank": "DIAMOND_II", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-pof-4", "team_id": "team-pof", "discord_id": "121212121212121204", "discord_username": "loyal", "ign": "Loyal", "role": "ADC", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-pof-5", "team_id": "team-pof", "discord_id": "121212121212121205", "discord_username": "kindred", "ign": "Kindred", "role": "SUPPORT", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-ratas", "tournament_id": "preview-fall-2026", "name": "LAS RATAS", "tag": "RATA", "slug": "las-ratas", "logo_url": null, "color": "#A16207", "captain_discord_id": "131313131313131313", "status": "approved", "seed": 13,
+      "players": [
+        { "id": "p-rata-1", "team_id": "team-ratas", "discord_id": "131313131313131301", "discord_username": "ratking", "ign": "RatKing", "role": "TOP", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-rata-2", "team_id": "team-ratas", "discord_id": "131313131313131313", "discord_username": "splitrat", "ign": "SplitRat", "role": "JUNGLE", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-rata-3", "team_id": "team-ratas", "discord_id": "131313131313131303", "discord_username": "queso", "ign": "Queso", "role": "MID", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-rata-4", "team_id": "team-ratas", "discord_id": "131313131313131304", "discord_username": "scrambler", "ign": "Scrambler", "role": "ADC", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-rata-5", "team_id": "team-ratas", "discord_id": "131313131313131305", "discord_username": "rodent", "ign": "Rodent", "role": "SUPPORT", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-smd", "tournament_id": "preview-fall-2026", "name": "Smite Me Daddy", "tag": "SMD", "slug": "smite-me-daddy", "logo_url": null, "color": "#A78BFA", "captain_discord_id": "141414141414141414", "status": "approved", "seed": 14,
+      "players": [
+        { "id": "p-smd-1", "team_id": "team-smd", "discord_id": "141414141414141414", "discord_username": "smitey", "ign": "Smitey", "role": "TOP", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-smd-2", "team_id": "team-smd", "discord_id": "141414141414141402", "discord_username": "stealit", "ign": "StealIt", "role": "JUNGLE", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-smd-3", "team_id": "team-smd", "discord_id": "141414141414141403", "discord_username": "drakekiller", "ign": "DrakeKiller", "role": "MID", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-smd-4", "team_id": "team-smd", "discord_id": "141414141414141404", "discord_username": "bonusarmor", "ign": "BonusArmor", "role": "ADC", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-smd-5", "team_id": "team-smd", "discord_id": "141414141414141405", "discord_username": "blessrng", "ign": "BlessRNG", "role": "SUPPORT", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-jong", "tournament_id": "preview-fall-2026", "name": "Jongno Jugglers", "tag": "JONG", "slug": "jongno-jugglers", "logo_url": null, "color": "#10B981", "captain_discord_id": "151515151515151515", "status": "approved", "seed": 15,
+      "players": [
+        { "id": "p-jong-1", "team_id": "team-jong", "discord_id": "151515151515151501", "discord_username": "stonefoot", "ign": "Stonefoot", "role": "TOP", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-jong-2", "team_id": "team-jong", "discord_id": "151515151515151502", "discord_username": "smitelord", "ign": "Smitelord", "role": "JUNGLE", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-jong-3", "team_id": "team-jong", "discord_id": "151515151515151515", "discord_username": "kun", "ign": "Kun", "role": "MID", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-jong-4", "team_id": "team-jong", "discord_id": "151515151515151504", "discord_username": "twiztd", "ign": "Twiztd", "role": "ADC", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-jong-5", "team_id": "team-jong", "discord_id": "151515151515151505", "discord_username": "tetherpin", "ign": "Tetherpin", "role": "SUPPORT", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 }
+      ]
+    },
+    { "id": "team-ping", "tournament_id": "preview-fall-2026", "name": "Pingstorm", "tag": "PING", "slug": "pingstorm", "logo_url": null, "color": "#06B6D4", "captain_discord_id": "161616161616161616", "status": "approved", "seed": 16,
+      "players": [
+        { "id": "p-ping-1", "team_id": "team-ping", "discord_id": "161616161616161601", "discord_username": "spamping", "ign": "SpamPing", "role": "TOP", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-ping-2", "team_id": "team-ping", "discord_id": "161616161616161602", "discord_username": "questmark", "ign": "QuestMark", "role": "JUNGLE", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_II", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-ping-3", "team_id": "team-ping", "discord_id": "161616161616161616", "discord_username": "alertping", "ign": "AlertPing", "role": "MID", "peak_rank": "MASTER", "current_rank": "DIAMOND_I", "is_captain": 1, "is_substitute": 0 },
+        { "id": "p-ping-4", "team_id": "team-ping", "discord_id": "161616161616161604", "discord_username": "missing", "ign": "Missing", "role": "ADC", "peak_rank": "DIAMOND_I", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 },
+        { "id": "p-ping-5", "team_id": "team-ping", "discord_id": "161616161616161605", "discord_username": "vision", "ign": "Vision", "role": "SUPPORT", "peak_rank": "DIAMOND_II", "current_rank": "DIAMOND_III", "is_captain": 0, "is_substitute": 0 }
+      ]
+    }
+  ],
+  "matches": [
+    { "id": "m1",  "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 1, "match_number": 1,  "team_a_id": "team-apex",    "team_b_id": "team-ping",    "team_a_score": 2, "team_b_score": 0, "winner_id": "team-apex",    "status": "completed", "advances_to_match_id": "m9",  "drops_to_match_id": "m16" },
+    { "id": "m2",  "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 1, "match_number": 2,  "team_a_id": "team-templars","team_b_id": "team-shrk",    "team_a_score": 2, "team_b_score": 1, "winner_id": "team-templars","status": "completed", "advances_to_match_id": "m9",  "drops_to_match_id": "m16" },
+    { "id": "m3",  "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 1, "match_number": 3,  "team_a_id": "team-cbar",    "team_b_id": "team-pof",     "team_a_score": 2, "team_b_score": 0, "winner_id": "team-cbar",    "status": "completed", "advances_to_match_id": "m10", "drops_to_match_id": "m17" },
+    { "id": "m4",  "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 1, "match_number": 4,  "team_a_id": "team-gnj",     "team_b_id": "team-ratas",   "team_a_score": 2, "team_b_score": 1, "winner_id": "team-gnj",     "status": "completed", "advances_to_match_id": "m10", "drops_to_match_id": "m17" },
+    { "id": "m5",  "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 1, "match_number": 5,  "team_a_id": "team-itwn",    "team_b_id": "team-smd",     "team_a_score": 2, "team_b_score": 0, "winner_id": "team-itwn",    "status": "completed", "advances_to_match_id": "m11", "drops_to_match_id": "m18" },
+    { "id": "m6",  "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 1, "match_number": 6,  "team_a_id": "team-anchovy", "team_b_id": "team-ysv",     "team_a_score": 2, "team_b_score": 1, "winner_id": "team-anchovy", "status": "completed", "advances_to_match_id": "m11", "drops_to_match_id": "m18" },
+    { "id": "m7",  "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 1, "match_number": 7,  "team_a_id": "team-bsan",    "team_b_id": "team-joes",    "team_a_score": 1, "team_b_score": 2, "winner_id": "team-joes",    "status": "completed", "advances_to_match_id": "m12", "drops_to_match_id": "m19" },
+    { "id": "m8",  "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 1, "match_number": 8,  "team_a_id": "team-hrio",    "team_b_id": "team-jong",    "team_a_score": 2, "team_b_score": 0, "winner_id": "team-hrio",    "status": "completed", "advances_to_match_id": "m12", "drops_to_match_id": "m19" },
+
+    { "id": "m9",  "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 2, "match_number": 9,  "team_a_id": "team-apex",    "team_b_id": "team-templars","team_a_score": 2, "team_b_score": 0, "winner_id": "team-apex",    "status": "completed", "advances_to_match_id": "m13", "drops_to_match_id": "m23" },
+    { "id": "m10", "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 2, "match_number": 10, "team_a_id": "team-cbar",    "team_b_id": "team-gnj",     "team_a_score": 2, "team_b_score": 1, "winner_id": "team-cbar",    "status": "completed", "advances_to_match_id": "m13", "drops_to_match_id": "m22" },
+    { "id": "m11", "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 2, "match_number": 11, "team_a_id": "team-itwn",    "team_b_id": "team-anchovy", "team_a_score": 1, "team_b_score": 2, "winner_id": "team-anchovy", "status": "completed", "advances_to_match_id": "m14", "drops_to_match_id": "m21" },
+    { "id": "m12", "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 2, "match_number": 12, "team_a_id": "team-joes",    "team_b_id": "team-hrio",    "team_a_score": 0, "team_b_score": 2, "winner_id": "team-hrio",    "status": "completed", "advances_to_match_id": "m14", "drops_to_match_id": "m20" },
+
+    { "id": "m13", "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 3, "match_number": 13, "team_a_id": "team-apex",    "team_b_id": "team-cbar",    "team_a_score": 2, "team_b_score": 1, "winner_id": "team-apex",    "status": "completed", "advances_to_match_id": "m15", "drops_to_match_id": "m26" },
+    { "id": "m14", "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 3, "match_number": 14, "team_a_id": "team-anchovy", "team_b_id": "team-hrio",    "team_a_score": 2, "team_b_score": 1, "winner_id": "team-anchovy", "status": "completed", "advances_to_match_id": "m15", "drops_to_match_id": "m27" },
+
+    { "id": "m15", "tournament_id": "preview-fall-2026", "bracket": "upper", "round_number": 4, "match_number": 15, "team_a_id": "team-apex",    "team_b_id": "team-anchovy", "team_a_score": 2, "team_b_score": 1, "winner_id": "team-apex",    "status": "completed", "advances_to_match_id": "m30", "drops_to_match_id": "m29" },
+
+    { "id": "m16", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 1, "match_number": 16, "team_a_id": "team-ping",    "team_b_id": "team-shrk",    "team_a_score": 2, "team_b_score": 1, "winner_id": "team-ping",    "status": "completed", "advances_to_match_id": "m20", "drops_to_match_id": null },
+    { "id": "m17", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 1, "match_number": 17, "team_a_id": "team-pof",     "team_b_id": "team-ratas",   "team_a_score": 2, "team_b_score": 0, "winner_id": "team-pof",     "status": "completed", "advances_to_match_id": "m21", "drops_to_match_id": null },
+    { "id": "m18", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 1, "match_number": 18, "team_a_id": "team-smd",     "team_b_id": "team-ysv",     "team_a_score": 1, "team_b_score": 2, "winner_id": "team-ysv",     "status": "completed", "advances_to_match_id": "m22", "drops_to_match_id": null },
+    { "id": "m19", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 1, "match_number": 19, "team_a_id": "team-bsan",    "team_b_id": "team-jong",    "team_a_score": 1, "team_b_score": 2, "winner_id": "team-jong",    "status": "completed", "advances_to_match_id": "m23", "drops_to_match_id": null },
+
+    { "id": "m20", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 2, "match_number": 20, "team_a_id": "team-ping",    "team_b_id": "team-joes",    "team_a_score": 0, "team_b_score": 2, "winner_id": "team-joes",    "status": "completed", "advances_to_match_id": "m24", "drops_to_match_id": null },
+    { "id": "m21", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 2, "match_number": 21, "team_a_id": "team-pof",     "team_b_id": "team-itwn",    "team_a_score": 1, "team_b_score": 2, "winner_id": "team-itwn",    "status": "completed", "advances_to_match_id": "m24", "drops_to_match_id": null },
+    { "id": "m22", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 2, "match_number": 22, "team_a_id": "team-ysv",     "team_b_id": "team-gnj",     "team_a_score": 0, "team_b_score": 2, "winner_id": "team-gnj",     "status": "completed", "advances_to_match_id": "m25", "drops_to_match_id": null },
+    { "id": "m23", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 2, "match_number": 23, "team_a_id": "team-jong",    "team_b_id": "team-templars","team_a_score": 1, "team_b_score": 2, "winner_id": "team-templars","status": "completed", "advances_to_match_id": "m25", "drops_to_match_id": null },
+
+    { "id": "m24", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 3, "match_number": 24, "team_a_id": "team-joes",    "team_b_id": "team-itwn",    "team_a_score": 1, "team_b_score": 2, "winner_id": "team-itwn",    "status": "completed", "advances_to_match_id": "m26", "drops_to_match_id": null },
+    { "id": "m25", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 3, "match_number": 25, "team_a_id": "team-gnj",     "team_b_id": "team-templars","team_a_score": 2, "team_b_score": 1, "winner_id": "team-gnj",     "status": "completed", "advances_to_match_id": "m27", "drops_to_match_id": null },
+
+    { "id": "m26", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 4, "match_number": 26, "team_a_id": "team-itwn",    "team_b_id": "team-cbar",    "team_a_score": 2, "team_b_score": 1, "winner_id": "team-itwn",    "status": "completed", "advances_to_match_id": "m28", "drops_to_match_id": null },
+    { "id": "m27", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 4, "match_number": 27, "team_a_id": "team-gnj",     "team_b_id": "team-hrio",    "team_a_score": 0, "team_b_score": 2, "winner_id": "team-hrio",    "status": "completed", "advances_to_match_id": "m28", "drops_to_match_id": null },
+
+    { "id": "m28", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 5, "match_number": 28, "team_a_id": "team-itwn",    "team_b_id": "team-hrio",    "team_a_score": 1, "team_b_score": 2, "winner_id": "team-hrio",    "status": "completed", "advances_to_match_id": "m29", "drops_to_match_id": null },
+
+    { "id": "m29", "tournament_id": "preview-fall-2026", "bracket": "lower", "round_number": 6, "match_number": 29, "team_a_id": "team-hrio",    "team_b_id": "team-anchovy", "team_a_score": 0, "team_b_score": 2, "winner_id": "team-anchovy", "status": "completed", "advances_to_match_id": "m30", "drops_to_match_id": null },
+
+    { "id": "m30", "tournament_id": "preview-fall-2026", "bracket": "grand_final", "round_number": 1, "match_number": 30, "team_a_id": "team-apex",    "team_b_id": "team-anchovy", "team_a_score": 3, "team_b_score": 1, "winner_id": "team-apex",    "status": "completed", "advances_to_match_id": "m31", "drops_to_match_id": "m31" },
+
+    { "id": "m31", "tournament_id": "preview-fall-2026", "bracket": "grand_final_reset", "round_number": 1, "match_number": 31, "team_a_id": null, "team_b_id": null, "team_a_score": null, "team_b_score": null, "winner_id": null, "status": "forfeit", "advances_to_match_id": null, "drops_to_match_id": null }
+  ]
+}

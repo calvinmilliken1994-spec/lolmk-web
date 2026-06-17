@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    @apply bg-base text-ink antialiased;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply font-sans text-body-md selection:bg-brand-red selection:text-ink;
+  }
+
+  /* Display font is meant to be uppercase */
+  .font-display {
+    text-transform: uppercase;
+  }
+
+  /* Tabular numbers for scores and tables */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0A0E1A;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1F2937;
+    border: 2px solid #0A0E1A;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2D3A52;
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-brand-red ring-offset-2 ring-offset-base;
+  }
+}
+
+@layer utilities {
+  .container-content {
+    @apply mx-auto w-full max-w-content px-4 md:px-8 lg:px-12;
+  }
+  .container-wide {
+    @apply mx-auto w-full max-w-wide px-4 md:px-8 lg:px-12;
+  }
+  .grain {
+    background-image: radial-gradient(circle at 20% 10%, rgba(186, 38, 60, 0.08), transparent 40%),
+      radial-gradient(circle at 85% 30%, rgba(40, 61, 116, 0.12), transparent 45%);
+  }
+}

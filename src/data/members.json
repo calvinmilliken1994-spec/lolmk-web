@@ -1,0 +1,74 @@
+[
+  {
+    "slug": "seoulgrinder",
+    "ign": "Seoul Grinder",
+    "displayName": "Alex K.",
+    "role": "Streamer",
+    "rank": "Master",
+    "blurb": "Solo q grinder, English-language KR streamer. Climbs at 3am.",
+    "socials": [
+      { "platform": "twitch", "href": "https://twitch.tv/seoulgrinder", "handle": "seoulgrinder" }
+    ],
+    "featured": true
+  },
+  {
+    "slug": "midlanenoona",
+    "ign": "midlane noona",
+    "displayName": "Hana P.",
+    "role": "Content Creator",
+    "rank": "Diamond II",
+    "blurb": "Mid-lane mains, KR meta breakdowns, occasional LCK reactions.",
+    "socials": [
+      { "platform": "youtube", "href": "https://youtube.com/@midlanenoona", "handle": "@midlanenoona" }
+    ],
+    "featured": true
+  },
+  {
+    "slug": "junglecha",
+    "ign": "jungle차이",
+    "displayName": "Min L.",
+    "role": "Community Leader",
+    "rank": "Master",
+    "blurb": "Runs in-houses, captains tournament teams, occasionally gets fed.",
+    "socials": [
+      { "platform": "discord", "href": "https://discord.gg/lolmk", "handle": "junglecha" }
+    ],
+    "featured": true
+  },
+  {
+    "slug": "kr-kayle",
+    "ign": "KR Kayle",
+    "displayName": "Sam W.",
+    "role": "Streamer",
+    "rank": "Grandmaster",
+    "blurb": "Top-lane Kayle one-trick. Hits Challenger every season for sport.",
+    "socials": [
+      { "platform": "twitch", "href": "https://twitch.tv/kr-kayle", "handle": "kr-kayle" }
+    ],
+    "featured": true
+  },
+  {
+    "slug": "supportwithyou",
+    "ign": "SupportWithYou",
+    "displayName": "Lee J.",
+    "role": "Content Creator",
+    "rank": "Diamond IV",
+    "blurb": "Support guides, KR ward placements, and a great laugh on voice.",
+    "socials": [
+      { "platform": "youtube", "href": "https://youtube.com/@supportwithyou", "handle": "@supportwithyou" }
+    ],
+    "featured": true
+  },
+  {
+    "slug": "loparkregular",
+    "ign": "LoLParkRegular",
+    "displayName": "Daniel C.",
+    "role": "Community Leader",
+    "rank": "Platinum I",
+    "blurb": "Runs LCK ticket runs and LoL Park meetups. Knows every staff member.",
+    "socials": [
+      { "platform": "instagram", "href": "https://instagram.com/loparkregular", "handle": "@loparkregular" }
+    ],
+    "featured": true
+  }
+]

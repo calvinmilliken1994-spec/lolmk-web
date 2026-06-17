@@ -1,0 +1,73 @@
+import type { Metadata } from "next";
+import { Inter, Space_Grotesk, Bebas_Neue, JetBrains_Mono } from "next/font/google";
+import { Header } from "@/components/layout/header";
+import { Footer } from "@/components/layout/footer";
+import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-space-grotesk",
+  display: "swap",
+});
+
+const bebasNeue = Bebas_Neue({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-bebas-neue",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+
+export const metadata: Metadata = {
+  title: {
+    default: "LoLMK — English-speaking League of Legends on KR",
+    template: "%s — LoLMK",
+  },
+  description:
+    "The largest English-speaking League of Legends community on the Korean server. Tournaments, in-houses, meetups, and how-tos for playing on KR.",
+  metadataBase: new URL("https://lolmk.gg"),
+  openGraph: {
+    title: "LoLMK — English-speaking League of Legends on KR",
+    description:
+      "The largest English-speaking League of Legends community on the Korean server.",
+    type: "website",
+    locale: "en_US",
+  },
+  icons: {
+    icon: "/logo.svg",
+  },
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html
+      lang="en"
+      className={`${inter.variable} ${spaceGrotesk.variable} ${bebasNeue.variable} ${jetbrainsMono.variable}`}
+    >
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css"
+        />
+      </head>
+      <body className="bg-base text-ink min-h-screen">
+        <Header />
+        <main className="pt-16">{children}</main>
+        <Footer />
+      </body>
+    </html>
+  );
+}

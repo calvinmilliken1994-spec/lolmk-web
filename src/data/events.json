@@ -1,0 +1,55 @@
+{
+  "upcoming": [
+    {
+      "id": "q2-2026-tournament",
+      "title": "Q2 2026 Tournament",
+      "kind": "tournament",
+      "startsAt": "2026-06-07T18:00:00+09:00",
+      "endsAt": "2026-06-21T22:00:00+09:00",
+      "location": "Online + Gen.G GGX finals",
+      "description": "16 teams, double elim, three weekends. Last quarter's champs return to defend.",
+      "cta": { "label": "Register", "href": "/tournaments/q2-2026" }
+    },
+    {
+      "id": "lck-watch-party-may",
+      "title": "LCK Playoffs Watch Party",
+      "kind": "watch-party",
+      "startsAt": "2026-05-17T17:00:00+09:00",
+      "location": "Hongdae · venue TBA",
+      "description": "Round 2 of LCK playoffs on the big screen. Food, drinks, English shoutcast.",
+      "cta": { "label": "RSVP on Discord", "href": "https://discord.gg/lolmk" }
+    },
+    {
+      "id": "may-meetup",
+      "title": "May Meetup + PC Bang Night",
+      "kind": "meetup",
+      "startsAt": "2026-05-24T19:00:00+09:00",
+      "location": "Gangnam · PC bang TBA",
+      "description": "Casual 5-stacks, normals, and food after. New arrivals especially welcome.",
+      "cta": { "label": "RSVP on Discord", "href": "https://discord.gg/lolmk" }
+    }
+  ],
+  "recurring": [
+    {
+      "id": "weekly-inhouse",
+      "title": "Weekly In-houses",
+      "cadence": "Every Friday",
+      "time": "21:00 KST",
+      "description": "Captains drafted, balanced lobbies, all ranks welcome."
+    },
+    {
+      "id": "ranked-flex-night",
+      "title": "Ranked Flex Night",
+      "cadence": "Every Wednesday",
+      "time": "20:00 KST",
+      "description": "Find duos and 5-stacks for ranked. Open to anyone in the Discord."
+    },
+    {
+      "id": "lck-watch",
+      "title": "LCK Watch Nights",
+      "cadence": "Match days during the split",
+      "time": "17:00 KST",
+      "description": "Voice chat watch-along for every LCK match during the regular split."
+    }
+  ]
+}

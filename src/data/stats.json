@@ -1,0 +1,5 @@
+[
+  { "id": "discord-online", "label": "Online in Discord", "value": "—", "hint": "right now" },
+  { "id": "members", "label": "Members", "value": "—", "hint": "and growing" },
+  { "id": "next-event", "label": "Next event", "value": "TBA", "hint": "" }
+]
