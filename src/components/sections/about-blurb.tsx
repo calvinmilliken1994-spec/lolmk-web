@@ -17,7 +17,7 @@ export function AboutBlurb() {
               LoLMK started as a Discord for English-speakers playing on the
               Korean server. Today it's the largest community of its kind: new
               expats finding 5-stacks, tourists getting their KR account
-              working, and long-timers running tournaments out of Gen.G GGX.
+              working, and long-timers running community events.
             </p>
             <p className="text-body-md text-ink-secondary max-w-[65ch]">
               No tryouts, no gatekeeping. Iron through Challenger — if you want

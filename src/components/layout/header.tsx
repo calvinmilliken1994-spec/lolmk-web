@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
@@ -79,8 +80,9 @@ export function Header() {
               href="https://discord.gg/lolmk"
               target="_blank"
               rel="noreferrer"
-              className={cn(buttonVariants({ variant: "primary", size: "sm" }))}
+              className={cn(buttonVariants({ variant: "discord", size: "sm" }))}
             >
+              <DiscordIcon className="h-8 w-8" />
               Join the Discord
             </a>
           </div>
@@ -131,8 +133,9 @@ export function Header() {
               href="https://discord.gg/lolmk"
               target="_blank"
               rel="noreferrer"
-              className={cn(buttonVariants({ variant: "primary", size: "lg" }), "mt-8 w-full")}
+              className={cn(buttonVariants({ variant: "discord", size: "lg" }), "mt-8 w-full")}
             >
+              <DiscordIcon className="h-10 w-10" />
               Join the Discord
             </a>
           </nav>

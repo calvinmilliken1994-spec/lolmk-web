@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
 
 interface ComingSoonProps {
@@ -72,9 +73,9 @@ export function ComingSoon({
               href={cta.href}
               target={cta.href.startsWith("http") ? "_blank" : undefined}
               rel={cta.href.startsWith("http") ? "noreferrer" : undefined}
-              className={cn(buttonVariants({ variant: "primary", size: "lg" }))}
+              className={cn(buttonVariants({ variant: "discord", size: "lg" }))}
             >
-              <MessageCircle strokeWidth={1.5} className="h-5 w-5" />
+              <DiscordIcon className="h-10 w-10" />
               {cta.label}
             </a>
             <Link

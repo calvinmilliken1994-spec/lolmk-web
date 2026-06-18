@@ -33,16 +33,16 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "LoLMK — English-speaking League of Legends on KR",
+    default: "LoLMK — Home",
     template: "%s — LoLMK",
   },
   description:
-    "The largest English-speaking League of Legends community on the Korean server. Tournaments, in-houses, meetups, and how-tos for playing on KR.",
+    "The largest English-speaking League of Legends community in Korea. Tournaments, in-houses, meetups, and how-tos for playing on KR.",
   metadataBase: new URL("https://lolmk.gg"),
   openGraph: {
-    title: "LoLMK — English-speaking League of Legends on KR",
+    title: "LoLMK — Home",
     description:
-      "The largest English-speaking League of Legends community on the Korean server.",
+      "The largest English-speaking League of Legends community in Korea.",
     type: "website",
     locale: "en_US",
   },

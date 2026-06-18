@@ -13,6 +13,14 @@ const buttonVariants = cva(
           "border border-line-strong bg-transparent text-ink hover:border-brand-red rounded-md font-semibold",
         ghost:
           "bg-transparent text-ink-secondary hover:text-ink rounded-md",
+        // Discord blurple. Hover shade matches Discord's own hover-on-button
+        // treatment from their marketing site.
+        discord:
+          "bg-[#5865F2] text-white hover:bg-[#4752C4] active:bg-[#3C45A5] rounded-md font-semibold",
+        // KakaoTalk corporate yellow (#FEE500) with their conventional black
+        // text. Hover step matches their official press kit hover spec.
+        kakao:
+          "bg-[#FEE500] text-[#181600] hover:bg-[#FDD835] active:bg-[#FBC02D] rounded-md font-semibold",
       },
       size: {
         sm: "px-4 py-2 text-body-sm",

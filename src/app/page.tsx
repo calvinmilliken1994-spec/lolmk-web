@@ -4,7 +4,8 @@ import { EventCalendar } from "@/components/sections/event-calendar";
 import { PhotoHighlights } from "@/components/sections/photo-highlights";
 import { Socials } from "@/components/sections/socials";
 import { AboutBlurb } from "@/components/sections/about-blurb";
-import { FinalCta } from "@/components/sections/final-cta";
+// FinalCta ("Ready when you are") hidden for now — uncomment to bring back.
+// import { FinalCta } from "@/components/sections/final-cta";
 import { getCommunityStats } from "@/lib/stats";
 import { getUpcomingEvents, getRecurringSchedule, getNextEvent } from "@/lib/events";
 import { getSocials } from "@/lib/socials";
@@ -33,7 +34,7 @@ export default async function HomePage() {
       <PhotoHighlights posts={igPosts} />
       <Socials socials={socials} />
       <AboutBlurb />
-      <FinalCta />
+      {/* <FinalCta /> */}
     </>
   );
 }

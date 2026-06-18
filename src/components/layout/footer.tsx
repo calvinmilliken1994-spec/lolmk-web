@@ -42,7 +42,7 @@ export function Footer() {
               <span className="font-display text-heading-lg text-ink">LoLMK</span>
             </div>
             <p className="text-body-sm text-ink-muted max-w-[28ch]">
-              English-speaking League of Legends on the Korean server. Tournaments, in-houses,
+              English-speaking League of Legends community in Korea. Tournaments, in-houses,
               meetups in Seoul.
             </p>
           </div>
@@ -82,7 +82,7 @@ export function Footer() {
             © {new Date().getFullYear()} LoLMK. Not affiliated with Riot Games or LCK.
           </p>
           <p className="text-caption text-ink-muted font-mono">
-            Built for the KR grind · Seoul, KR
+            Seoul, KR
           </p>
         </div>
       </div>

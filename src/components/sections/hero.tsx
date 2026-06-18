@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { DiscordIcon, KakaoTalkIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
 
 interface HeroProps {
@@ -32,15 +33,14 @@ export function Hero({ nextEventLabel }: HeroProps) {
               <br />
               of Legends
               <br />
-              community on
+              community in
               <br />
-              <span className="text-brand-red">the Korean server.</span>
+              <span className="text-brand-red">Korea.</span>
             </h1>
 
             <p className="text-body-lg text-ink-secondary max-w-[52ch]">
-              The biggest English-speaking LoL community on KR. Tournaments,
-              in-houses, and meetups in Seoul — for new arrivals, tourists, and
-              long-time players who want their lobbies to actually talk to them.
+              League of Legends | Valorant | Riftbound | 2XKO | TFT
+              Inhouses | Tournaments | Watch Parties | Meetups
             </p>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -48,16 +48,18 @@ export function Hero({ nextEventLabel }: HeroProps) {
                 href="https://discord.gg/lolmk"
                 target="_blank"
                 rel="noreferrer"
-                className={cn(buttonVariants({ variant: "primary", size: "lg" }))}
+                className={cn(buttonVariants({ variant: "discord", size: "lg" }))}
               >
+                <DiscordIcon className="h-10 w-10" />
                 Join the Discord
               </a>
               <a
                 href="https://open.kakao.com/o/gIPbdi3e"
                 target="_blank"
                 rel="noreferrer"
-                className={cn(buttonVariants({ variant: "secondary", size: "lg" }))}
+                className={cn(buttonVariants({ variant: "kakao", size: "lg" }))}
               >
+                <KakaoTalkIcon className="h-10 w-10" />
                 Message us on Kakao
               </a>
             </div>

@@ -1,0 +1,23 @@
+{
+  // Workspace-scoped VS Code settings. Apply only when the LoLMK folder is
+  // open; do not affect your global VS Code settings or other projects.
+
+  // Define a LoLMK terminal profile that auto-loads scripts/lolmk-shortcuts.ps1
+  // so `lolmk`, `lolmk-dev`, `lolmk-ship`, etc. are available the moment a
+  // terminal opens.
+  "terminal.integrated.profiles.windows": {
+    "LoLMK": {
+      "path": "powershell.exe",
+      "args": [
+        "-NoExit",
+        "-Command",
+        ". '${workspaceFolder}\\scripts\\lolmk-shortcuts.ps1'"
+      ],
+      "icon": "rocket",
+      "overrideName": true
+    }
+  },
+
+  // Make LoLMK the default terminal profile inside this workspace only.
+  "terminal.integrated.defaultProfile.windows": "LoLMK"
+}

@@ -14,10 +14,10 @@ export function EventCalendar({ upcoming, recurring }: EventCalendarProps) {
     <section className="container-wide py-24">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
         <div className="max-w-2xl">
-          <p className="text-label uppercase text-ink-muted mb-4">Calendar</p>
-          <h2 className="font-heading text-display-md text-ink">Upcoming events</h2>
+          <p className="text-label uppercase text-ink-muted mb-4">Event Calendar</p>
+          <h2 className="font-heading text-display-md text-ink">Events</h2>
           <p className="mt-4 text-body-md text-ink-secondary">
-            Tournaments, watch parties, and meetups. Times are KST — Discord posts
+            Tournaments, watch parties, and meetups. Times are KST — Events
             convert to your local time.
           </p>
         </div>

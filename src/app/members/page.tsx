@@ -15,8 +15,7 @@ export default function MembersPage() {
       bullets={[
         "Streamers and content creators with links to their channels",
         "Community leaders who run in-houses and tournaments",
-        "Filter by role · TOP / JG / MID / ADC / SUP / FILL",
-      ]}
+       ]}
     />
   );
 }
