@@ -6,9 +6,10 @@ import { cn } from "@/lib/utils";
 
 interface HeroProps {
   nextEventLabel: string;
+  nextEventIsLive: boolean;
 }
 
-export function Hero({ nextEventLabel }: HeroProps) {
+export function Hero({ nextEventLabel, nextEventIsLive }: HeroProps) {
   return (
     <section className="relative overflow-hidden border-b border-line-subtle">
       <div
@@ -23,8 +24,8 @@ export function Hero({ nextEventLabel }: HeroProps) {
         <div className="grid lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 space-y-8">
             <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="red" pulse>
-                Live · {nextEventLabel}
+              <Badge variant="red" pulse={nextEventIsLive}>
+                {nextEventIsLive ? "Live" : "Next event"} · {nextEventLabel}
               </Badge>
             </div>
 

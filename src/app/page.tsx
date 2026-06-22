@@ -12,6 +12,23 @@ import { getSocials } from "@/lib/socials";
 import { getInstagramPosts } from "@/lib/instagram";
 import { formatKstDate } from "@/lib/format";
 
+const DEFAULT_EVENT_DURATION_MS = 3 * 60 * 60 * 1000; // 3 hours
+
+function isEventLiveNow(
+  startsAt: string,
+  endsAt: string | undefined,
+  isLiveFlag: boolean | undefined,
+): boolean {
+  if (isLiveFlag) return true;
+  const start = new Date(startsAt).getTime();
+  if (Number.isNaN(start)) return false;
+  const end = endsAt
+    ? new Date(endsAt).getTime()
+    : start + DEFAULT_EVENT_DURATION_MS;
+  const now = Date.now();
+  return now >= start && now <= end;
+}
+
 export default async function HomePage() {
   const [stats, upcoming, recurring, nextEvent, socials, igPosts] = await Promise.all([
     getCommunityStats(),
@@ -26,9 +43,16 @@ export default async function HomePage() {
     ? `${nextEvent.title} · ${formatKstDate(nextEvent.startsAt)}`
     : "Next up: TBA";
 
+  // An event counts as "live" if Discord reports it active, or if right now
+  // (at build / 5-min revalidation time) falls inside its start–end window.
+  // Events without an explicit end get a 3-hour default window.
+  const nextEventIsLive = nextEvent
+    ? isEventLiveNow(nextEvent.startsAt, nextEvent.endsAt, nextEvent.isLive)
+    : false;
+
   return (
     <>
-      <Hero nextEventLabel={nextEventLabel} />
+      <Hero nextEventLabel={nextEventLabel} nextEventIsLive={nextEventIsLive} />
       <StatsStrip stats={stats} />
       <EventCalendar upcoming={upcoming} recurring={recurring} />
       <PhotoHighlights posts={igPosts} />
