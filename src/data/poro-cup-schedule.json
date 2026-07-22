@@ -1,0 +1,11 @@
+[
+  { "id": "round-1", "kind": "round", "phase": "rounds", "title": "Round 1", "short": "1", "minutes": 60 },
+  { "id": "round-2", "kind": "round", "phase": "rounds", "title": "Round 2", "short": "2", "minutes": 60 },
+  { "id": "round-3", "kind": "round", "phase": "rounds", "title": "Round 3", "short": "3", "minutes": 60 },
+  { "id": "round-4", "kind": "round", "phase": "rounds", "title": "Round 4", "short": "4", "minutes": 60 },
+  { "id": "round-5", "kind": "round", "phase": "rounds", "title": "Round 5", "short": "5", "minutes": 60 },
+  { "id": "round-6", "kind": "round", "phase": "rounds", "title": "Round 6", "short": "6", "minutes": 60 },
+  { "id": "break", "kind": "break", "phase": "break", "title": "Break", "short": "BREAK", "minutes": 30 },
+  { "id": "round-7", "kind": "round", "phase": "topcut", "title": "Round 7", "short": "7", "minutes": 60 },
+  { "id": "round-8", "kind": "final", "phase": "topcut", "title": "Grand Final", "short": "8", "minutes": 60 }
+]
