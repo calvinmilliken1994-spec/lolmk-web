@@ -87,10 +87,16 @@ const config: Config = {
           from: { transform: "translateX(0)" },
           to: { transform: "translateX(-50%)" },
         },
+        // Gentle attention flash for the timer when a round hits 00:00.
+        "time-flash": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.5" },
+        },
       },
       animation: {
         "pulse-dot": "pulse-dot 1.6s ease-in-out infinite",
         "marquee": "marquee 40s linear infinite",
+        "time-flash": "time-flash 1.1s ease-in-out infinite",
       },
     },
   },
