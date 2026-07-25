@@ -27,3 +27,15 @@ export async function getNextEvent(): Promise<CommunityEvent | null> {
   const upcoming = await getUpcomingEvents();
   return upcoming[0] ?? null;
 }
+
+/**
+ * The event to feature in the banner below the hero. Tournaments are the
+ * marquee events — bigger, more info to surface — so the soonest upcoming
+ * tournament takes priority over an earlier but smaller event. Falls back to
+ * the chronologically next event when nothing tournament-sized is scheduled.
+ */
+export async function getFeaturedEvent(): Promise<CommunityEvent | null> {
+  const upcoming = await getUpcomingEvents();
+  const nextTournament = upcoming.find((e) => e.kind === "tournament");
+  return nextTournament ?? upcoming[0] ?? null;
+}

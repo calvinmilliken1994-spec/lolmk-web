@@ -1,4 +1,5 @@
 import { Hero } from "@/components/sections/hero";
+import { NextEventBanner } from "@/components/sections/next-event-banner";
 import { StatsStrip } from "@/components/sections/stats-strip";
 import { EventCalendar } from "@/components/sections/event-calendar";
 import { PhotoHighlights } from "@/components/sections/photo-highlights";
@@ -7,7 +8,12 @@ import { AboutBlurb } from "@/components/sections/about-blurb";
 // FinalCta ("Ready when you are") hidden for now — uncomment to bring back.
 // import { FinalCta } from "@/components/sections/final-cta";
 import { getCommunityStats } from "@/lib/stats";
-import { getUpcomingEvents, getRecurringSchedule, getNextEvent } from "@/lib/events";
+import {
+  getUpcomingEvents,
+  getRecurringSchedule,
+  getNextEvent,
+  getFeaturedEvent,
+} from "@/lib/events";
 import { getSocials } from "@/lib/socials";
 import { getInstagramPosts } from "@/lib/instagram";
 import { formatKstDate } from "@/lib/format";
@@ -30,14 +36,16 @@ function isEventLiveNow(
 }
 
 export default async function HomePage() {
-  const [stats, upcoming, recurring, nextEvent, socials, igPosts] = await Promise.all([
-    getCommunityStats(),
-    getUpcomingEvents(),
-    getRecurringSchedule(),
-    getNextEvent(),
-    getSocials(),
-    getInstagramPosts(6),
-  ]);
+  const [stats, upcoming, recurring, nextEvent, featuredEvent, socials, igPosts] =
+    await Promise.all([
+      getCommunityStats(),
+      getUpcomingEvents(),
+      getRecurringSchedule(),
+      getNextEvent(),
+      getFeaturedEvent(),
+      getSocials(),
+      getInstagramPosts(6),
+    ]);
 
   const nextEventLabel = nextEvent
     ? `${nextEvent.title} · ${formatKstDate(nextEvent.startsAt)}`
@@ -50,9 +58,25 @@ export default async function HomePage() {
     ? isEventLiveNow(nextEvent.startsAt, nextEvent.endsAt, nextEvent.isLive)
     : false;
 
+  const discordOnline = stats.find((s) => s.id === "discord-online")?.value ?? null;
+  const discordMembers = stats.find((s) => s.id === "members")?.value ?? null;
+
+  // Tournaments get the marquee slot; label it honestly when the featured
+  // event isn't literally the soonest one on the calendar.
+  const bannerEyebrow =
+    featuredEvent?.kind === "tournament" && featuredEvent.id !== nextEvent?.id
+      ? "Upcoming tournament"
+      : "Next event";
+
   return (
     <>
       <Hero nextEventLabel={nextEventLabel} nextEventIsLive={nextEventIsLive} />
+      <NextEventBanner
+        event={featuredEvent}
+        eyebrow={bannerEyebrow}
+        online={discordOnline}
+        members={discordMembers}
+      />
       <StatsStrip stats={stats} />
       <EventCalendar upcoming={upcoming} recurring={recurring} />
       <PhotoHighlights posts={igPosts} />

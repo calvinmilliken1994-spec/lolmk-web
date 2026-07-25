@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk, Bebas_Neue, JetBrains_Mono } from "next/font/google";
+import { Inter, Space_Grotesk, Bebas_Neue, Chakra_Petch } from "next/font/google";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import "./globals.css";
@@ -24,10 +24,13 @@ const bebasNeue = Bebas_Neue({
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+// Squared, technical, esports-native face for event-type pills, section
+// kickers, and tabular labels. Replaces JetBrains Mono, whose uppercase
+// tracked labels read as generic "AI-mono" scaffolding.
+const chakraPetch = Chakra_Petch({
   subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-jetbrains-mono",
+  weight: ["500", "600", "700"],
+  variable: "--font-chakra",
   display: "swap",
 });
 
@@ -55,7 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${spaceGrotesk.variable} ${bebasNeue.variable} ${jetbrainsMono.variable}`}
+      className={`${inter.variable} ${spaceGrotesk.variable} ${bebasNeue.variable} ${chakraPetch.variable}`}
     >
       <head>
         <link

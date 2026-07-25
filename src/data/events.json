@@ -31,25 +31,25 @@
   ],
   "recurring": [
     {
-      "id": "weekly-inhouse",
-      "title": "Weekly In-houses",
-      "cadence": "Every Friday",
-      "time": "21:00 KST",
-      "description": "Captains drafted, balanced lobbies, all ranks welcome."
+      "id": "weekly-riftbound",
+      "title": "Weekly Riftbound",
+      "cadence": "Every Wednesday",
+      "time": "Nights · KST",
+      "description": "Our main Riftbound night in Discord. Open lobbies, all skill levels welcome."
     },
     {
-      "id": "ranked-flex-night",
-      "title": "Ranked Flex Night",
-      "cadence": "Every Wednesday",
-      "time": "20:00 KST",
-      "description": "Find duos and 5-stacks for ranked. Open to anyone in the Discord."
+      "id": "daily-aram-sr",
+      "title": "Daily ARAMs & Summoner's Rift",
+      "cadence": "Every day",
+      "time": "All day · KST",
+      "description": "Casual ARAM and Summoner's Rift games running daily. Hop in and find a lobby."
     },
     {
       "id": "lck-watch",
       "title": "LCK Watch Nights",
       "cadence": "Match days during the split",
       "time": "17:00 KST",
-      "description": "Voice chat watch-along for every LCK match during the regular split."
+      "description": "Voice-chat watch-along for every LCK match during the regular split."
     }
   ]
 }

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "sample-latest",
+    "tournament": "Poro Cup #6",
+    "game": "Riftbound",
+    "date": "2025-08-16",
+    "format": "Swiss → Top 8 · BO5 final",
+    "teams": 32,
+    "champion": {
+      "name": "Champion Team",
+      "tag": "CHMP",
+      "players": ["Player One", "Player Two", "Player Three"]
+    },
+    "runnerUp": { "name": "Runner-up Team", "tag": "RUP" },
+    "links": [],
+    "placeholder": true
+  }
+]

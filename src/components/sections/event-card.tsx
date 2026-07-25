@@ -1,25 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, MapPin, Calendar, X } from "lucide-react";
+import { ArrowUpRight, MapPin, Monitor, Calendar, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { formatKstDateTime } from "@/lib/format";
-import type { CommunityEvent, EventKind } from "@/types/event";
-
-const KIND_LABEL: Record<EventKind, string> = {
-  tournament: "Tournament",
-  "in-house": "In-house",
-  scrim: "Scrim",
-  meetup: "Meetup",
-  "watch-party": "Watch party",
-};
-
-function kindBadgeVariant(kind: EventKind): "red" | "blue" | "default" {
-  if (kind === "tournament") return "red";
-  if (kind === "watch-party") return "blue";
-  return "default";
-}
+import { DiscordIcon } from "@/components/ui/brand-icons";
+import { formatKstDate, formatKstTime, formatKstDateTime } from "@/lib/format";
+import { classifyEvent, isOnlineEvent, resolveRsvp } from "@/lib/event-format";
+import type { CommunityEvent } from "@/types/event";
 
 const EXPAND_THRESHOLD = 180;
 function shouldShowExpand(description: string): boolean {
@@ -47,6 +35,12 @@ export function EventCard({ event }: { event: CommunityEvent }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const showExpand = event.description ? shouldShowExpand(event.description) : false;
 
+  const tag = classifyEvent(event);
+  const online = isOnlineEvent(event);
+  const rsvp = resolveRsvp(event);
+  const rsvpIsExternal = rsvp.href.startsWith("http");
+  const LocationIcon = online ? Monitor : MapPin;
+
   useEffect(() => {
     const dlg = dialogRef.current;
     if (!dlg) return;
@@ -58,7 +52,33 @@ export function EventCard({ event }: { event: CommunityEvent }) {
     if (e.target === e.currentTarget) setOpen(false);
   }
 
-  const ctaIsExternal = event.cta?.href.startsWith("http");
+  function RsvpButton({ block = false }: { block?: boolean }) {
+    if (rsvp.closed) {
+      return (
+        <span
+          className={`inline-flex items-center justify-center gap-2 border border-line text-ink-muted px-6 py-3 font-semibold rounded-md cursor-not-allowed ${block ? "w-full" : ""}`}
+        >
+          {rsvp.label}
+        </span>
+      );
+    }
+    return (
+      <a
+        href={rsvp.href}
+        target={rsvpIsExternal ? "_blank" : undefined}
+        rel={rsvpIsExternal ? "noreferrer" : undefined}
+        className={`inline-flex items-center justify-center gap-2 bg-brand-red hover:bg-brand-red-hover active:bg-brand-red-muted text-ink px-6 py-3 font-semibold rounded-md transition-colors ${block ? "w-full" : ""}`}
+      >
+        {rsvp.provider === "discord" ? (
+          <DiscordIcon className="h-4 w-4" />
+        ) : null}
+        {rsvp.label}
+        {rsvpIsExternal && rsvp.provider !== "discord" && (
+          <ArrowUpRight strokeWidth={1.5} className="h-4 w-4" />
+        )}
+      </a>
+    );
+  }
 
   return (
     <>
@@ -68,13 +88,17 @@ export function EventCard({ event }: { event: CommunityEvent }) {
       >
         <div className="md:w-48 shrink-0 bg-elevated border-r border-line-subtle p-6 flex flex-col justify-center">
           <Calendar strokeWidth={1.5} className="h-5 w-5 text-brand-red mb-2" />
-          <p className="font-display text-heading-lg text-ink leading-tight">
-            {formatKstDateTime(event.startsAt)}
+          <p className="font-mono text-heading-sm text-ink leading-tight">
+            {formatKstDate(event.startsAt)}
+          </p>
+          <p className="font-mono text-body-sm text-ink-muted mt-1">
+            {formatKstTime(event.startsAt)}
           </p>
         </div>
         <div className="flex-1 p-6 flex flex-col gap-3 min-w-0">
           <div className="flex flex-wrap gap-2">
-            <Badge variant={kindBadgeVariant(event.kind)}>{KIND_LABEL[event.kind]}</Badge>
+            <Badge variant={tag.tone}>{tag.label}</Badge>
+            {online && <Badge variant="outline">Online</Badge>}
             {event.isLive && (
               <Badge variant="red" pulse>
                 Live now
@@ -93,7 +117,7 @@ export function EventCard({ event }: { event: CommunityEvent }) {
                   onClick={() => setOpen(true)}
                   className="mt-2 text-body-sm font-medium text-brand-blue-bright hover:text-ink inline-flex items-center gap-1"
                 >
-                  Read full details
+                  More details
                   <span aria-hidden>→</span>
                 </button>
               )}
@@ -101,20 +125,17 @@ export function EventCard({ event }: { event: CommunityEvent }) {
           )}
           <div className="mt-auto flex flex-wrap items-center gap-4 pt-2">
             <span className="inline-flex items-center gap-2 text-caption text-ink-muted font-mono break-all">
-              <MapPin strokeWidth={1.5} className="h-4 w-4 shrink-0" />
+              <LocationIcon strokeWidth={1.5} className="h-4 w-4 shrink-0" />
               {event.location}
             </span>
-            {event.cta && (
-              <a
-                href={event.cta.href}
-                target={ctaIsExternal ? "_blank" : undefined}
-                rel={ctaIsExternal ? "noreferrer" : undefined}
-                className="text-body-sm font-medium text-brand-red-bright hover:text-brand-red-hover inline-flex items-center gap-1 ml-auto"
-              >
-                {event.cta.label}
-                <ArrowUpRight strokeWidth={1.5} className="h-4 w-4" />
-              </a>
-            )}
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="text-body-sm font-medium text-brand-red-bright hover:text-brand-red-hover inline-flex items-center gap-1 ml-auto"
+            >
+              {rsvp.closed ? "View details" : rsvp.label}
+              <ArrowUpRight strokeWidth={1.5} className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </Card>
@@ -129,7 +150,8 @@ export function EventCard({ event }: { event: CommunityEvent }) {
         <div className="bg-surface border border-line-strong shadow-none">
           <div className="flex items-start justify-between gap-4 p-6 border-b border-line-subtle">
             <div className="flex flex-wrap gap-2 items-center">
-              <Badge variant={kindBadgeVariant(event.kind)}>{KIND_LABEL[event.kind]}</Badge>
+              <Badge variant={tag.tone}>{tag.label}</Badge>
+              {online && <Badge variant="outline">Online</Badge>}
               {event.isLive && (
                 <Badge variant="red" pulse>
                   Live now
@@ -158,7 +180,7 @@ export function EventCard({ event }: { event: CommunityEvent }) {
                 {event.title}
               </h2>
               <p className="inline-flex items-center gap-2 text-body-sm text-ink-secondary">
-                <MapPin strokeWidth={1.5} className="h-4 w-4 shrink-0" />
+                <LocationIcon strokeWidth={1.5} className="h-4 w-4 shrink-0" />
                 <span className="break-words">{event.location}</span>
               </p>
             </div>
@@ -183,26 +205,16 @@ export function EventCard({ event }: { event: CommunityEvent }) {
               </div>
             )}
 
-            {event.cta && (
-              <div className="flex flex-wrap gap-3 pt-2 border-t border-line-subtle">
-                <a
-                  href={event.cta.href}
-                  target={ctaIsExternal ? "_blank" : undefined}
-                  rel={ctaIsExternal ? "noreferrer" : undefined}
-                  className="inline-flex items-center gap-2 bg-brand-red hover:bg-brand-red-hover active:bg-brand-red-muted text-ink px-6 py-3 font-semibold rounded-md transition-colors"
-                >
-                  {event.cta.label}
-                  <ArrowUpRight strokeWidth={1.5} className="h-4 w-4" />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="inline-flex items-center gap-2 border border-line-strong text-ink hover:border-brand-red px-6 py-3 font-semibold rounded-md transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            )}
+            <div className="flex flex-wrap gap-3 pt-2 border-t border-line-subtle">
+              <RsvpButton />
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="inline-flex items-center gap-2 border border-line-strong text-ink hover:border-brand-red px-6 py-3 font-semibold rounded-md transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       </dialog>
