@@ -97,13 +97,14 @@ function CountdownScene({ endsAt }: { endsAt: string | null }) {
 function RevealScene({ data }: { data: MayhemFull }) {
   const revealed = data.teams.slice(0, data.event.reveal_index);
   const upNext = data.teams[data.event.reveal_index] ?? null;
+  const latestTeam = revealed[revealed.length - 1] ?? null;
 
   return (
     <div className="w-full max-w-6xl">
       <p className="text-center text-label uppercase tracking-[0.3em] text-ink-muted mb-8">
         Team reveal · {revealed.length} / {data.teams.length}
       </p>
-      <div className="grid grid-cols-3 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-3 md:grid-cols-5 gap-6 mb-10">
         {data.teams.map((t, i) => {
           const isRevealed = i < revealed.length;
           const isLatest = i === revealed.length - 1;
@@ -132,7 +133,37 @@ function RevealScene({ data }: { data: MayhemFull }) {
           );
         })}
       </div>
-      {upNext && (
+
+      {/* Staggered roster reveal for the most recently revealed team. Keyed
+          on team.id so React remounts (and therefore re-triggers the CSS
+          animation) every time a new team is revealed, rather than only on
+          first mount. */}
+      {latestTeam && (
+        <div key={latestTeam.id} className="flex flex-col items-center gap-5">
+          <div className="flex items-center gap-3 motion-safe:animate-[fade-slide-up_0.5s_ease-out_both]">
+            {latestTeam.icon_url && (
+              <Image src={latestTeam.icon_url} alt="" width={40} height={40} className="h-10 w-10 object-contain" />
+            )}
+            <p className="font-display text-display-sm text-brand-red-bright">{latestTeam.name}</p>
+          </div>
+          <ul className="flex flex-wrap justify-center gap-x-8 gap-y-2">
+            {latestTeam.players.map((p, i) => (
+              <li
+                key={p.id}
+                className="text-body-lg text-ink-secondary motion-safe:animate-[fade-slide-up_0.4s_ease-out_both]"
+                style={{ animationDelay: `${0.35 + i * 0.18}s` }}
+              >
+                {p.display_name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {upNext && !latestTeam && (
+        <p className="text-center text-body-lg text-ink-secondary animate-pulse">Revealing next…</p>
+      )}
+      {upNext && latestTeam && (
         <p className="text-center mt-8 text-body-lg text-ink-secondary animate-pulse">
           Revealing next…
         </p>
@@ -146,15 +177,25 @@ function TeamListScene({ teams }: { teams: MayhemTeam[] }) {
     <div className="w-full max-w-6xl">
       <p className="text-center font-display text-display-md mb-10">The Teams</p>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
-        {teams.map((t) => (
-          <div key={t.id} className="border border-line bg-surface p-4 flex flex-col items-center gap-3">
+        {teams.map((t, teamIndex) => (
+          <div
+            key={t.id}
+            className="border border-line bg-surface p-4 flex flex-col items-center gap-3 motion-safe:animate-[fade-slide-up_0.5s_ease-out_both]"
+            style={{ animationDelay: `${teamIndex * 0.08}s` }}
+          >
             {t.icon_url && (
               <Image src={t.icon_url} alt="" width={56} height={56} className="h-14 w-14 object-contain" />
             )}
             <p className="font-heading font-semibold text-body-md text-center">{t.name}</p>
             <ul className="text-body-sm text-ink-secondary text-center space-y-0.5">
-              {t.players.map((p) => (
-                <li key={p.id}>{p.display_name}</li>
+              {t.players.map((p, i) => (
+                <li
+                  key={p.id}
+                  className="motion-safe:animate-[fade-slide-up_0.35s_ease-out_both]"
+                  style={{ animationDelay: `${teamIndex * 0.08 + 0.2 + i * 0.08}s` }}
+                >
+                  {p.display_name}
+                </li>
               ))}
             </ul>
           </div>

@@ -13,6 +13,27 @@ import path from "node:path";
 
 const ICON_DIR = path.join(process.cwd(), "public", "images", "aramteamicons");
 
+/**
+ * Hard-coded fallback manifest matching the files in
+ * public/images/aramteamicons/. fs.readdirSync() against `public/` isn't
+ * guaranteed to resolve on every serverless runtime (the directory may not
+ * be included in the deployed function bundle), so this manifest is the
+ * source of truth when the filesystem read comes back empty. Keep in sync
+ * with the actual PNG filenames in that folder.
+ */
+const ICON_MANIFEST = [
+  "Team Baron",
+  "Team Brambleback",
+  "Team Gromp",
+  "Team Krug",
+  "Team Meep",
+  "Team Minion",
+  "Team Poro",
+  "Team Raptor",
+  "Team Scuttle",
+  "Team Sentinel",
+];
+
 export interface TeamIdentity {
   /** Display name, e.g. "Team Krug" or "Team Krug II" on a second lap. */
   name: string;
@@ -29,9 +50,11 @@ function loadBaseNames(): string[] {
       .readdirSync(ICON_DIR)
       .filter((f) => f.toLowerCase().endsWith(".png"))
       .sort();
-    cachedBaseNames = files.map((f) => f.replace(/\.png$/i, ""));
+    cachedBaseNames = files.length > 0 ? files.map((f) => f.replace(/\.png$/i, "")) : ICON_MANIFEST;
   } catch {
-    cachedBaseNames = [];
+    // public/ isn't guaranteed readable from every serverless runtime —
+    // fall back to the known manifest rather than generic "Team 1" names.
+    cachedBaseNames = ICON_MANIFEST;
   }
   return cachedBaseNames;
 }
@@ -44,13 +67,6 @@ const ROMAN = ["", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
  */
 export function pickTeamIdentities(count: number): TeamIdentity[] {
   const base = loadBaseNames();
-  if (base.length === 0) {
-    // Fallback so the tool never hard-fails if the folder is empty/missing.
-    return Array.from({ length: count }, (_, i) => ({
-      name: `Team ${i + 1}`,
-      iconUrl: "",
-    }));
-  }
 
   const shuffled = shuffle(base);
   const identities: TeamIdentity[] = [];

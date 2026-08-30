@@ -63,6 +63,30 @@ export async function renamePlayer(playerId: string, displayName: string) {
   refresh();
 }
 
+/**
+ * Rename existing teams to fresh icon identities without touching rosters
+ * or match state. Use this to fix teams that were created before the
+ * filesystem-icon-discovery bug was fixed (see mayhem-icons.ts) and ended up
+ * with generic "Team 1"-style names instead of real icon names.
+ */
+export async function refreshTeamIdentities() {
+  await requireAdmin();
+  const full = await getMayhemFull();
+  if (full.teams.length === 0) return;
+
+  const identities = shuffle(pickTeamIdentities(full.teams.length));
+  const orderedTeams = [...full.teams].sort((a, b) => a.reveal_order - b.reveal_order);
+  for (let i = 0; i < orderedTeams.length; i++) {
+    const identity = identities[i];
+    await sql`
+      UPDATE mayhem_teams SET name = ${identity.name}, icon_url = ${identity.iconUrl}
+      WHERE id = ${orderedTeams[i].id}
+    `;
+  }
+  await touch();
+  refresh();
+}
+
 export async function clearAllPlayers() {
   await requireAdmin();
   await sql`DELETE FROM mayhem_matches WHERE event_id = ${SINGLETON_EVENT_ID}`;
