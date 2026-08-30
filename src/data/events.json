@@ -32,10 +32,10 @@
   "recurring": [
     {
       "id": "weekly-riftbound",
-      "title": "Weekly Riftbound",
+      "title": "Weekly In-house Night",
       "cadence": "Every Wednesday",
       "time": "Nights · KST",
-      "description": "Our main Riftbound night in Discord. Open lobbies, all skill levels welcome."
+      "description": "Our main in-house night in Discord. Open lobbies, all skill levels welcome."
     },
     {
       "id": "daily-aram-sr",

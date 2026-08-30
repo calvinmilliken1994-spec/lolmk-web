@@ -14,7 +14,7 @@ export function EventCalendar({ upcoming, recurring }: EventCalendarProps) {
         <p className="text-label uppercase text-ink-muted mb-4">On the calendar</p>
         <h2 className="font-heading text-display-md text-ink">Upcoming events</h2>
         <p className="mt-4 text-body-md text-ink-secondary">
-          Online Riftbound nights, in-person tournaments, watch parties, and
+          Online in-house nights, in-person tournaments, watch parties, and
           meetups. Tap any event for full details and to RSVP. Times are KST.
         </p>
       </div>

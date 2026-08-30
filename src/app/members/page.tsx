@@ -11,7 +11,7 @@ export default function MembersPage() {
     <ComingSoon
       kicker="Members"
       title="The directory's on the way."
-      description="Streamers, content creators, captains, regulars. A grid of who's who in LoLMK — searchable, filterable by role — is in the works. For now, hop in Discord and meet people directly."
+      description="Streamers, content creators, captains, regulars. A grid of who's who in LoLMK, searchable and filterable by role, is in the works. For now, hop in Discord and meet people directly."
       bullets={[
         "Streamers and content creators with links to their channels",
         "Community leaders who run in-houses and tournaments",

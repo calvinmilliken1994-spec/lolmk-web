@@ -1,5 +1,4 @@
 import { ArrowRight } from "lucide-react";
-import { DiscordIcon } from "@/components/ui/brand-icons";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatKstDateTime } from "@/lib/format";
@@ -8,8 +7,6 @@ import type { CommunityEvent } from "@/types/event";
 
 interface NextEventBannerProps {
   event: CommunityEvent | null;
-  online: string | null;
-  members: string | null;
   /** Small label above the title, e.g. "Next event" or "Upcoming tournament". */
   eyebrow?: string;
 }
@@ -27,8 +24,6 @@ const TONE_PILL: Record<EventTone, string> = {
 
 export function NextEventBanner({
   event,
-  online,
-  members,
   eyebrow = "Next event",
 }: NextEventBannerProps) {
   if (!event) return null;
@@ -37,7 +32,7 @@ export function NextEventBanner({
   const day = KST_DAY.format(start);
   const month = KST_MONTH.format(start).toUpperCase();
 
-  // Same location-aware tag the calendar uses (Online Riftbound vs Riftbound
+  // Same location-aware tag the calendar uses (Online <game> vs <game>
   // Tournament, etc.) so the label reads identically across the site.
   const tag = classifyEvent(event);
   const meta = [formatKstDateTime(event.startsAt), event.location]
@@ -49,7 +44,6 @@ export function NextEventBanner({
     ? "View bracket & standings"
     : event.cta?.label ?? "View details";
   const ctaHref = event.cta?.href ?? "https://discord.gg/lolmk";
-  const hasPresence = Boolean(online && online !== "—");
 
   return (
     <section className="border-b border-line-subtle bg-surface">
@@ -87,24 +81,8 @@ export function NextEventBanner({
           </div>
         </div>
 
-        {/* Presence + actions */}
+        {/* Actions. Live presence moved into the hero's Discord CTA. */}
         <div className="flex items-center gap-4 flex-wrap lg:shrink-0">
-          {hasPresence && (
-            <div className="flex items-center gap-3 rounded-sm border border-[#5865F2]/60 bg-[#5865F2]/10 px-4 py-2.5">
-              <DiscordIcon className="h-5 w-5 text-[#5865F2]" />
-              <div className="leading-tight">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                  <span className="text-caption font-mono text-ink">{online} online now</span>
-                </span>
-                {members && members !== "—" && (
-                  <span className="block text-[0.7rem] font-mono uppercase tracking-wider text-ink-muted">
-                    {members} members
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
           <a
             href={ctaHref}
             target="_blank"

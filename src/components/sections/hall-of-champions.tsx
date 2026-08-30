@@ -114,7 +114,7 @@ function FeaturedChampion({ record }: { record: ChampionRecord }) {
               </p>
             </div>
             {record.placeholder && (
-              <Badge variant="outline">Sample — replace with results</Badge>
+              <Badge variant="outline">Sample, replace with results</Badge>
             )}
           </div>
 

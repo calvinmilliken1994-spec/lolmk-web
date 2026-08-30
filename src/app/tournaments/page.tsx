@@ -10,13 +10,13 @@ import { cn } from "@/lib/utils";
 export const metadata = {
   title: "Tournaments",
   description:
-    "Riftbound tournaments run by LoLMK on the Korean server — champions, format, and how to enter.",
+    "League of Legends tournaments run by LoLMK on the Korean server: champions, format, and how to enter.",
 };
 
 const FORMAT_POINTS = [
-  "Online Riftbound nights run in Discord — casual, open to everyone.",
-  "Seasonal tournaments: Swiss into a Top 8 bracket, best-of-5 finals.",
-  "Finals played in-person in Seoul when possible, with an English stream.",
+  "Team registration and rosters are managed through LoLMK.",
+  "Formats vary by event: 5v5 Summoner's Rift, ARAM, and custom modes.",
+  "Seasonal tournaments run Swiss into a Top 8 bracket, best-of-5 finals.",
 ];
 
 export default async function TournamentsPage() {
@@ -36,11 +36,11 @@ export default async function TournamentsPage() {
           <div className="max-w-3xl space-y-6">
             <Badge variant="red">Tournaments</Badge>
             <h1 className="font-display text-display-lg md:text-display-xl text-ink leading-[0.95]">
-              Riftbound, played for keeps.
+              League tournaments, played for keeps.
             </h1>
             <p className="text-body-lg text-ink-secondary max-w-[55ch]">
-              From open online nights to seasonal in-person finals on the KR
-              server. See who&apos;s holding the crown, then come take a shot at it.
+              5v5 Summoner's Rift, ARAM, and custom modes on the KR server.
+              See who's holding the crown, then come take a shot at it.
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <a
@@ -74,7 +74,7 @@ export default async function TournamentsPage() {
               Two ways to play.
             </h2>
             <p className="mt-4 text-body-md text-ink-secondary max-w-[52ch]">
-              Everything is organized in Discord today — signups, brackets, and
+              Everything is organized in Discord today: signups, brackets, and
               standings. On-site signups and live brackets are coming to this
               page next.
             </p>

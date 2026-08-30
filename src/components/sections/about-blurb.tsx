@@ -20,7 +20,7 @@ export function AboutBlurb() {
               working, and long-timers running community events.
             </p>
             <p className="text-body-md text-ink-secondary max-w-[65ch]">
-              No tryouts, no gatekeeping. Iron through Challenger — if you want
+              No tryouts, no gatekeeping. Iron through Challenger: if you want
               English voice on KR, you're welcome.
             </p>
             <Link

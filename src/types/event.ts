@@ -10,7 +10,7 @@ export interface CommunityEvent {
   description: string;
   cta?: { label: string; href: string };
   isLive?: boolean;
-  /** Game a tournament is played in (e.g. "Riftbound"), shown as a tag. */
+  /** Game a tournament is played in (e.g. "League of Legends"), shown as a tag. */
   game?: string;
   /**
    * Signup state for tournaments. "external" = handled off-site for now,

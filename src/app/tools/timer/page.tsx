@@ -4,7 +4,7 @@ import { getPoroCupSchedule } from "@/lib/poro-cup";
 export const metadata = {
   title: "Poro Cup Timer",
   description:
-    "Round timer for the LoLMK Poro Cup — the Riftbound: League of Legends TCG tournament.",
+    "Round timer for the LoLMK Poro Cup, the Riftbound: League of Legends TCG tournament.",
   robots: { index: false, follow: false },
 };
 

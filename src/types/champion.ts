@@ -15,15 +15,15 @@ export interface ChampionTeam {
 
 export interface ChampionRecord {
   id: string;
-  /** Tournament name, e.g. "Poro Cup #6". */
+  /** Tournament name, e.g. "Season Opener". */
   tournament: string;
-  /** Game played, e.g. "Riftbound". */
+  /** Game played, e.g. "League of Legends". */
   game: string;
   /** ISO date of the final. */
   date: string;
   champion: ChampionTeam;
   runnerUp?: ChampionTeam;
-  /** Human-readable format summary, e.g. "Swiss → Top 8 · BO5 final". */
+  /** Human-readable format summary, e.g. "Swiss into Top 8, best-of-5 final". */
   format?: string;
   /** Number of teams/players that entered. */
   teams?: number;

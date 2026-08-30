@@ -3,7 +3,7 @@ import { ComingSoon } from "@/components/sections/coming-soon";
 export const metadata = {
   title: "How-tos",
   description:
-    "Guides for playing on the Korean LoL server — making an account, buying RP, finding PC bangs, and more.",
+    "Guides for playing on the Korean LoL server: making an account, buying RP, finding PC bangs, and more.",
 };
 
 export default function HowTosPage() {

@@ -1,10 +1,10 @@
 [
   {
     "id": "sample-latest",
-    "tournament": "Poro Cup #6",
-    "game": "Riftbound",
+    "tournament": "Season Opener",
+    "game": "League of Legends",
     "date": "2025-08-16",
-    "format": "Swiss → Top 8 · BO5 final",
+    "format": "Swiss into Top 8, best-of-5 final",
     "teams": 32,
     "champion": {
       "name": "Champion Team",

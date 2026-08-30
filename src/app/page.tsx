@@ -59,7 +59,6 @@ export default async function HomePage() {
     : false;
 
   const discordOnline = stats.find((s) => s.id === "discord-online")?.value ?? null;
-  const discordMembers = stats.find((s) => s.id === "members")?.value ?? null;
 
   // Tournaments get the marquee slot; label it honestly when the featured
   // event isn't literally the soonest one on the calendar.
@@ -70,13 +69,12 @@ export default async function HomePage() {
 
   return (
     <>
-      <Hero nextEventLabel={nextEventLabel} nextEventIsLive={nextEventIsLive} />
-      <NextEventBanner
-        event={featuredEvent}
-        eyebrow={bannerEyebrow}
-        online={discordOnline}
-        members={discordMembers}
+      <Hero
+        nextEventLabel={nextEventLabel}
+        nextEventIsLive={nextEventIsLive}
+        discordOnline={discordOnline}
       />
+      <NextEventBanner event={featuredEvent} eyebrow={bannerEyebrow} />
       <StatsStrip stats={stats} />
       <EventCalendar upcoming={upcoming} recurring={recurring} />
       <PhotoHighlights posts={igPosts} />

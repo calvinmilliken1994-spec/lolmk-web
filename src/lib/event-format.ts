@@ -75,8 +75,8 @@ export function resolveRsvp(event: CommunityEvent): ResolvedRsvp {
 // ---------------------------------------------------------------------------
 // Event tagging
 //
-// A single "tournament" kind isn't descriptive enough — a Riftbound night in a
-// Discord voice channel and an in-person Riftbound tournament read very
+// A single "tournament" kind isn't descriptive enough: an in-house night in a
+// Discord voice channel and an in-person League tournament read very
 // differently. We split them by location: Discord/online locations are the
 // casual online sessions; anything with a real venue is the competitive
 // tournament.
@@ -103,7 +103,7 @@ export function isOnlineEvent(event: Pick<CommunityEvent, "location">): boolean 
  */
 export function classifyEvent(event: CommunityEvent): EventTag {
   const online = isOnlineEvent(event);
-  const game = event.game ?? "Riftbound";
+  const game = event.game ?? "League of Legends";
 
   switch (event.kind) {
     case "tournament":
