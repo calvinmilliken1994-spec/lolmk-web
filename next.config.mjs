@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  redirects: async () => [
+    // The tournament timer moved behind the admin tools wall.
+    { source: "/timer", destination: "/tools/timer", permanent: false },
+  ],
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

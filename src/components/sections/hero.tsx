@@ -7,9 +7,12 @@ import { cn } from "@/lib/utils";
 interface HeroProps {
   nextEventLabel: string;
   nextEventIsLive: boolean;
+  /** Live Discord presence count ("186"), or null / "—" when unknown. */
+  discordOnline: string | null;
 }
 
-export function Hero({ nextEventLabel, nextEventIsLive }: HeroProps) {
+export function Hero({ nextEventLabel, nextEventIsLive, discordOnline }: HeroProps) {
+  const hasPresence = Boolean(discordOnline && discordOnline !== "—");
   return (
     <section className="relative overflow-hidden border-b border-line-subtle">
       <div
@@ -40,7 +43,7 @@ export function Hero({ nextEventLabel, nextEventIsLive }: HeroProps) {
             </h1>
 
             <p className="text-body-lg text-ink-secondary max-w-[52ch]">
-              League of Legends | Valorant | Riftbound | 2XKO | TFT
+              League of Legends | Valorant | 2XKO | TFT
               Inhouses | Tournaments | Watch Parties | Meetups
             </p>
 
@@ -52,7 +55,15 @@ export function Hero({ nextEventLabel, nextEventIsLive }: HeroProps) {
                 className={cn(buttonVariants({ variant: "discord", size: "lg" }))}
               >
                 <DiscordIcon className="h-10 w-10" />
-                Join the Discord
+                <span className="flex flex-col items-start leading-tight">
+                  <span>Join the Discord</span>
+                  {hasPresence && (
+                    <span className="flex items-center gap-1.5 text-caption font-mono normal-case opacity-90">
+                      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-success" />
+                      {discordOnline} online now
+                    </span>
+                  )}
+                </span>
               </a>
               <a
                 href="https://open.kakao.com/o/gIPbdi3e"

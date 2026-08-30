@@ -55,8 +55,10 @@ export function PhotoHighlights({ posts }: PhotoHighlightsProps) {
         </a>
       </div>
 
-      <div className="overflow-x-auto -mx-4 md:-mx-8 lg:-mx-12 px-4 md:px-8 lg:px-12 scroll-smooth">
-        <div className="flex gap-4 min-w-max">
+      <div className="container-wide">
+        {/* Square 1:1 tiles — mirrors the native Instagram profile grid so the
+            section reads unmistakably as the feed. */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {posts.length > 0
             ? posts.map((post) => <PhotoCard key={post.id} post={post} />)
             : PLACEHOLDER_TINTS.map((tint, i) => <PlaceholderCard key={i} tint={tint} />)}
@@ -76,13 +78,13 @@ function PhotoCard({ post }: { post: InstagramPost }) {
       href={post.permalink}
       target="_blank"
       rel="noreferrer"
-      className="group relative w-72 sm:w-80 lg:w-96 shrink-0 aspect-[4/5] border border-line bg-base overflow-hidden block"
+      className="group relative aspect-square border border-line bg-base overflow-hidden block"
     >
       <Image
         src={src}
         alt={caption || "Instagram post from @lolmeetupkorea"}
         fill
-        sizes="(max-width: 640px) 288px, (max-width: 1024px) 320px, 384px"
+        sizes="(max-width: 768px) 50vw, 33vw"
         className="object-cover transition-transform duration-500 ease-out-soft group-hover:scale-105"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-base via-base/30 to-transparent opacity-90 group-hover:opacity-70 transition-opacity" />
@@ -103,7 +105,7 @@ function PhotoCard({ post }: { post: InstagramPost }) {
 
 function PlaceholderCard({ tint }: { tint: string }) {
   return (
-    <figure className="group relative w-72 sm:w-80 lg:w-96 shrink-0 aspect-[4/5] border border-line bg-base overflow-hidden">
+    <figure className="group relative aspect-square border border-line bg-base overflow-hidden">
       <div className={`absolute inset-0 bg-gradient-to-br ${tint}`} />
       <div className="absolute inset-0 bg-base/40" />
       <div className="absolute inset-0 flex items-center justify-center text-ink-muted">

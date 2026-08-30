@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, BadgeCheck } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
@@ -82,8 +82,9 @@ export function Header() {
               rel="noreferrer"
               className={cn(buttonVariants({ variant: "discord", size: "sm" }))}
             >
-              <DiscordIcon className="h-8 w-8" />
-              Join the Discord
+              <DiscordIcon className="h-5 w-5" />
+              Log in with Discord
+              <BadgeCheck strokeWidth={2} className="h-4 w-4 text-success" />
             </a>
           </div>
 
@@ -135,8 +136,9 @@ export function Header() {
               rel="noreferrer"
               className={cn(buttonVariants({ variant: "discord", size: "lg" }), "mt-8 w-full")}
             >
-              <DiscordIcon className="h-10 w-10" />
-              Join the Discord
+              <DiscordIcon className="h-6 w-6" />
+              Log in with Discord
+              <BadgeCheck strokeWidth={2} className="h-5 w-5 text-success" />
             </a>
           </nav>
         </div>

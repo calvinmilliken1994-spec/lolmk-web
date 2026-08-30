@@ -2,7 +2,7 @@ import scheduleData from "@/data/poro-cup-schedule.json";
 import type { TimerSegment } from "@/types/timer";
 
 /**
- * The LoLMK Poro Cup match schedule that drives the /timer page.
+ * The LoLMK Poro Cup match schedule that drives the /tools/timer page.
  *
  * Today this reads a static JSON file. Durations are edited there — every
  * round is 60 minutes and the break is 15. Per the data-access convention in

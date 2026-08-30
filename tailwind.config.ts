@@ -48,7 +48,7 @@ const config: Config = {
         display: ["var(--font-bebas-neue)", "Impact", "sans-serif"],
         heading: ["var(--font-space-grotesk)", "system-ui", "sans-serif"],
         sans: ["var(--font-inter)", "Pretendard", "system-ui", "sans-serif"],
-        mono: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
+        mono: ["var(--font-chakra)", "ui-monospace", "monospace"],
       },
       fontSize: {
         "display-xl": ["6rem", { lineHeight: "0.95", letterSpacing: "0.02em", fontWeight: "400" }],

@@ -1,612 +1,413 @@
 # TOURNAMENT.md
 
-Complete spec for LoLMK's tournament system. The bot owns the data, the website displays it. Read this file in full before building tournament features (admin commands, signup flow, bracket generation, or the public tournament page).
+Complete spec for LoLMK's tournament system. Read this file in full before building tournament features (auth, team application, admin dashboard, bracket generation, or the public tournament pages).
+
+> **Plan of record: web-first.** The **website owns the data**. Members log in with Discord, captains create and manage teams on the site, and admins run the tournament from a web dashboard. Discord is used for **authentication** (and, optionally later, announcements) — it is no longer the source of truth. This replaces the earlier bot-first / SQLite-on-the-bot design; see [Why web-first](#why-web-first-what-changed).
+
+> **Scope: League of Legends only (for now).** This system covers LoLMK's **League of Legends** tournaments — 5v5 on **Summoner's Rift**, **ARAM** on Howling Abyss, and other custom/fun gamemodes. **Riftbound is explicitly out of scope** and handled separately; it may be added as its own tournament type in the future, but nothing here should assume it. Roles and ranks below are League concepts and only apply to League modes.
 
 ## Architecture at a glance
 
 ```
-Admins & captains (Discord slash commands + modals)
-        ↓
-Discord bot (discord.js v14, single Node.js process)
-        ↓
-SQLite (better-sqlite3, single file: tournaments.db)
-        ↓
-Bot's internal HTTP API (Express/Hono, 3-4 read endpoints)
-        ↓
-Website API routes (Next.js, cache 30-60s)
-        ↓
-Tournament pages (/tournaments, /tournaments/[slug])
+Members / Captains (browser)              Admins (browser)
+        │  Discord OAuth (Auth.js)                │
+        ▼                                         ▼
+   Next.js App Router  ──── Server Actions (writes) ────┐
+   (Vercel)            ──── Server Components (reads) ───┤   ← ALL db access is server-side
+        │                                                ▼
+        │                              Supabase Postgres  (source of truth, via Supavisor pooler)
+        │                              + Supabase Storage (team logos)
+        ▼                                                ▲
+   Team logo uploads ──► Storage (normalized, moderated) │
+                                                         │
+   Bot token (REST, no gateway) ── cached member directory + optional announcements
 ```
 
-**Single source of truth: SQLite file on the bot host.** The website never talks to Discord for tournament data. Discord is the interface; SQLite is the database.
+**Single source of truth: Supabase Postgres.** The website reads and writes it directly through `src/lib/` helpers and Server Actions, **all server-side**. No always-on bot is required to ship any of this — the whole flow runs on Vercel + Supabase.
 
-## Why SQLite (not Postgres, not Discord-only)
+## Why web-first (what changed)
 
-- Free, zero external services
-- Single file = trivial backups (copy the file)
-- `better-sqlite3` is synchronous, blazing fast, no connection pooling concerns
-- No rate limits, unlike pulling from Discord on every page load
-- Migrates to Postgres in a single day if/when scale demands it
-- Sufficient for 8–16 teams per tournament, quarterly cadence
+Previously this spec put a Discord bot + local SQLite at the center, with the website as a read-only client. We inverted that:
+
+- **Hosting.** A gateway bot must run 24/7 and can't live on Vercel. Web-first runs entirely on Vercel + Supabase.
+- **The features are web-shaped.** Team application forms, captain roster editing, logo uploads, and a live admin bracket dashboard are far easier as native web UI than Discord modals.
+- **One clear owner.** A single Postgres DB the web app owns — with the bot token used only for REST lookups/announcements — keeps one source of truth.
 
 ## Tech stack
 
-- **Bot**: Node.js + TypeScript + discord.js v14
-- **Database**: SQLite via `better-sqlite3`
-- **Migrations**: simple SQL files run on startup, or `kysely` for typed queries + migrations
-- **Internal API**: Hono or Express, single port (e.g. 3001), bearer-token auth for the website only
-- **Hosting**: Railway, Fly.io, or a small VPS. SQLite file lives on persistent disk.
-- **Website**: existing Next.js app, reads via `fetch` from the bot's API with 30-60s revalidation
+- **App**: existing Next.js (App Router) + TypeScript, on Vercel.
+- **Auth**: **Auth.js (NextAuth v5)** + Discord provider. Guild-membership gate, role-based Member / Captain / Admin (see [Authentication](#authentication--access-control)).
+- **Database**: **Supabase Postgres**. Serverless code connects through the **Supavisor pooler** (pooled string, port `6543`, transaction mode). Migrations use the **direct** connection (`5432`).
+- **Query layer**: **Kysely** or **Drizzle** (typed SQL + migrations), wrapped behind `src/lib/` per the repo's data-access convention.
+- **Writes**: Next.js **Server Actions**. No separate API server.
+- **File storage**: **Supabase Storage** for team logos.
+- **Bracket rendering**: **`@g-loot/react-tournament-brackets`**, themed to the LoLMK palette. Verify React 19 / Next 15 compatibility before committing; fall back to a custom SVG bracket if needed.
+- **Live bracket (optional, later)**: push updates **server → client via SSE** rather than exposing a browser DB client; or Supabase Realtime restricted by RLS to public bracket columns only.
+
+## Data security model
+
+The rule that keeps this leak-proof: **only the bracket (and a minimal set of public team display fields) is ever public. Everything else — rosters under review, `rejected_reason`, admin data, member directory — is admin-only.**
+
+- **All DB access is server-side** (Server Components for reads, Server Actions for writes) using the server connection. **The Supabase browser client is never shipped.** The browser never talks to the database, so it can only ever receive what a server component chose to render.
+- **Public read surface** is explicit and narrow: the bracket (matches + team name/tag/logo/seed) and, once approved, the public team pages. Server helpers select only those fields.
+- **RLS is enabled as defense-in-depth**, even though the app doesn't rely on it (no anon client). If Realtime is added later, RLS read policies scoped to public columns become load-bearing.
+- **Pooled vs direct**: serverless → Supavisor (`6543`); migrations → direct (`5432`).
+
+## Authentication & access control
+
+Auth is the foundation — build it first. Everything else gates on it.
+
+### Discord OAuth (Auth.js)
+
+- Provider: Discord. Scopes: `identify guilds` (+ `guilds.members.read` to read the user's roles in the LoLMK guild without a bot token).
+- Sessions: **JWT strategy, short-lived** (see re-check below). Store `discordId`, `isMember`, `isCaptain`, `isAdmin` on the token; expose on `session.user`.
+
+### Membership gate — only verified LoLMK members
+
+Enforced in the Auth.js **`signIn` callback**: resolve the user's roles in the LoLMK guild — via their `guilds.members.read` token **or** a bot-token member lookup (`GET /guilds/{id}/members/{user}`) — and **reject the sign-in unless they hold the `LoLMK Verified` role**. Since that role is auto-granted on joining, this is effectively "must be a verified member," and the same lookup sets the `isCaptain` / `isAdmin` flags below. No verified role → no session.
+
+### Roles
+
+Derived from Discord roles at login (and re-checked, below) — nothing hand-maintained.
+
+- **Member — the `LoLMK Verified` role** (`MEMBER_ROLE_ID`). Auto-granted to everyone who joins the Discord and **required to log in** — being verified in the server *is* the login gate. Members can log in and view public pages.
+- **Captain — the `Captain` role** (`CAPTAIN_ROLE_ID`), **granted by admins** to members who may run a team. **Only Captains can create a team, and only one active team per Captain** (see [One team per captain](#captain-self-service--my-team)).
+- **Admin — the `Tournament Admin` role** (`ADMIN_ROLE_ID`). Runs `/admin`: reviews/approves teams, seeds brackets, reports matches, disbands teams.
+
+Guard every Server Action and admin route by re-checking the session **server-side**. Captain-only actions compare `session.user.discordId` to `team.captain_discord_id`.
+
+### Membership & role re-checks (important)
+
+JWTs cache role state, so we must re-verify to avoid stale access and members who leave the server:
+
+- **Short sessions** (e.g. ≤ 30 min) so role/membership changes propagate quickly on refresh.
+- **Re-verify on every sensitive action** — before team create/edit/disband and any admin mutation, do a fresh bot-token member lookup: confirm the actor is still in the guild and still holds the required role. Deny + clear the session if not.
+- **"Member left the guild" handling** — if a captain or rostered player is no longer a member (detected at re-check, or via a periodic sweep of active teams), flag the team for admin attention and block further captain actions. A team whose captain has left is surfaced to admins to reassign or disband. (This restores the old bot's `guildMemberRemove` safeguard.)
 
 ## Database schema
 
-Run on bot startup if tables don't exist.
+Supabase Postgres. Mirrors `src/types/tournament.ts` (the website's typed contract) — keep them in sync. Timestamps `timestamptz`; ids `text` (nanoid/ulid). JWT sessions need no Auth.js adapter tables.
 
 ```sql
 CREATE TABLE tournaments (
-  id TEXT PRIMARY KEY,                   -- e.g. "q1-2026"
-  slug TEXT UNIQUE NOT NULL,             -- URL slug, matches id by convention
-  name TEXT NOT NULL,                    -- "Q1 2026 Tournament"
-  season TEXT NOT NULL,                  -- "Q1 2026"
-  format TEXT NOT NULL DEFAULT 'double_elim',  -- double_elim, single_elim (future)
-  status TEXT NOT NULL DEFAULT 'draft',  -- draft, signups_open, signups_closed, bracket_released, in_progress, completed
-  max_teams INTEGER NOT NULL DEFAULT 16,
-  signup_deadline TEXT,                  -- ISO 8601
-  start_date TEXT,                       -- ISO 8601
-  end_date TEXT,                         -- ISO 8601
-  description TEXT,
+  id                TEXT PRIMARY KEY,               -- e.g. "spring-2026"
+  slug              TEXT UNIQUE NOT NULL,
+  name              TEXT NOT NULL,
+  game              TEXT NOT NULL DEFAULT 'League of Legends',
+  mode              TEXT NOT NULL DEFAULT 'sr_5v5', -- sr_5v5 | aram | custom
+  season            TEXT NOT NULL,
+  format            TEXT NOT NULL DEFAULT 'double_elim',  -- double_elim | single_elim
+  status            TEXT NOT NULL DEFAULT 'draft',
+     -- draft | signups_open | signups_closed | bracket_released | in_progress | completed
+  max_teams         INTEGER NOT NULL DEFAULT 16,
+  team_size         INTEGER NOT NULL DEFAULT 5,     -- starters expected (mode-dependent)
+  signup_deadline   TIMESTAMPTZ,
+  start_date        TIMESTAMPTZ,
+  end_date          TIMESTAMPTZ,
+  description       TEXT,
   prize_description TEXT,
-  rules_url TEXT,
-  champion_team_id TEXT,                 -- set when status = completed
-  created_by TEXT NOT NULL,              -- Discord ID
-  created_at TEXT NOT NULL,              -- ISO 8601
-  updated_at TEXT NOT NULL
+  rules_url         TEXT,
+  champion_team_id  TEXT,                           -- set when status = completed
+  created_by        TEXT NOT NULL,                  -- admin discord id
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE teams (
-  id TEXT PRIMARY KEY,                   -- ulid or nanoid
-  tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  tag TEXT NOT NULL,                     -- 2-4 char abbreviation, e.g. "APX"
-  slug TEXT NOT NULL,                    -- URL slug derived from name
-  logo_url TEXT,                         -- optional, captain-provided
-  color TEXT,                            -- optional hex code for team branding
-  captain_discord_id TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending', -- pending, approved, rejected, withdrawn
-  seed INTEGER,                          -- assigned at draw time, NULL before
-  rejected_reason TEXT,
-  created_at TEXT NOT NULL,
-  approved_at TEXT,
-  UNIQUE (tournament_id, slug),
-  UNIQUE (tournament_id, tag)
+  id                  TEXT PRIMARY KEY,
+  tournament_id       TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  name                TEXT NOT NULL,
+  tag                 TEXT NOT NULL,                -- 2-4 chars
+  slug                TEXT NOT NULL,
+  logo_url            TEXT,                         -- PERMANENT storage URL (never a raw Discord CDN url)
+  color               TEXT,                         -- optional hex
+  captain_discord_id  TEXT NOT NULL,
+  status              TEXT NOT NULL DEFAULT 'pending', -- pending | approved | rejected | withdrawn
+  seed                INTEGER,
+  rejected_reason     TEXT,                         -- internal, never public
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  approved_at         TIMESTAMPTZ,
+  UNIQUE (tournament_id, lower(slug)),              -- case-insensitive
+  UNIQUE (tournament_id, lower(tag))
 );
 
+-- One ACTIVE team per captain per tournament (rejected/withdrawn don't count).
+CREATE UNIQUE INDEX one_active_team_per_captain
+  ON teams (tournament_id, captain_discord_id)
+  WHERE status IN ('pending', 'approved');
+
 CREATE TABLE players (
-  id TEXT PRIMARY KEY,                   -- ulid or nanoid
-  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  discord_id TEXT NOT NULL,
-  discord_username TEXT NOT NULL,        -- snapshot at signup time
-  ign TEXT NOT NULL,                     -- in-game name on KR
-  role TEXT NOT NULL,                    -- TOP, JUNGLE, MID, ADC, SUPPORT, FILL
-  peak_rank TEXT,                        -- e.g. "DIAMOND_II", "MASTER", "GRANDMASTER", "CHALLENGER"
-  current_rank TEXT,
-  is_captain INTEGER NOT NULL DEFAULT 0, -- 0 or 1
-  is_substitute INTEGER NOT NULL DEFAULT 0,
-  joined_at TEXT NOT NULL,
-  UNIQUE (team_id, discord_id)
+  id                TEXT PRIMARY KEY,
+  team_id           TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  tournament_id     TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE, -- denormalized for the constraint below
+  discord_id        TEXT NOT NULL,
+  discord_username  TEXT NOT NULL,                  -- snapshot at add time
+  ign               TEXT NOT NULL,                  -- KR summoner name
+  role              TEXT,                           -- TOP | JUNGLE | MID | ADC | SUPPORT | FILL (nullable: sr_5v5 only)
+  peak_rank         TEXT,
+  current_rank      TEXT,
+  rank_verified     BOOLEAN NOT NULL DEFAULT false, -- true once Riot RSO/API confirms (later)
+  is_captain        BOOLEAN NOT NULL DEFAULT false,
+  is_substitute     BOOLEAN NOT NULL DEFAULT false,
+  joined_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (team_id, discord_id),
+  UNIQUE (tournament_id, discord_id)               -- a player can be on only ONE team per tournament
 );
 
 CREATE TABLE matches (
-  id TEXT PRIMARY KEY,                   -- ulid or nanoid
-  tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
-  bracket TEXT NOT NULL,                 -- upper, lower, grand_final, grand_final_reset
-  round_number INTEGER NOT NULL,         -- 1, 2, 3, ...
-  match_number INTEGER NOT NULL,         -- unique within tournament for display ordering
-  team_a_id TEXT REFERENCES teams(id) ON DELETE SET NULL,
-  team_b_id TEXT REFERENCES teams(id) ON DELETE SET NULL,
-  team_a_score INTEGER,
-  team_b_score INTEGER,
-  winner_id TEXT REFERENCES teams(id) ON DELETE SET NULL,
-  status TEXT NOT NULL DEFAULT 'scheduled', -- scheduled, in_progress, completed, forfeit
-  advances_to_match_id TEXT REFERENCES matches(id) ON DELETE SET NULL,
-  drops_to_match_id TEXT REFERENCES matches(id) ON DELETE SET NULL,
-  scheduled_at TEXT,
-  played_at TEXT,
-  vod_url TEXT,
-  notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  id                    TEXT PRIMARY KEY,
+  tournament_id         TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  bracket               TEXT NOT NULL,              -- upper | lower | grand_final | grand_final_reset
+  round_number          INTEGER NOT NULL,
+  match_number          INTEGER NOT NULL,
+  team_a_id             TEXT REFERENCES teams(id) ON DELETE SET NULL,
+  team_b_id             TEXT REFERENCES teams(id) ON DELETE SET NULL,
+  team_a_score          INTEGER,
+  team_b_score          INTEGER,
+  winner_id             TEXT REFERENCES teams(id) ON DELETE SET NULL,
+  status                TEXT NOT NULL DEFAULT 'scheduled', -- scheduled | in_progress | completed | forfeit | bye
+  advances_to_match_id  TEXT REFERENCES matches(id) ON DELETE SET NULL,
+  drops_to_match_id     TEXT REFERENCES matches(id) ON DELETE SET NULL,
+  scheduled_at          TIMESTAMPTZ,
+  played_at             TIMESTAMPTZ,
+  vod_url               TEXT,
+  notes                 TEXT,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE tournament_admins (
-  tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
-  discord_id TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'admin',    -- head_admin, admin
-  added_at TEXT NOT NULL,
-  PRIMARY KEY (tournament_id, discord_id)
+-- Append-only audit trail for admin/captain actions (disputes, accountability).
+CREATE TABLE audit_log (
+  id            BIGSERIAL PRIMARY KEY,
+  actor_discord_id TEXT NOT NULL,
+  action        TEXT NOT NULL,                      -- team.approve, team.reject, team.disband, bracket.seed, match.report, ...
+  entity        TEXT NOT NULL,                      -- e.g. "team:abc" / "match:xyz"
+  detail        JSONB,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_teams_tournament ON teams(tournament_id);
-CREATE INDEX idx_teams_status ON teams(tournament_id, status);
-CREATE INDEX idx_players_team ON players(team_id);
+CREATE INDEX idx_teams_status     ON teams(tournament_id, status);
+CREATE INDEX idx_players_team     ON players(team_id);
 CREATE INDEX idx_matches_tournament ON matches(tournament_id);
-CREATE INDEX idx_matches_status ON matches(tournament_id, status);
+CREATE INDEX idx_matches_status   ON matches(tournament_id, status);
 ```
 
-### Ranks (use exact enum strings)
+Admins/captains are **not** tables — they're derived from Discord roles at login and re-checked. Completed tournaments feed the public **Hall of Champions** (interim data lives in `src/data/champions.json` via `src/lib/champions.ts`; once tournaments run through the DB, the champion is derived from the completed tournament + winning team, and the JSON becomes a backfill of pre-system history).
+
+### Ranks (League — exact enum strings)
 
 ```
-IRON_IV, IRON_III, IRON_II, IRON_I,
-BRONZE_IV ... BRONZE_I,
-SILVER_IV ... SILVER_I,
-GOLD_IV ... GOLD_I,
-PLATINUM_IV ... PLATINUM_I,
-EMERALD_IV ... EMERALD_I,
-DIAMOND_IV ... DIAMOND_I,
-MASTER,
-GRANDMASTER,
-CHALLENGER
+IRON_IV … IRON_I, BRONZE_IV … BRONZE_I, SILVER_IV … SILVER_I,
+GOLD_IV … GOLD_I, PLATINUM_IV … PLATINUM_I, EMERALD_IV … EMERALD_I,
+DIAMOND_IV … DIAMOND_I, MASTER, GRANDMASTER, CHALLENGER
 ```
 
-### Roles (use exact enum strings)
+### Roles (League 5v5 — exact enum strings)
 
 ```
 TOP, JUNGLE, MID, ADC, SUPPORT, FILL
 ```
+
+Roles apply to **`sr_5v5`** only. For **ARAM** and **custom** modes, `role` is left null and the roster is just the players.
 
 ## Tournament status flow
 
 ```
 draft → signups_open → signups_closed → bracket_released → in_progress → completed
                 ↑                                ↓
-                └──── (admin can reopen) ─────────
+                └──────── (admin can reopen) ─────┘
 ```
 
-Admin-controlled transitions. The bot validates that prerequisites are met before advancing (e.g. `bracket_released` requires at least 4 approved teams).
+Admin-controlled, validated server-side (e.g. `bracket_released` requires ≥ 4 approved teams).
 
-## Discord bot commands
+## Team application flow (website)
 
-All commands use Discord slash commands, gated by Discord roles. Define a `TOURNAMENT_ADMIN` role; all admin commands require it. Captain commands check team ownership at runtime.
+Teams are formed **off-site** — captains recruit and everyone agrees before anyone is added on the website. The site records the agreed roster; it is not a matchmaking tool.
 
-### Tournament management (admin)
+1. **Captain role.** A member asks an admin for the **Captain** role. Only Captains see "Create a team."
+2. **Log in & apply.** On `/tournaments/[slug]` (when `signups_open`), a Captain hits **"Create a team"** → `/tournaments/[slug]/apply`. The Captain is `session.user` — they don't re-enter their own identity.
+3. **Build the roster.** The form collects team **name** + **tag** (both unique, case-insensitive, within the tournament), optional **color** and **logo** ([Logo upload](#team-logo-upload)), and the roster. Players are added via a **typeahead member picker** backed by the cached guild-member directory (search nickname/username → resolves to the Discord ID). For each player: **IGN**, **rank** (current + peak), and — for `sr_5v5` — **role**. Roster size + whether roles are required follow the tournament's `mode`/`team_size`.
+4. **Validation (server-side).**
+   - Every player is a **current, verified guild member** (re-checked against the directory at submit).
+   - **No player is already on another team** in this tournament (`UNIQUE(tournament_id, discord_id)` + a friendly pre-check).
+   - Name/tag unique (case-insensitive); tag 2-4 alphanumeric; captain is on the roster; expected roster size met.
+   - The Captain has **no other active team** in this tournament.
+5. **Submit for review.** Inserts the `team` (`status = pending`) + `players`. **Held for admin review** — nothing goes into a bracket until approved.
+6. **Balance check + approval.** An admin reviews roster completeness and **balance** (ranks shown per player) on the dashboard, then **approves** (`approved`, `approved_at`) or **rejects** (`rejected_reason`, internal). The captain sees status on My Team.
 
-| Command | Purpose |
-|---|---|
-| `/tournament create` | Modal: name, season, max_teams, signup_deadline, start_date, description |
-| `/tournament edit <id>` | Modal pre-filled with current values |
-| `/tournament status <id> <status>` | Transition status; validates prerequisites |
-| `/tournament list` | List all tournaments with status |
-| `/tournament delete <id>` | Confirmation required; cascades to teams/matches |
+### Member directory (handle resolution)
 
-### Team management (admin)
+The picker is powered by a **cached guild-member directory**: a bot application with the **`GUILD_MEMBERS` privileged intent** calls `GET /guilds/{id}/members` over REST (no gateway process needed — the same bot token used for events/stats), and the result is cached in the DB and refreshed on a schedule (and on-demand before a big signup window). This gives fast typeahead and lets us verify membership at submit time.
 
-| Command | Purpose |
-|---|---|
-| `/team list <tournament>` | Show all teams with status |
-| `/team approve <team>` | Approve pending signup; notifies captain |
-| `/team reject <team> <reason>` | Reject pending signup with reason |
-| `/team remove <team>` | Hard remove (use sparingly, prefer reject/withdraw) |
-| `/team edit <team>` | Modal to edit team name, tag, logo, color |
-| `/team set-captain <team> <user>` | Transfer captaincy |
+## Captain self-service — "My Team"
 
-### Captain commands
+At **`/tournaments/[slug]/my-team`** (captain-only; guarded by `captain_discord_id === session.user.discordId`), a captain can:
 
-| Command | Purpose |
-|---|---|
-| `/signup <tournament>` | Opens modal — captain submits team details + roster |
-| `/myteam roster` | Shows current roster |
-| `/myteam edit-logo <url>` | Update team logo URL |
-| `/myteam swap-player <out> <in>` | Swap a player (only before signup deadline) |
-| `/myteam withdraw <reason>` | Captain-initiated withdrawal |
+- **One team, and only one.** A Captain may create and hold exactly **one active team per tournament** (DB-enforced).
+- **Edit the roster & roles** — reassign roles and **swap in substitutes** when needed. The one-team-per-player rule still applies to any newly added player. **After a team is approved, any roster change (including a sub swap) sends it back to `pending` and re-enters admin review** — the balance check runs again before the team is re-confirmed.
+- **Upload/replace the team logo** ([below](#team-logo-upload)).
+- **Disband the team** — captain-initiated teardown (status → `withdrawn`; removed from the bracket if already drawn). **Admins can disband any team** as well (audited).
+- **See status** — pending / approved / rejected (+ reason) and, once live, their bracket path.
 
-### Bracket commands (admin)
+## Team logo upload
 
-| Command | Purpose |
-|---|---|
-| `/bracket draw <tournament>` | Generates random double-elim bracket; sets seeds; transitions status to `bracket_released` |
-| `/bracket reset <tournament>` | Wipes bracket back to `signups_closed`; confirmation required |
-| `/bracket view <tournament>` | Posts current bracket state as a Discord embed |
+Captains upload a logo directly from the site (on the apply form and My Team).
 
-### Match commands (admin)
+**⚠️ The trap:** never store a raw `cdn.discordapp.com` URL — Discord attachment URLs are signed and **expire**. Always **re-host**.
 
-| Command | Purpose |
-|---|---|
-| `/match report <match> <winner> <score>` | Records result; advances winner; drops loser (or eliminates) |
-| `/match unreport <match>` | Undoes a result; only valid if no downstream matches have results |
-| `/match schedule <match> <datetime>` | Set scheduled time |
-| `/match set-vod <match> <url>` | Attach VOD link after the match |
+Pipeline: client uploads to **Supabase Storage** via a Server Action → **normalize with `sharp`** (square ~256×256 PNG/WebP, strip EXIF; disallow/rasterize SVG; type + size limits) → store the **permanent** URL in `teams.logo_url` → the logo is public only after the team is **approved** (it appears in the admin review UI; admins can clear it). Orphaned uploads (team never submitted) are swept periodically. Fallback everywhere is the initials-in-colored-box crest (already implemented in the Hall of Champions). Add the storage host to `next.config` `images.remotePatterns`.
 
-### Public/read-only commands
+## Admin dashboard
 
-| Command | Purpose |
-|---|---|
-| `/tournaments` | List active and recent tournaments with website links |
-| `/standings <tournament>` | Current standings or bracket summary |
-| `/team info <team>` | Show team roster |
-| `/schedule <tournament>` | Upcoming matches |
+`/admin` (+ `/admin/tournaments/[slug]`), gated by the Admin role, every action re-checked server-side and **audited**.
 
-## Signup flow (modal-driven)
+- **Team review** — queue of `pending` teams with rosters + ranks; **Approve / Reject (with reason)**. The balance-check surface.
+- **Tournament lifecycle** — create/edit tournaments; advance `status`.
+- **Bracket** — **"Seed bracket (random)"** button runs the draw (below); reset if needed.
+- **Live match reporting** — set winners/scores; the engine advances winners and drops losers.
+- **Disband** — remove any team (audited).
+- **Live updates** — after each write, `revalidateTag('tournament:<slug>')` so public pages refresh on next load. For finals, optionally push via SSE.
 
-Captain runs `/signup tournament:q1-2026`. Bot opens a modal with these fields:
+## Bracket generation
 
-1. Team name (text input)
-2. Team tag (text input, 2-4 chars, uppercase enforced)
-3. Captain confirmation — Discord auto-fills from command user
-4. Players — 5 lines of "discord_mention | ign | role | current_rank | peak_rank"
+Runs server-side (Server Action), triggered by the admin **"Seed bracket (random)"** button — only after every team has been reviewed. Volume is small and handled internally, so there's no waitlist/over-subscription logic.
 
-Modal validation:
-- Team name unique within tournament
-- Tag unique within tournament, alphanumeric, 2-4 chars
-- Exactly 5 players (Top, Jungle, Mid, ADC, Support) — substitutes added after approval
-- Captain must be one of the 5 listed players
-- All Discord IDs must be valid members of the server
+1. Pull `status = 'approved'` teams.
+2. **Random** Fisher-Yates shuffle → assign seeds `1..N`.
+3. If `N` isn't a power of two, **byes are added at random**: the shuffle decides which top seeds get a round-1 bye up to the next power of two (a `bye` match auto-advances). No fixed 4/8/16 requirement.
+4. Generate match records: upper-bracket single-elim shape; double-elim lower bracket; grand final + conditional reset.
+5. Populate round-1 upper-bracket slots (with byes auto-resolved); wire every match's `advances_to_match_id` / `drops_to_match_id`.
+6. Status → `bracket_released`.
 
-On submit:
-- Team created with `status = pending`
-- Players inserted
-- Announcement posted to admin review channel with embed + Approve/Reject buttons
-- Captain receives DM confirmation
+### Match counts (double elim, no byes)
 
-Admins click Approve/Reject buttons in the review channel (or run `/team approve`). On approval:
-- Team status → `approved`
-- Captain DM'd
-- Public team-created announcement posted to tournament announcement channel
-- Discord role `Q1 2026 — <Team Name>` auto-created and assigned to all roster members
-- Captain gets `Q1 2026 — Captain` role
-
-## Bracket generation algorithm
-
-When `/bracket draw` runs:
-
-1. Pull all teams where `status = 'approved'` for the tournament
-2. Validate count: 4, 6, 8, 12, 16 (otherwise error — odd-count handling with byes is added in a later phase if needed)
-3. Shuffle teams with Fisher-Yates
-4. Assign seeds 1..N in shuffle order
-5. Generate match records:
-   - Upper bracket: standard single-elim shape with N teams
-   - Lower bracket: standard double-elim lower bracket shape (depends on N)
-   - Grand finals: 1 match + 1 conditional reset match
-6. Populate `team_a_id` and `team_b_id` for round 1 of upper bracket only; all other matches start with null teams
-7. Populate `advances_to_match_id` and `drops_to_match_id` for every match (this is the wiring)
-8. Set tournament status → `bracket_released`
-9. Post bracket image/embed to Discord announcement channel
-10. Ping all captains via team roles
-
-### Match counts by team count (double elim)
-
-| Teams | Upper matches | Lower matches | Grand finals | Total |
+| Teams | Upper | Lower | Grand finals | Total |
 |---|---|---|---|---|
 | 4 | 3 | 2 | 2 | 7 |
 | 8 | 7 | 6 | 2 | 15 |
 | 16 | 15 | 14 | 2 | 31 |
 
-(Counts include the conditional grand-final reset match — only played if the lower-bracket team wins the first grand finals.)
+(Total includes the conditional grand-final reset, played only if the lower-bracket team wins the first grand final.)
 
-### Bracket library
+## Match reporting
 
-Use **`@g-loot/react-tournament-brackets`** on the website for rendering. Theme it to match the LoLMK palette (`brand-red`, `brand-blue`, `bg-surface`). Only build a custom SVG bracket if the library cannot match the lolesports broadcast visual target after styling.
+Admin reports a result on the dashboard. The Server Action re-checks admin permission, validates the match isn't `completed` and the winner is a participant, writes the score + `winner_id` + `completed`/`played_at`, **advances** the winner and **drops** the loser (upper-bracket losses; lower-bracket losses eliminate), handles the grand final (upper wins → tournament `completed` + `champion_team_id` + Hall of Champions; lower wins → enable reset), writes an **audit** row, and revalidates. **Withdrawals/forfeits** after the draw resolve like a loss for the absent team (`forfeit`), auto-advancing the opponent. **Unreport** is allowed only if downstream matches are still `scheduled`.
 
-## Match reporting flow
+## IGN & rank verification — options
 
-Admin runs `/match report match_id:<auto-complete> winner:<team A | team B> score:<2-0 | 2-1>` after a match concludes.
+How much we trust the ranks captains enter. Pick per phase:
 
-Bot performs:
+- **A. Manual (recommended to start).** Captains type IGNs + ranks; admins eyeball at review. Zero integration.
+- **B. Riot RSO — "Sign in with Riot" (recommended target).** Players link their Riot account via OAuth; proves account ownership **and** lets us pull verified rank from the ranked API, setting `rank_verified`. Requires a Riot dev app with **production RSO approval** (lead time — apply early).
+- **C. Ranked-API lookup (augment, not identity).** Look the summoner up on KR (Summoner-V4 / League-V4) to confirm it exists and auto-fill/validate the displayed rank — but this does **not** prove the Discord user owns it. Good paired with A.
 
-1. Validate caller has admin permission
-2. Validate match exists and status != `completed`
-3. Validate winner is one of `team_a_id` or `team_b_id`
-4. Update match: `winner_id`, `team_a_score`, `team_b_score`, `status = completed`, `played_at = now`
-5. Advance winner:
-   - Find `advances_to_match_id`
-   - Insert winner into the next available team slot (a or b) on that match
-6. Drop loser (for upper bracket matches):
-   - Find `drops_to_match_id`
-   - Insert loser into the next available team slot on that match
-   - For lower bracket losses, loser is eliminated (no drop target)
-7. If this was the grand finals:
-   - If upper-bracket team won: mark tournament `completed`, set `champion_team_id`
-   - If lower-bracket team won: enable grand_final_reset match
-8. Post result announcement to Discord channel
-9. The website's next data fetch (within 30-60s cache TTL) picks up the changes
+Plan: ship **A**, layer in **C** to auto-fill rank display, move to **B** when stakes justify the RSO approval.
 
-### Match unreport
+### Member profiles (future)
 
-Only allowed if the match's downstream matches (winner advance + loser drop) are both still `scheduled` (no results reported on them yet). Otherwise the admin must unreport downstream first.
+A lightweight middle ground that also improves signup UX. Let each verified member set their **IGN** once on a profile, and have the site pull their **current rank** from the Riot ranked API (League-V4 by summoner name on KR) on a refresh cadence. Team application then **pre-fills** each player's IGN + rank from their profile instead of the captain typing it — fewer errors, always-current ranks. It's self-asserted IGN + API-validated rank (not proof of ownership — that's RSO/B), but a strong bridge. Sketch:
 
-## Bot internal HTTP API
-
-The bot exposes a small read-only HTTP API on a port (e.g. 3001) for the website to consume. Bearer-token auth — token shared between bot and website via env var.
-
-| Endpoint | Returns |
-|---|---|
-| `GET /api/tournaments` | List all tournaments (id, slug, name, season, status, dates) |
-| `GET /api/tournaments/:slug` | Full tournament + all teams + all players + all matches |
-| `GET /api/tournaments/:slug/teams` | Just teams + players for the pre-bracket view |
-| `GET /api/tournaments/:slug/bracket` | Just the matches for the bracket view |
-| `GET /api/tournaments/:slug/team/:teamSlug` | Single team + roster |
-
-All endpoints return JSON. Response shapes match the TypeScript types in `src/types/tournament.ts` on the website side (shared types should be defined once and ideally shared via a small package, or duplicated if monorepo isn't set up).
-
-### Website caching
-
-Website API routes wrap these endpoints and apply Next.js fetch caching:
-
-```ts
-const res = await fetch(`${BOT_API}/tournaments/${slug}`, {
-  headers: { Authorization: `Bearer ${BOT_API_TOKEN}` },
-  next: { revalidate: 60 }, // refresh every 60 seconds
-});
+```sql
+CREATE TABLE profiles (            -- future enhancement
+  discord_id      TEXT PRIMARY KEY,
+  ign             TEXT,
+  region          TEXT NOT NULL DEFAULT 'KR',
+  current_rank    TEXT,
+  peak_rank       TEXT,
+  rank_updated_at TIMESTAMPTZ,
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
 
-During an active tournament weekend, drop the revalidate to 30s. After the tournament completes, bump to 3600 (1 hour) since data is static.
+Because every member already logs in with Discord, profiles need no extra auth — just a `/profile` page and a scheduled rank-refresh job.
 
 ## Website page flow
 
 ### `/tournaments` (hub)
-
-- Featured current tournament (large card)
-- Past tournaments grid
-- "How tournaments work" section
-- Sign-up CTA when signups are open
+- Featured current tournament + **Hall of Champions** + "how it works".
+- Auth-aware CTA: **"Create a team"** when `signups_open` **and** the viewer is a Captain; **"Log in with Discord"** when logged out; "Ask an admin for the Captain role to enter" for members without it; "Signups closed" otherwise.
 
 ### `/tournaments/[slug]`
+Renders by status: **pre-bracket** (hero + status + deadline; team grid of approved teams; apply CTA) · **bracket-released / in_progress** (bracket is the hero; sidebar of upcoming matches + recent results; team grid below) · **completed** (champion banner, final bracket, standings, VODs, photos).
 
-Conditionally renders based on tournament status:
+### `/tournaments/[slug]/apply` — captain application (Captain role required).
+### `/tournaments/[slug]/my-team` — captain roster/logo/disband (captain only).
+### `/tournaments/[slug]/teams/[teamSlug]` — public team page: logo, roster, match history (approved teams only).
 
-**Pre-bracket (`draft`, `signups_open`, `signups_closed`)**
-- Hero with tournament name + status badge + signup deadline countdown
-- Team grid (12-16 cards in a responsive grid: 4 cols desktop, 2 cols tablet, 1 col mobile)
-- "Sign up via Discord" CTA → links to Discord with instructions on running `/signup`
-- "Bracket draw on [date]" announcement when signups_closed
+**Teams are per-tournament and start fresh every time.** Rosters don't carry over between tournaments (members come and go), so there's no persistent team identity or cross-tournament history — each tournament is a clean slate.
 
-**Bracket-released (`bracket_released`, `in_progress`)**
-- Hero with tournament name + status badge
-- Full bracket visualization (hero of the page)
-- Sidebar: upcoming matches + recent results
-- Team grid below bracket (cards still clickable for rosters)
+## Team card & roster modal spec
 
-**Completed (`completed`)**
-- Hero with champion banner (winning team featured)
-- Final bracket
-- MVP / awards section if data exists
-- Photo gallery from the tournament
-- Final standings table
-- VOD links collected from match records
+### Team card (grid)
+Square or 3:4 portrait; `bg-surface`, hover `bg-elevated`; 1px `border`, hover `border-strong`; sharp corners. Logo top-center (80px, or initials-in-colored-box fallback). Name in Bebas Neue `display-sm` all-caps; tag below in `label` style; captain in `body-sm`; player-count badge ("5/5" or "5/5 +2") bottom-right; pending badge top-right only if pending. Click → roster modal.
 
-### `/tournaments/[slug]/teams/[teamSlug]`
-
-- Team logo, name, tag
-- Captain + full roster
-- Match history within this tournament
-- Cross-tournament history (placeholder for Phase 2 when teams persist across tournaments)
-
-## Team card and roster modal spec
-
-### Team card (in grid)
-
-- Aspect ratio: 3:4 portrait or square
-- Background: `bg-surface`; hover → `bg-elevated`
-- Border: 1px `border-default`; hover → `border-strong`
-- Layout:
-  - Logo top-center (80px circle, or initials-in-colored-box fallback if no logo)
-  - Team name in Bebas Neue `display-sm`, all caps, `text-primary`
-  - Team tag below in `label` style (uppercase, tracked, `text-muted`)
-  - Captain name in `body-sm`, `text-secondary`
-  - Player count badge bottom-right ("5/5" or "5/5 +2")
-  - Status badge top-right (only shown if pending — `brand-red-muted` background)
-- Cursor: pointer
-- Click → opens team modal
-
-### Team roster modal (pop-out)
-
-- Backdrop: `bg-overlay`, blur 4px
-- Container: `bg-surface`, max-width 640px, full-width on mobile, sharp corners, `border-default` border
-- Header section:
-  - Team logo (96px circle, left)
-  - Team name in Bebas Neue `display-md`, all caps
-  - Team tag below in `label` style
-  - Captain name with `brand-red` "C" badge
-  - Close button top-right
-- Starters section heading: "STARTERS" in `label` style
-- Each player row:
-  - Avatar (40px circle, from Discord CDN)
-  - Player IGN in `heading-md`, weight 600
-  - Discord username in `body-sm`, `text-muted` (smaller, below IGN)
-  - Role badge — color-coded chip with role name
-  - Right side: peak rank (Bebas Neue, bright) and current rank (`body-sm`, muted) stacked
-- Substitutes section: same row style, with "SUBSTITUTES" label above, 70% opacity
-- Footer: optional 4px team color stripe at the bottom if `team.color` is set
-- Close behaviors: X button, click backdrop, Esc key
+### Roster modal (pop-out)
+Backdrop blur; `bg-surface`, max-width 640px, sharp corners, `border`. Header: logo (96px), name (Bebas `display-md`), tag (`label`), captain with `brand-red` "C" badge, close button. **STARTERS** section; each row: avatar (40px, Discord CDN), IGN (`heading-md` 600), Discord username (`body-sm` muted), role chip (5v5 only), peak rank (Bebas, bright) over current rank (`body-sm` muted) on the right. **SUBSTITUTES** section at 70% opacity. Optional 4px `team.color` stripe at the bottom. Close on X, backdrop, Esc.
 
 ### Role badge colors
+Uniform/subtle (`bg-elevated` + `text-primary`); FILL gets `brand-blue-muted` + `brand-blue-bright`. Lane icons instead of color are a later upgrade. (Hidden entirely for ARAM/custom modes.)
 
-Match the lane/role aesthetic. These can be subtle since role isn't a brand moment:
+## Optional Discord bot (later)
 
-- TOP: `bg-elevated` + `text-primary`
-- JUNGLE: `bg-elevated` + `text-primary`
-- MID: `bg-elevated` + `text-primary`
-- ADC: `bg-elevated` + `text-primary`
-- SUPPORT: `bg-elevated` + `text-primary`
-- FILL: `brand-blue-muted` + `brand-blue-bright`
+Not required for anything above. If added, it's a **client** of the same Supabase DB (or just uses the bot token via REST): posts announcements (signups open, team approved, results, champion crowned), convenience `/myteam` reads, and — with Riot RSO — a rank-verification worker. Never a competing writer of truth.
 
-Keep them uniform unless visual differentiation becomes important — broadcast tournaments often use lane icons instead of color, which is a Phase 2 upgrade.
-
-## Project structure (bot)
-
-Separate repo or `apps/bot` if monorepo. Suggested layout:
+## Environment variables (website)
 
 ```
-LoLMK-bot/
-├── src/
-│   ├── commands/
-│   │   ├── tournament/
-│   │   │   ├── create.ts
-│   │   │   ├── edit.ts
-│   │   │   ├── status.ts
-│   │   │   ├── list.ts
-│   │   │   └── delete.ts
-│   │   ├── team/
-│   │   │   ├── list.ts
-│   │   │   ├── approve.ts
-│   │   │   ├── reject.ts
-│   │   │   ├── remove.ts
-│   │   │   ├── edit.ts
-│   │   │   └── set-captain.ts
-│   │   ├── captain/
-│   │   │   ├── signup.ts
-│   │   │   ├── myteam-roster.ts
-│   │   │   ├── myteam-edit-logo.ts
-│   │   │   ├── myteam-swap-player.ts
-│   │   │   └── myteam-withdraw.ts
-│   │   ├── bracket/
-│   │   │   ├── draw.ts
-│   │   │   ├── reset.ts
-│   │   │   └── view.ts
-│   │   ├── match/
-│   │   │   ├── report.ts
-│   │   │   ├── unreport.ts
-│   │   │   ├── schedule.ts
-│   │   │   └── set-vod.ts
-│   │   └── public/
-│   │       ├── tournaments.ts
-│   │       ├── standings.ts
-│   │       ├── team-info.ts
-│   │       └── schedule.ts
-│   ├── modals/
-│   │   ├── tournament-create.ts
-│   │   ├── tournament-edit.ts
-│   │   ├── team-edit.ts
-│   │   └── signup.ts
-│   ├── events/
-│   │   ├── ready.ts
-│   │   ├── interactionCreate.ts        (slash command + modal + button router)
-│   │   └── guildMemberRemove.ts        (handle captains leaving server)
-│   ├── lib/
-│   │   ├── db.ts                       (better-sqlite3 instance)
-│   │   ├── migrations.ts               (run SQL on startup)
-│   │   ├── bracket.ts                  (bracket generation logic)
-│   │   ├── permissions.ts              (admin/captain role checks)
-│   │   ├── notifications.ts            (channel/DM announcements)
-│   │   └── validate.ts                 (input validation)
-│   ├── api/                            (HTTP API for website)
-│   │   ├── server.ts                   (Hono/Express setup)
-│   │   ├── routes/
-│   │   │   ├── tournaments.ts
-│   │   │   ├── teams.ts
-│   │   │   └── matches.ts
-│   │   └── auth.ts                     (bearer token middleware)
-│   ├── types/
-│   │   ├── tournament.ts
-│   │   ├── team.ts
-│   │   ├── match.ts
-│   │   └── shared.ts                   (synced with website types)
-│   ├── config.ts                       (env vars, channel IDs, role IDs)
-│   └── index.ts                        (bot entry, register commands, start API)
-├── data/                               (.gitignored — SQLite file lives here)
-│   └── tournaments.db
-├── migrations/                         (.sql files)
-│   ├── 001_initial_schema.sql
-│   └── ...
-├── .env.example
-├── package.json
-├── tsconfig.json
-└── README.md
-```
+# Auth.js (Discord OAuth)
+AUTH_SECRET=
+AUTH_DISCORD_ID=
+AUTH_DISCORD_SECRET=
 
-## Environment variables
-
-### Bot
-
-```
-DISCORD_TOKEN=
-DISCORD_CLIENT_ID=
+# Membership / role gating
 DISCORD_GUILD_ID=
+DISCORD_BOT_TOKEN=          # events/stats + member directory + role lookups (GUILD_MEMBERS intent enabled)
+MEMBER_ROLE_ID=             # "LoLMK Verified" — REQUIRED to log in
+CAPTAIN_ROLE_ID=            # "Captain" — may create a team
+ADMIN_ROLE_ID=              # "Tournament Admin" — runs /admin
 
-# Channel IDs
-ANNOUNCEMENT_CHANNEL_ID=
-ADMIN_REVIEW_CHANNEL_ID=
-TOURNAMENT_LOG_CHANNEL_ID=
+# Supabase Postgres
+DATABASE_URL=               # Supavisor POOLED connection (port 6543) — used by serverless
+DIRECT_URL=                 # direct connection (port 5432) — used by migrations only
 
-# Role IDs
-TOURNAMENT_ADMIN_ROLE_ID=
-HEAD_ADMIN_ROLE_ID=
+# Supabase Storage (team logos)
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=  # server-side only, never exposed to the browser
 
-# Database
-DATABASE_PATH=./data/tournaments.db
-
-# Internal API
-API_PORT=3001
-API_TOKEN=                              # generated, shared with website
+# Riot (verification — Phase 5)
+RIOT_API_KEY=
 ```
 
-### Website (add to existing .env)
+## Data-access convention
 
-```
-BOT_API_URL=https://bot.lolmk.com       # or localhost:3001 in dev
-BOT_API_TOKEN=                          # matches bot's API_TOKEN
-```
+Per `CLAUDE.md`: components never touch the DB directly. All reads/writes go through `src/lib/` helpers (`tournaments.ts`, `teams.ts`, `matches.ts`, `members.ts`, `champions.ts`) wrapping Kysely/Drizzle; Server Actions call these helpers. Types live once in `src/types/tournament.ts`.
 
-## Backup strategy
+## Backups
 
-The SQLite file is the entire database. Treat it like gold.
+Supabase-managed: enable **automated daily backups + point-in-time recovery**. Snapshot manually before risky ops (bracket reset, disband, tournament delete). Storage (logos) is durable in the bucket.
 
-- **Automated backup**: cron job copies `tournaments.db` to a backup directory hourly, retains last 168 (1 week). Optionally also uploads to S3/R2/Backblaze daily.
-- **Manual backup before risky operations**: admin command `/db backup` triggers a snapshot copy on demand. Useful before `/bracket reset` or `/tournament delete`.
-- **Verify backups occasionally**: spin up the bot pointing at a backup file in a staging env to confirm it works.
+## Phasing (web-first)
 
-## Migration story (if you outgrow SQLite)
+Each phase is independently shippable.
 
-When to migrate (none of these apply yet):
-- Concurrent writes from multiple bot processes (you'd run more than one bot — unlikely)
-- Website needs to write to the DB (member self-edit profiles, for instance)
-- Cross-server scaling needed
-- Real-time subscriptions for live bracket updates
+### Phase 1 — Auth + roles
+Auth.js Discord login gated on the `LoLMK Verified` role; expose `isMember` / `isCaptain` / `isAdmin`; short sessions + re-check on sensitive actions. Real "logged in" state; the nav verified badge becomes real. **Needs from you: the guild ID and the numeric role IDs for `LoLMK Verified`, `Captain`, and `Tournament Admin`.**
 
-Migration path: `better-sqlite3` → `pg` (node-postgres) is mostly a connection string change. SQL syntax is 95% compatible. Use Kysely from day one to make the migration trivial — same query builder works for both.
+### Phase 2 — DB + member directory + team application
+Provision Supabase (pooler + storage); schema + migrations; `src/lib` helpers. Cached guild-member directory (bot token, `GUILD_MEMBERS` intent). Apply form (Captain-gated) + Server Action; multi-team + one-team-per-captain checks; teams land `pending`.
 
-## Phasing
+### Phase 3 — Admin review + My Team
+Admin dashboard: review queue, approve/reject, balance check, disband, audit log. Captain My Team: edit roster/roles, subs, **logo upload** (Storage + `sharp` + moderation), disband.
 
-### Phase 1 — Minimum viable tournament
+### Phase 4 — Bracket + live admin
+Random draw with random byes ("Seed bracket" button) + public bracket render. Admin match reporting with auto-advancement + forfeits. Live via `revalidateTag` (SSE for finals).
 
-Goal: run Q1 2026 with admin-driven operations.
-
-- DB schema + migrations
-- `/tournament create`, `/tournament status`, `/tournament list`
-- `/team create` (admin), `/team approve`, `/team list`
-- Bot HTTP API with tournament + teams + bracket endpoints
-- Website renders `/tournaments/[slug]` for both pre-bracket and bracket states
-- `/bracket draw` for 4/8/16 teams
-- `/match report` with bracket advancement
-
-Captains don't self-serve yet; admins enter teams. Ship this first, run a real tournament with it.
-
-### Phase 2 — Captain self-service
-
-- `/signup` modal
-- Admin approve/reject buttons in admin channel
-- `/myteam` commands
-- Auto-role assignment on approval
-- Notification system (DMs, channel posts)
-
-### Phase 3 — Polish
-
-- `/match unreport`, schedule changes
-- VOD attachment
-- Photo gallery integration with tournament page
-- Standings table for round-robin (if format expands)
-- Cross-tournament team/player history
-
-### Phase 4 — Future ideas
-
-- Riot API integration for rank verification
-- Live bracket updates via websockets
-- Captain dashboard on the website (requires website auth — Discord OAuth)
-- Tournament templates for recurring formats
+### Phase 5 — Verification + optional bot
+Riot RSO account linking + rank verification (`rank_verified`); ranked-API auto-fill. Optional Discord bot (announcements, `/myteam`) as a same-DB client.
 
 ## Open questions
 
-- Are tournaments single-server only (just LoLMK's Discord) or could the bot run for other communities? Phase 1 assumes single-server. Architecture supports multi-server with a small `server_id` column addition.
-- Do we want team logos enforced (require upload at signup) or optional (placeholder if missing)? Phase 1: optional with placeholder.
-- Should match results require confirmation from both team captains, or is admin-reported sufficient? Phase 1: admin-only. Captain confirmation is a Phase 3 polish if disputes arise.
-- Tiebreaker rules for round-robin format? Not relevant for Phase 1 (double elim only).
-- Do we ever need to support odd team counts with byes (6, 12)? Phase 1: yes, but only for even-power-of-2 plus 6 and 12. Other counts error out.
+- **Numeric role IDs:** roles are decided — `LoLMK Verified` (login), `Captain` (create teams), `Tournament Admin` (admin). Still need the **numeric Discord role IDs + guild ID** for config.
+- **Mode roster rules:** for ARAM / custom modes, confirm team size and whether subs are allowed (defaults: `team_size` from the tournament, roles only for `sr_5v5`).
+- **IGN verification timing:** ship manual (A) first, or start the Riot **RSO** (B) production approval now given its lead time? The [member-profiles](#member-profiles-future) approach can bridge it.

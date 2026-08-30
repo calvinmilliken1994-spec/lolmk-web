@@ -1,0 +1,18 @@
+[
+  {
+    "id": "sample-latest",
+    "tournament": "Season Opener",
+    "game": "League of Legends",
+    "date": "2025-08-16",
+    "format": "Swiss into Top 8, best-of-5 final",
+    "teams": 32,
+    "champion": {
+      "name": "Champion Team",
+      "tag": "CHMP",
+      "players": ["Player One", "Player Two", "Player Three"]
+    },
+    "runnerUp": { "name": "Runner-up Team", "tag": "RUP" },
+    "links": [],
+    "placeholder": true
+  }
+]
