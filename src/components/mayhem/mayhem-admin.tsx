@@ -35,6 +35,7 @@ import {
   generateKnockoutFromAllTeams,
   generateKnockoutFromGroups,
   recordMatchResult,
+  refreshTeamIdentities,
   removePlayer,
   randomizeTeams,
   setActiveMatch,
@@ -250,14 +251,23 @@ function PlayersPanel({
         </div>
 
         {alreadyRandomized && !confirmReroll ? (
-          <Button
-            variant="secondary"
-            className="w-full"
-            onClick={() => setConfirmReroll(true)}
-            disabled={pending}
-          >
-            <RotateCcw className="h-4 w-4" /> Reroll teams
-          </Button>
+          <div className="space-y-2">
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={() => setConfirmReroll(true)}
+              disabled={pending}
+            >
+              <RotateCcw className="h-4 w-4" /> Reroll teams
+            </Button>
+            <button
+              onClick={() => run(() => refreshTeamIdentities())}
+              disabled={pending}
+              className="w-full text-caption uppercase tracking-wider text-ink-muted hover:text-ink py-1"
+            >
+              Refresh team names/icons (keeps rosters)
+            </button>
+          </div>
         ) : alreadyRandomized && confirmReroll ? (
           <div className="space-y-2">
             <p className="text-body-sm text-danger">
