@@ -228,12 +228,14 @@ export function buildKnockoutBracket(
         m.advances_to_slot = "b";
       });
     } else if (dropRound.length > 1) {
-      // WB round 0 losers pair among themselves: split drop round into
-      // self-pairs by re-routing every 2nd entrant's slot A into the other's
-      // slot B — simplest correct approach: pair feeder[2i] vs feeder[2i+1].
-      // Rebuild as pairs of feeder losers directly instead of the 1:1 above.
+      // WB round 0 losers pair among themselves: instead of the 1:1
+      // dropRound-per-feeder-match built above (which would leave every
+      // dropRound match with only slot A filled), replace it with half as
+      // many matches, each pairing feeder[2i] (slot A) with feeder[2i+1]
+      // (slot B) directly. dropRound has NOT been pushed into `matches` yet
+      // at this point (that happens below), so we only need to discard the
+      // local dropRound array here — never touch `matches` itself.
       dropRound.length = 0;
-      matches.splice(matches.length - dropSize, dropSize);
       matchNumber -= dropSize;
       for (let i = 0; i < feeder.length / 2; i++) {
         const match: BracketMatch = {
