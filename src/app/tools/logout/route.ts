@@ -10,6 +10,6 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   const res = NextResponse.redirect(new URL("/tools", req.url));
-  res.cookies.delete({ name: TOOLS_COOKIE_NAME, path: "/tools" });
+  res.cookies.delete({ name: TOOLS_COOKIE_NAME, path: "/" });
   return res;
 }

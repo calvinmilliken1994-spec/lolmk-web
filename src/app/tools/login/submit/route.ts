@@ -20,7 +20,7 @@ async function handleLogin(username: unknown, password: unknown, wantsJson: bool
   }
 
   const expected = hashToolsCredentials(creds.username, creds.password);
-  const actual = hashToolsCredentials(username.trim(), password);
+  const actual = hashToolsCredentials(username.trim(), password.trim());
   if (actual !== expected) {
     if (!wantsJson) return NextResponse.redirect(new URL("/tools/login?error=1", "http://x"));
     return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
@@ -29,11 +29,12 @@ async function handleLogin(username: unknown, password: unknown, wantsJson: bool
   const res = wantsJson
     ? NextResponse.json({ ok: true })
     : NextResponse.redirect(new URL("/tools", "http://x"));
+  res.headers.set("Cache-Control", "no-store");
   res.cookies.set(TOOLS_COOKIE_NAME, expected, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/tools",
+    path: "/",
     maxAge: TOOLS_COOKIE_MAX_AGE,
   });
   return res;
