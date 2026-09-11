@@ -94,6 +94,9 @@ export function buildKnockoutBracket(
   const id = opts.idFactory ?? defaultId;
   const eventId = opts.tournamentId;
   const n = teamIdsBySeed.length;
+  if (opts.doubleElimination && opts.thirdPlaceMatch) {
+    throw new Error("Third-place matches are not supported for double-elimination brackets.");
+  }
   const size = nextPowerOfTwo(Math.max(n, 2));
   const rounds = Math.log2(size);
   const seedOrder = standardSeedOrder(size);
@@ -102,37 +105,40 @@ export function buildKnockoutBracket(
   let matchNumber = opts.startMatchNumber ?? 1;
   const matches: BracketMatch[] = [];
 
+  function makeMatch(bracket: BracketSide, roundNumber: number): BracketMatch {
+    return {
+      id: id(),
+      event_id: eventId,
+      bracket,
+      group_id: opts.groupId ?? null,
+      round_number: roundNumber,
+      match_number: matchNumber++,
+      best_of: opts.knockoutBestOf,
+      team_a_id: null,
+      team_b_id: null,
+      team_a_score: 0,
+      team_b_score: 0,
+      winner_id: null,
+      status: "pending",
+      advances_to_match_id: null,
+      advances_to_slot: null,
+      drops_to_match_id: null,
+      drops_to_slot: null,
+    };
+  }
+
   // ---- Upper (or single-elim only) bracket ----
   const wbRounds: BracketMatch[][] = [];
   for (let r = 0; r < rounds; r++) {
     const matchesInRound = size / 2 ** (r + 1);
     const round: BracketMatch[] = [];
     for (let i = 0; i < matchesInRound; i++) {
-      let teamA: string | null = null;
-      let teamB: string | null = null;
+      const m = makeMatch("upper", r + 1);
       if (r === 0) {
-        teamA = seedTeam(seedOrder[i * 2]);
-        teamB = seedTeam(seedOrder[i * 2 + 1]);
+        m.team_a_id = seedTeam(seedOrder[i * 2]);
+        m.team_b_id = seedTeam(seedOrder[i * 2 + 1]);
       }
-      round.push({
-        id: id(),
-        event_id: eventId,
-        bracket: "upper",
-        group_id: opts.groupId ?? null,
-        round_number: r + 1,
-        match_number: matchNumber++,
-        best_of: opts.knockoutBestOf,
-        team_a_id: teamA,
-        team_b_id: teamB,
-        team_a_score: 0,
-        team_b_score: 0,
-        winner_id: null,
-        status: "pending",
-        advances_to_match_id: null,
-        advances_to_slot: null,
-        drops_to_match_id: null,
-        drops_to_slot: null,
-      });
+      round.push(m);
     }
     wbRounds.push(round);
     matches.push(...round);
@@ -153,25 +159,7 @@ export function buildKnockoutBracket(
     if (opts.thirdPlaceMatch && wbRounds.length >= 2) {
       const semis = wbRounds[wbRounds.length - 2];
       if (semis.length === 2) {
-        const thirdPlace: BracketMatch = {
-          id: id(),
-          event_id: eventId,
-          bracket: "third_place",
-          group_id: opts.groupId ?? null,
-          round_number: wbRounds.length,
-          match_number: matchNumber++,
-          best_of: opts.knockoutBestOf,
-          team_a_id: null,
-          team_b_id: null,
-          team_a_score: 0,
-          team_b_score: 0,
-          winner_id: null,
-          status: "pending",
-          advances_to_match_id: null,
-          advances_to_slot: null,
-          drops_to_match_id: null,
-          drops_to_slot: null,
-        };
+        const thirdPlace = makeMatch("third_place", wbRounds.length);
         semis[0].drops_to_match_id = thirdPlace.id;
         semis[0].drops_to_slot = "a";
         semis[1].drops_to_match_id = thirdPlace.id;
@@ -182,152 +170,141 @@ export function buildKnockoutBracket(
     return resolveByes(retagFinal(matches));
   }
 
-  // ---- Lower bracket (double elimination), standard alternating pattern ----
-  // LB "drop" rounds receive that WB round's losers; LB "consolidation"
-  // rounds pair the previous LB round's winners among themselves. Round 0 is
-  // effectively a drop round for WB round-0 losers (no prior LB winners yet).
-  const lbRounds: BracketMatch[][] = [];
-  let feeder: BracketMatch[] = wbRounds[0]; // whose losers seed LB round 0
-  let prevLbWinnersRound: BracketMatch[] | null = null;
-
-  for (let wbR = 1; wbR < rounds; wbR++) {
-    // Drop round: prevLbWinnersRound (or nothing on the very first) vs feeder losers
-    const dropSize = feeder.length;
-    const dropRound: BracketMatch[] = [];
-    for (let i = 0; i < dropSize; i++) {
-      dropRound.push({
-        id: id(),
-        event_id: eventId,
-        bracket: "lower",
-        group_id: opts.groupId ?? null,
-        round_number: lbRounds.length + 1,
-        match_number: matchNumber++,
-        best_of: opts.knockoutBestOf,
-        team_a_id: null,
-        team_b_id: null,
-        team_a_score: 0,
-        team_b_score: 0,
-        winner_id: null,
-        status: "pending",
-        advances_to_match_id: null,
-        advances_to_slot: null,
-        drops_to_match_id: null,
-        drops_to_slot: null,
-      });
-    }
-    // Feeder losers drop into slot A
-    feeder.forEach((m, i) => {
-      m.drops_to_match_id = dropRound[i].id;
-      m.drops_to_slot = "a";
-    });
-    // Previous LB round winners feed into slot B (or, on round 0, pair
-    // amongst themselves directly rather than a separate consolidation step)
-    if (prevLbWinnersRound) {
-      prevLbWinnersRound.forEach((m, i) => {
-        m.advances_to_match_id = dropRound[i].id;
-        m.advances_to_slot = "b";
-      });
-    } else if (dropRound.length > 1) {
-      // WB round 0 losers pair among themselves: instead of the 1:1
-      // dropRound-per-feeder-match built above (which would leave every
-      // dropRound match with only slot A filled), replace it with half as
-      // many matches, each pairing feeder[2i] (slot A) with feeder[2i+1]
-      // (slot B) directly. dropRound has NOT been pushed into `matches` yet
-      // at this point (that happens below), so we only need to discard the
-      // local dropRound array here — never touch `matches` itself.
-      dropRound.length = 0;
-      matchNumber -= dropSize;
-      for (let i = 0; i < feeder.length / 2; i++) {
-        const match: BracketMatch = {
-          id: id(),
-          event_id: eventId,
-          bracket: "lower",
-          group_id: opts.groupId ?? null,
-          round_number: lbRounds.length + 1,
-          match_number: matchNumber++,
-          best_of: opts.knockoutBestOf,
-          team_a_id: null,
-          team_b_id: null,
-          team_a_score: 0,
-          team_b_score: 0,
-          winner_id: null,
-          status: "pending",
-          advances_to_match_id: null,
-          advances_to_slot: null,
-          drops_to_match_id: null,
-          drops_to_slot: null,
-        };
-        feeder[i * 2].drops_to_match_id = match.id;
-        feeder[i * 2].drops_to_slot = "a";
-        feeder[i * 2 + 1].drops_to_match_id = match.id;
-        feeder[i * 2 + 1].drops_to_slot = "b";
-        dropRound.push(match);
-      }
-    }
-    matches.push(...dropRound);
-    lbRounds.push(dropRound);
-
-    // Consolidation round: dropRound winners pair among themselves (skip
-    // after the last WB round — that's handled by the LB final vs WB final).
-    if (dropRound.length > 1) {
-      const consolRound: BracketMatch[] = [];
-      for (let i = 0; i < dropRound.length / 2; i++) {
-        consolRound.push({
-          id: id(),
-          event_id: eventId,
-          bracket: "lower",
-          group_id: opts.groupId ?? null,
-          round_number: lbRounds.length + 1,
-          match_number: matchNumber++,
-          best_of: opts.knockoutBestOf,
-          team_a_id: null,
-          team_b_id: null,
-          team_a_score: 0,
-          team_b_score: 0,
-          winner_id: null,
-          status: "pending",
-          advances_to_match_id: null,
-          advances_to_slot: null,
-          drops_to_match_id: null,
-          drops_to_slot: null,
-        });
-      }
-      dropRound.forEach((m, i) => {
-        const target = consolRound[Math.floor(i / 2)];
-        m.advances_to_match_id = target.id;
-        m.advances_to_slot = i % 2 === 0 ? "a" : "b";
-      });
-      matches.push(...consolRound);
-      lbRounds.push(consolRound);
-      prevLbWinnersRound = consolRound;
-    } else {
-      prevLbWinnersRound = dropRound;
-    }
-
-    feeder = wbRounds[wbR];
+  // ---- Lower bracket (double elimination) ----
+  //
+  // Standard structure, expressed as an alternation of two round kinds:
+  //
+  //  - "minor" round: pairs the current LB survivors among themselves,
+  //    halving their count (survivors[2i] vs survivors[2i+1]).
+  //  - "major" round: the current LB survivors face the next wave of
+  //    upper-bracket losers, one-to-one (same count on both sides — this
+  //    always holds for a standard power-of-two bracket, see below).
+  //
+  // Sequence: minor(UBR1 losers) -> major(vs UBR2 losers) -> minor -> major
+  // (vs UBR3 losers) -> ... -> major(vs UBR[rounds] loser) = LB final.
+  // The very last major round (facing the WB-final loser) is the LB final
+  // and is NOT followed by another minor round.
+  //
+  // Why the sizes always match: UBR_k has size/2^k matches. The minor round
+  // right after UBR1's losers are collected halves size/2 -> size/4, which
+  // equals UBR2's match count. Each subsequent major round preserves that
+  // count (paired 1:1 with the same-sized next UB-loser wave), and each
+  // following minor round halves it again to match the round after that.
+  // This identity holds by induction for any power-of-two team count, so no
+  // padding/reconciliation between LB and UB round sizes is ever needed.
+  if (rounds < 2) {
+    // Degenerate case (2 teams): no lower bracket rounds are possible.
+    // Only realistic for tools with very small minimum team counts; the
+    // grand final below simply has no LB challenger.
+    return resolveByes(finishGrandFinal(matches, wbFinal, [], opts, makeMatch));
   }
 
-  // Grand Final: WB champion vs LB champion.
-  const lbChamp = prevLbWinnersRound ?? lbRounds[lbRounds.length - 1];
-  const grandFinal: BracketMatch = {
-    id: id(),
-    event_id: eventId,
-    bracket: "grand_final",
-    group_id: opts.groupId ?? null,
-    round_number: rounds + 1,
-    match_number: matchNumber++,
-    best_of: opts.knockoutBestOf,
-    team_a_id: null,
-    team_b_id: null,
-    team_a_score: 0,
-    team_b_score: 0,
-    winner_id: null,
-    status: "pending",
-    advances_to_match_id: null,
-    advances_to_slot: null,
-    drops_to_match_id: null,
-    drops_to_slot: null,
-  };
+  const ubLosersRound1 = wbRounds[0];
+  // These are WB round-1 matches: their *winner* already advances into WB
+  // round 2 (wired by the "Link WB round r -> r+1" step above) — only their
+  // *loser* drops into LB round 1. Using pairAmongThemselves here would
+  // overwrite that WB advancement link; use the drop-specific helper.
+  let survivors: BracketMatch[] = dropIntoNewRound(ubLosersRound1, "lower", 1, makeMatch);
+  matches.push(...survivors);
+
+  for (let wbR = 1; wbR < rounds; wbR++) {
+    const feederLosers = wbRounds[wbR]; // UB round (wbR+1)'s losers
+    const roundNumber = survivors[0].round_number + 1;
+    const majorRound = pairAgainstFeeder(survivors, feederLosers, "lower", roundNumber, makeMatch);
+    matches.push(...majorRound);
+    survivors = majorRound;
+
+    const isLastWbRound = wbR === rounds - 1;
+    if (!isLastWbRound && survivors.length > 1) {
+      const minorRound = pairAmongThemselves(survivors, "lower", roundNumber + 1, makeMatch);
+      matches.push(...minorRound);
+      survivors = minorRound;
+    }
+  }
+
+  // `survivors` now holds the single LB final winner slot (the LB champion).
+  return resolveByes(finishGrandFinal(matches, wbFinal, survivors, opts, makeMatch));
+}
+
+/** Pair a list of same-bracket matches among themselves, halving their count. */
+function pairAmongThemselves(
+  source: BracketMatch[],
+  bracket: BracketSide,
+  roundNumber: number,
+  makeMatch: (bracket: BracketSide, roundNumber: number) => BracketMatch,
+): BracketMatch[] {
+  const round: BracketMatch[] = [];
+  for (let i = 0; i < source.length / 2; i++) {
+    round.push(makeMatch(bracket, roundNumber));
+  }
+  source.forEach((m, i) => {
+    const target = round[Math.floor(i / 2)];
+    m.advances_to_match_id = target.id;
+    m.advances_to_slot = i % 2 === 0 ? "a" : "b";
+  });
+  return round;
+}
+
+/**
+ * Pair a list of WB matches' *losers* (via drops_to_match_id, not
+ * advances_to_match_id) among themselves, halving their count. Use this
+ * instead of pairAmongThemselves when `source` still needs its
+ * advances_to_match_id left untouched (e.g. WB round-1 matches, whose
+ * winners already advance into WB round 2).
+ */
+function dropIntoNewRound(
+  source: BracketMatch[],
+  bracket: BracketSide,
+  roundNumber: number,
+  makeMatch: (bracket: BracketSide, roundNumber: number) => BracketMatch,
+): BracketMatch[] {
+  const round: BracketMatch[] = [];
+  for (let i = 0; i < source.length / 2; i++) {
+    round.push(makeMatch(bracket, roundNumber));
+  }
+  source.forEach((m, i) => {
+    const target = round[Math.floor(i / 2)];
+    m.drops_to_match_id = target.id;
+    m.drops_to_slot = i % 2 === 0 ? "a" : "b";
+  });
+  return round;
+}
+
+/** Pair LB survivors (slot A) 1:1 against a new wave of UB losers (slot B). */
+function pairAgainstFeeder(
+  survivors: BracketMatch[],
+  feederLosers: BracketMatch[],
+  bracket: BracketSide,
+  roundNumber: number,
+  makeMatch: (bracket: BracketSide, roundNumber: number) => BracketMatch,
+): BracketMatch[] {
+  const round: BracketMatch[] = [];
+  for (let i = 0; i < survivors.length; i++) {
+    round.push(makeMatch(bracket, roundNumber));
+  }
+  survivors.forEach((m, i) => {
+    m.advances_to_match_id = round[i].id;
+    m.advances_to_slot = "a";
+  });
+  feederLosers.forEach((m, i) => {
+    // Cross the incoming upper-bracket loser wave. Pairing the same index
+    // sends an upper-round loser straight back against the survivor from
+    // its own branch, producing an immediate rematch.
+    const target = round[round.length - 1 - i];
+    m.drops_to_match_id = target.id;
+    m.drops_to_slot = "b";
+  });
+  return round;
+}
+
+function finishGrandFinal(
+  matches: BracketMatch[],
+  wbFinal: BracketMatch,
+  lbChamp: BracketMatch[],
+  opts: BuildOptions,
+  makeMatch: (bracket: BracketSide, roundNumber: number) => BracketMatch,
+): BracketMatch[] {
+  const grandFinal = makeMatch("grand_final", 1);
   wbFinal.advances_to_match_id = grandFinal.id;
   wbFinal.advances_to_slot = "a";
   if (lbChamp.length === 1) {
@@ -337,61 +314,153 @@ export function buildKnockoutBracket(
   matches.push(grandFinal);
 
   if (opts.grandFinalReset) {
-    const reset: BracketMatch = {
-      id: id(),
-      event_id: eventId,
-      bracket: "grand_final",
-      group_id: opts.groupId ?? null,
-      round_number: rounds + 2,
-      match_number: matchNumber++,
-      best_of: opts.knockoutBestOf,
-      team_a_id: null,
-      team_b_id: null,
-      team_a_score: 0,
-      team_b_score: 0,
-      winner_id: null,
-      status: "pending",
-      advances_to_match_id: null,
-      advances_to_slot: null,
-      drops_to_match_id: null,
-      drops_to_slot: null,
-    };
+    const reset = makeMatch("grand_final", grandFinal.round_number + 1);
     matches.push(reset);
     // Reset is only played (UI-side) if the LB champion wins the first GF —
     // recordMatchResult() (mayhem-db.ts / sr-db.ts) handles that conditional
     // creation logic by checking bracket === "grand_final" && !grandFinalReset yet.
   }
 
-  return resolveByes(matches);
+  return matches;
 }
 
 function retagFinal(matches: BracketMatch[]): BracketMatch[] {
   // Single-elim: the WB final IS the grand final. Retag it for consistent
-  // rendering/labels on the live screen.
+  // rendering/labels on the live screen. Grand-final rounds are local to
+  // that bracket section: GF1 is always round 1 and a reset is round 2.
   return matches.map((m) =>
     m.advances_to_match_id === null && m.bracket === "upper" && m.drops_to_match_id === null
-      ? { ...m, bracket: "grand_final" as BracketSide }
+      ? { ...m, bracket: "grand_final" as BracketSide, round_number: 1 }
       : m,
   );
 }
 
 /**
- * Auto-resolve bye matches (one real team + one null slot) transitively:
- * mark them completed, set the winner, and advance/drop as normal. Runs
- * until no more byes can be resolved (a chain of byes can cascade).
+ * Auto-resolve bye matches (one real team + one permanently-empty slot)
+ * transitively: mark them completed, set the winner, and advance/drop as
+ * normal. Runs until no more byes can be resolved (a chain of byes, or a
+ * chain of "no loser to drop" from byes, can both cascade).
+ *
+ * Critical distinction this function must get right: an empty slot is only
+ * a genuine bye if NO team will ever arrive there — either because no
+ * match feeds that slot at all (a first-round seed bye), or because the
+ * match that feeds it can itself never produce an occupant (see "fully
+ * dead" below). An empty slot fed by a real, still-undecided match is NOT a
+ * bye — it must wait for that match to actually be played. Treating
+ * "temporarily empty, pending a real result" the same as "permanently
+ * empty" would crown a false winner before the deciding match happens.
+ *
+ * A subtler case this must also handle: a lower-bracket match can have BOTH
+ * of its incoming slots dead at once — e.g. two upper-bracket round-1 byes
+ * both drop into the same LB match, so neither slot will ever receive a
+ * team. Such a match is "fully dead": it will never be played, produces no
+ * winner, and its own downstream slot(s) must be marked dead too — which
+ * can cascade further (a chain of consecutive fully-dead LB rounds when
+ * enough seeds are byes). This is computed as a fixed point over the whole
+ * match set before any bye winners are assigned.
  */
 export function resolveByes(matches: BracketMatch[]): BracketMatch[] {
   const byId = new Map(matches.map((m) => [m.id, m]));
+
+  // Every (matchId, slot) pair that some other match's advances_to/drops_to
+  // targets — i.e. every slot that has a real feeder match, whether or not
+  // that feeder has been decided yet.
+  const hasIncoming = new Set<string>();
+  for (const m of matches) {
+    if (m.advances_to_match_id && m.advances_to_slot) {
+      hasIncoming.add(`${m.advances_to_match_id}:${m.advances_to_slot}`);
+    }
+    if (m.drops_to_match_id && m.drops_to_slot) {
+      hasIncoming.add(`${m.drops_to_match_id}:${m.drops_to_slot}`);
+    }
+  }
+
+  // The grand-final *reset* match (when enabled) is a deliberate exception:
+  // it has zero incoming links by design (see finishGrandFinal) because it
+  // is populated later, conditionally, by application code — only if the
+  // lower-bracket champion wins the first grand final. It must never be
+  // treated as "fully dead" just because nothing structurally feeds it.
+  const hasAnyIncoming = (matchId: string) =>
+    hasIncoming.has(`${matchId}:a`) || hasIncoming.has(`${matchId}:b`);
+  const grandFinals = matches
+    .filter((m) => m.bracket === "grand_final")
+    .sort((a, b) => a.round_number - b.round_number);
+  const deferredResetId = grandFinals.length > 1 ? grandFinals[grandFinals.length - 1].id : null;
+  const isDeferredResetMatch = (m: BracketMatch) =>
+    m.id === deferredResetId && !hasAnyIncoming(m.id);
+
+  // Fixed-point pass 1: compute every dead slot, including cascades through
+  // fully-dead matches (both slots dead => the match itself is dead => its
+  // own outgoing slot(s) are dead too).
+  const dead = new Set<string>();
+  for (const m of matches) {
+    if (isDeferredResetMatch(m)) continue;
+    if (m.team_a_id === null && !hasIncoming.has(`${m.id}:a`)) dead.add(`${m.id}:a`);
+    if (m.team_b_id === null && !hasIncoming.has(`${m.id}:b`)) dead.add(`${m.id}:b`);
+    if (m.status === "bye" && m.drops_to_match_id && m.drops_to_slot) {
+      dead.add(`${m.drops_to_match_id}:${m.drops_to_slot}`);
+    }
+  }
+  let deadChanged = true;
+  while (deadChanged) {
+    deadChanged = false;
+    for (const m of byId.values()) {
+      if (isDeferredResetMatch(m)) continue;
+      // A match is "fully dead" once both its slots are confirmed dead
+      // (whether built-in-empty or filled-in-during-play — but a match
+      // that already has a real team in a slot is never fully dead).
+      const aDead = m.team_a_id === null && dead.has(`${m.id}:a`);
+      const bDead = m.team_b_id === null && dead.has(`${m.id}:b`);
+      if (!aDead || !bDead) continue;
+      // Fully dead: propagate to whatever this match would have fed.
+      if (m.advances_to_match_id && m.advances_to_slot) {
+        const key = `${m.advances_to_match_id}:${m.advances_to_slot}`;
+        if (!dead.has(key)) {
+          dead.add(key);
+          deadChanged = true;
+        }
+      }
+      if (m.drops_to_match_id && m.drops_to_slot) {
+        const key = `${m.drops_to_match_id}:${m.drops_to_slot}`;
+        if (!dead.has(key)) {
+          dead.add(key);
+          deadChanged = true;
+        }
+      }
+    }
+  }
+
   let changed = true;
   while (changed) {
     changed = false;
     for (const m of byId.values()) {
       if (m.status !== "pending") continue;
+      if (isDeferredResetMatch(m)) continue; // never auto-resolved; app code populates it
       const hasA = m.team_a_id !== null;
       const hasB = m.team_b_id !== null;
-      // Both slots permanently empty (no upstream match feeds this slot) and
-      // not a first-round match — leave as pending; it'll fill in later.
-      if (hasA === hasB) continue; // both filled (real match) or both empty (not ready)
+      if (hasA && hasB) continue; // real match, both teams present — wait for it to be played
+
+      if (!hasA && !hasB) {
+        // Fully dead (both slots confirmed dead, no team will ever arrive):
+        // resolve with no winner so it stops being iterated as "pending"
+        // forever, but don't treat it as a bye advancing a team — there is
+        // no team to advance. Its downstream dead-slot propagation is
+        // already accounted for in the fixed point above.
+        if (dead.has(`${m.id}:a`) && dead.has(`${m.id}:b`)) {
+          m.status = "bye";
+          m.winner_id = null;
+          changed = true;
+        }
+        continue;
+      }
+
+      // Exactly one slot filled. Only resolve as a bye once the empty slot
+      // is a *confirmed* dead end. If it's fed by a real match that hasn't
+      // been decided yet, leave this match pending — it will fill in
+      // naturally (as an ordinary two-team match) once that feeder plays.
+      const emptySlot = hasA ? "b" : "a";
+      if (!dead.has(`${m.id}:${emptySlot}`)) continue;
+
       const winner = hasA ? m.team_a_id : m.team_b_id;
       m.status = "bye";
       m.winner_id = winner;
@@ -407,4 +476,156 @@ export function resolveByes(matches: BracketMatch[]): BracketMatch[] {
     }
   }
   return Array.from(byId.values());
+}
+
+/** A reported series must end exactly when one side reaches the win target. */
+export function validateClinchingScore(bestOf: 1 | 3 | 5, teamAScore: number, teamBScore: number): void {
+  if (!Number.isInteger(teamAScore) || !Number.isInteger(teamBScore) || teamAScore < 0 || teamBScore < 0) {
+    throw new Error("Scores must be non-negative whole numbers.");
+  }
+  const winsNeeded = Math.floor(bestOf / 2) + 1;
+  const winnerScore = Math.max(teamAScore, teamBScore);
+  const loserScore = Math.min(teamAScore, teamBScore);
+  if (winnerScore !== winsNeeded || loserScore >= winsNeeded) {
+    throw new Error(`A best-of-${bestOf} result must finish when one team reaches ${winsNeeded} wins.`);
+  }
+}
+
+export interface AppliedBracketResult {
+  matches: BracketMatch[];
+  winnerId: string;
+  loserId: string;
+  championId: string | null;
+}
+
+/** Apply one result, including advancement, bye cascades, and GF reset state. */
+export function applyBracketResult(
+  matches: BracketMatch[],
+  matchId: string,
+  teamAScore: number,
+  teamBScore: number,
+): AppliedBracketResult {
+  const byId = new Map(matches.map((m) => [m.id, m]));
+  const match = byId.get(matchId);
+  if (!match) throw new Error("Match not found.");
+  if (match.status === "completed") throw new Error("This match already has a result.");
+  if (!match.team_a_id || !match.team_b_id) {
+    throw new Error("Both teams must be set before reporting a result.");
+  }
+  validateClinchingScore(match.best_of, teamAScore, teamBScore);
+
+  const winnerId = teamAScore > teamBScore ? match.team_a_id : match.team_b_id;
+  const loserId = winnerId === match.team_a_id ? match.team_b_id : match.team_a_id;
+  match.team_a_score = teamAScore;
+  match.team_b_score = teamBScore;
+  match.winner_id = winnerId;
+  match.status = "completed";
+
+  if (match.advances_to_match_id && match.advances_to_slot) {
+    const target = byId.get(match.advances_to_match_id);
+    if (!target) throw new Error("Bracket advancement target is missing.");
+    if (match.advances_to_slot === "a") target.team_a_id = winnerId;
+    else target.team_b_id = winnerId;
+  }
+  if (match.drops_to_match_id && match.drops_to_slot) {
+    const target = byId.get(match.drops_to_match_id);
+    if (!target) throw new Error("Bracket drop target is missing.");
+    if (match.drops_to_slot === "a") target.team_a_id = loserId;
+    else target.team_b_id = loserId;
+  }
+
+  resolveByes(matches);
+
+  const grandFinals = matches
+    .filter((m) => m.bracket === "grand_final")
+    .sort((a, b) => a.round_number - b.round_number);
+  const isGf1 = grandFinals[0]?.id === matchId;
+  const reset = grandFinals[1];
+  let championId: string | null = null;
+  if (isGf1 && reset) {
+    if (winnerId === match.team_b_id) {
+      reset.team_a_id = match.team_a_id;
+      reset.team_b_id = match.team_b_id;
+      reset.status = "pending";
+    } else {
+      reset.team_a_id = null;
+      reset.team_b_id = null;
+      reset.winner_id = null;
+      reset.status = "bye";
+      championId = winnerId;
+    }
+  } else if (match.bracket === "grand_final") {
+    championId = winnerId;
+  }
+
+  return { matches, winnerId, loserId, championId };
+}
+
+/**
+ * Retract a result and every auto-resolved bye that depended on it. A real
+ * downstream match that is completed or already has both teams still blocks
+ * undo; only mechanical bye propagation is rolled back automatically.
+ */
+export function retractBracketResult(matches: BracketMatch[], matchId: string): BracketMatch[] {
+  const byId = new Map(matches.map((m) => [m.id, m]));
+  const root = byId.get(matchId);
+  if (!root) throw new Error("Match not found.");
+  if (root.status !== "completed") throw new Error("This match has no result to undo.");
+
+  const clearOutcome = (source: BracketMatch, kind: "advance" | "drop") => {
+    const targetId = kind === "advance" ? source.advances_to_match_id : source.drops_to_match_id;
+    const slot = kind === "advance" ? source.advances_to_slot : source.drops_to_slot;
+    const occupant = kind === "advance"
+      ? source.winner_id
+      : source.winner_id === source.team_a_id
+        ? source.team_b_id
+        : source.team_a_id;
+    if (!targetId || !slot || !occupant) return;
+    const target = byId.get(targetId);
+    if (!target) throw new Error("Bracket downstream target is missing.");
+
+    if (target.status === "completed") {
+      throw new Error("Can't undo — a downstream match already has a result.");
+    }
+    if (target.status !== "bye" && target.team_a_id && target.team_b_id) {
+      throw new Error("Can't undo — a downstream match already has both teams.");
+    }
+    if (target.status === "bye") {
+      // Retract its own mechanical winner first; this recursively clears a
+      // chain of bye advancements before clearing the slot that created it.
+      clearOutcome(target, "advance");
+      clearOutcome(target, "drop");
+      target.team_a_score = 0;
+      target.team_b_score = 0;
+      target.winner_id = null;
+      target.status = "pending";
+    }
+    if (slot === "a" && target.team_a_id === occupant) target.team_a_id = null;
+    if (slot === "b" && target.team_b_id === occupant) target.team_b_id = null;
+  };
+
+  clearOutcome(root, "advance");
+  clearOutcome(root, "drop");
+
+  const grandFinals = matches
+    .filter((m) => m.bracket === "grand_final")
+    .sort((a, b) => a.round_number - b.round_number);
+  if (grandFinals[0]?.id === root.id && grandFinals[1]) {
+    const reset = grandFinals[1];
+    if (reset.status === "completed") {
+      throw new Error("Can't undo — the grand-final reset has already been played.");
+    }
+    reset.team_a_id = null;
+    reset.team_b_id = null;
+    reset.team_a_score = 0;
+    reset.team_b_score = 0;
+    reset.winner_id = null;
+    reset.status = "pending";
+  }
+
+  root.team_a_score = 0;
+  root.team_b_score = 0;
+  root.winner_id = null;
+  root.status = "pending";
+  return matches;
 }

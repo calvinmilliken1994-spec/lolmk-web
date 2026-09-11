@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Lock, Swords, Timer } from "lucide-react";
+import { ArrowRight, Lock, Swords, Timer, Trophy } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getToolsCredentials, isToolsSession } from "@/lib/tools-auth";
+import { isDiscordAuthConfigured, isToolsSession } from "@/lib/tools-auth";
 
 export const metadata: Metadata = {
   title: "Tools",
@@ -34,11 +34,18 @@ const TOOLS: ToolEntry[] = [
       "Run fun ARAM tournaments: entrants, team randomizer, configurable brackets, live match control. Pairs with the /mayhemlive venue screen.",
     icon: Swords,
   },
+  {
+    name: "Summoner's Rift",
+    slug: "summoners-rift",
+    description:
+      "Persistent 5v5 tournaments: teams and logos, random seeding, single/double-elim brackets, live result reporting and a full audit log.",
+    icon: Trophy,
+  },
 ];
 
 export default async function ToolsPage() {
-  const credentialsConfigured = getToolsCredentials() !== null;
-  const signedIn = credentialsConfigured && (await isToolsSession());
+  const configured = isDiscordAuthConfigured();
+  const signedIn = configured && (await isToolsSession());
 
   return (
     <>
@@ -60,15 +67,17 @@ export default async function ToolsPage() {
               key.
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              {credentialsConfigured ? (
+              {configured ? (
                 signedIn ? (
-                  <Link
-                    href="/tools/logout"
-                    className={cn(buttonVariants({ variant: "secondary", size: "lg" }))}
-                  >
-                    <Lock strokeWidth={1.5} className="h-5 w-5" />
-                    Sign out
-                  </Link>
+                  <form action="/tools/logout" method="post">
+                    <button
+                      type="submit"
+                      className={cn(buttonVariants({ variant: "secondary", size: "lg" }))}
+                    >
+                      <Lock strokeWidth={1.5} className="h-5 w-5" />
+                      Sign out
+                    </button>
+                  </form>
                 ) : (
                   <Link
                     href="/tools/login"
@@ -81,8 +90,9 @@ export default async function ToolsPage() {
                 )
               ) : (
                 <p className="text-body-sm text-warning border border-warning/50 bg-warning/10 px-4 py-2.5 rounded-sm">
-                  Login is not configured yet. Set TOOLS_ADMIN_USERNAME and
-                  TOOLS_ADMIN_PASSWORD.
+                  Login is not configured yet. Set the Discord OAuth env vars
+                  (DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_GUILD_ID,
+                  DISCORD_ADMIN_ROLE_ID).
                 </p>
               )}
             </div>

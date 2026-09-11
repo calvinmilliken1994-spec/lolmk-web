@@ -6,6 +6,7 @@ const DATE_FMT = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "long",
   day: "numeric",
+  timeZone: "Asia/Seoul",
 });
 
 function initials(team: ChampionTeam): string {
@@ -53,9 +54,16 @@ function DetailCell({
 export function HallOfChampions({
   latest,
   past,
+  samples = [],
 }: {
   latest: ChampionRecord | null;
   past: ChampionRecord[];
+  /**
+   * Seeded sample records (`placeholder: true`). Kept strictly apart from
+   * `latest`/`past` so a demo row can never be rendered as a real winner —
+   * it only appears, clearly badged, when there are no real results yet.
+   */
+  samples?: ChampionRecord[];
 }) {
   return (
     <section className="container-wide py-24 border-t border-line-subtle">
@@ -88,7 +96,21 @@ export function HallOfChampions({
           )}
         </>
       ) : (
-        <EmptyHall />
+        <>
+          <EmptyHall />
+          {samples.length > 0 && (
+            <div className="mt-8">
+              <p className="text-label uppercase text-ink-muted mb-4">
+                Placeholder — not a real result
+              </p>
+              <ul className="divide-y divide-line-subtle border-y border-line-subtle opacity-60">
+                {samples.map((r) => (
+                  <PastChampionRow key={r.id} record={r} />
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
@@ -113,9 +135,13 @@ function FeaturedChampion({ record }: { record: ChampionRecord }) {
                 {record.tournament} · {record.game} · {DATE_FMT.format(new Date(record.date))}
               </p>
             </div>
-            {record.placeholder && (
+            {record.placeholder ? (
               <Badge variant="outline">Sample, replace with results</Badge>
-            )}
+            ) : record.source === "legacy" ? (
+              <Badge variant="outline" title="Entered by hand; predates the tournament system.">
+                Pre-system record
+              </Badge>
+            ) : null}
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-6">
@@ -180,9 +206,16 @@ function PastChampionRow({ record }: { record: ChampionRecord }) {
           {record.champion.name}
         </p>
         <p className="text-caption font-mono uppercase tracking-wide text-ink-muted">
-          {record.tournament} · {DATE_FMT.format(new Date(record.date))}
+          {record.tournament} · {record.game} · {DATE_FMT.format(new Date(record.date))}
         </p>
       </div>
+      {record.placeholder ? (
+        <Badge variant="outline">Sample</Badge>
+      ) : record.source === "legacy" ? (
+        <Badge variant="outline" title="Entered by hand; predates the tournament system.">
+          Pre-system
+        </Badge>
+      ) : null}
       <Crown strokeWidth={1.5} className="h-5 w-5 text-warning shrink-0" />
     </li>
   );
