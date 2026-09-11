@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { CursorToggle } from "@/components/layout/cursor-toggle";
 
 const COLUMNS: { title: string; links: { label: string; href: string; external?: boolean }[] }[] = [
   {
@@ -81,9 +82,12 @@ export function Footer() {
           <p className="text-caption text-ink-muted">
             © {new Date().getFullYear()} LoLMK. Not affiliated with Riot Games or LCK.
           </p>
-          <p className="text-caption text-ink-muted font-mono">
-            Seoul, KR
-          </p>
+          <div className="flex items-center gap-6">
+            <CursorToggle />
+            <p className="text-caption text-ink-muted font-mono">
+              Seoul, KR
+            </p>
+          </div>
         </div>
       </div>
     </footer>

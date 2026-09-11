@@ -44,6 +44,12 @@
   *:focus-visible {
     @apply outline-none ring-2 ring-brand-red ring-offset-2 ring-offset-base;
   }
+
+  /* Site-wide custom cursor, toggled via .lolmk-cursor on <html>. */
+  html.lolmk-cursor,
+  html.lolmk-cursor * {
+    cursor: url("/lolcursor.cur"), auto !important;
+  }
 }
 
 @layer components {
