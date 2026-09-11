@@ -65,6 +65,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css"
         />
+        <script
+          // Applied before hydration so the custom cursor never flashes on/off.
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('lolmk-cursor')!=='off'){document.documentElement.classList.add('lolmk-cursor')}}catch(e){}",
+          }}
+        />
       </head>
       <body className="bg-base text-ink min-h-screen">
         <Header />
