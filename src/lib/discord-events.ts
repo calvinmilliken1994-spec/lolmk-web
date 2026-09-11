@@ -24,11 +24,11 @@ interface DiscordScheduledEvent {
 // before more generic ones. Add to these lists as new event vocabularies show
 // up; admins shouldn't have to learn a tagging convention.
 const KIND_KEYWORDS: ReadonlyArray<readonly [EventKind, readonly string[]]> = [
-  ["tournament", ["tournament", "cup", "championship", "showdown", "finals", "playoff", "bracket"]],
   ["watch-party", ["watch party", "watch night", "watch-along", "watchalong", "viewing party", "screening", "broadcast"]],
   ["in-house", ["in-house", "inhouse", "in house", "captains draft"]],
   ["scrim", ["scrim", "scrimmage", "5v5 practice"]],
   ["meetup", ["meetup", "meet up", "meet-up", "hangout", "gathering", "social night"]],
+  ["tournament", ["tournament", "cup", "championship", "showdown", "finals", "playoff", "bracket"]],
 ];
 
 function detectKind(name: string, description: string | null): EventKind {

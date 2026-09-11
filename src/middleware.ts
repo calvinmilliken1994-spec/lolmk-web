@@ -1,18 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { sql } from "@vercel/postgres";
 
 /**
- * Login wall for the admin tools area. Everything under /tools is protected
- * except the landing page itself, the login form, and the logout endpoint.
+ * Login wall for the admin tools area, Discord OAuth-backed.
  *
- * The cookie value is sha256("username:password"); we recompute the expected
- * hash from the env credentials and compare. Unset credentials fail closed —
- * visitors get the login page, never the tools.
+ * CHEAP, Edge-compatible presence/expiry check only — @vercel/postgres's
+ * tagged-template `sql` is fetch-based (verified: dist/index.js has no
+ * TCP/net imports, unlike index-node.js which is the pg-Pool-based build
+ * for real Node servers) so it's safe to call from the Edge middleware
+ * runtime. This does NOT do full role re-verification against Discord —
+ * that's isToolsSession() in discord-auth.ts, called from every protected
+ * Node-runtime page/server action directly. Middleware is defense in
+ * depth, not the only gate — server actions don't route through it at all.
+ *
+ * token_hash matches admin-session-db.ts: the cookie holds the raw token,
+ * only its SHA-256 digest is ever looked up here or stored in Postgres.
+ * Hashing uses Web Crypto (crypto.subtle), NOT node:crypto — Next.js
+ * middleware runs on the Edge runtime, which does not have Node's crypto
+ * module. node:crypto here would fail at request time even though it
+ * typechecks fine (tsc has no idea which runtime a file executes under).
  */
 
-const COOKIE_NAME = "lolmk-tools";
+const SESSION_COOKIE_NAME = "lolmk-admin-session";
 
-async function sha256Hex(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input);
+async function hashToken(token: string): Promise<string> {
+  const data = new TextEncoder().encode(token);
   const digest = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -22,8 +34,6 @@ async function sha256Hex(input: string): Promise<string> {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Public by design: the landing page is the front door, login/logout are
-  // how you go through it.
   if (
     pathname === "/tools" ||
     pathname === "/tools/" ||
@@ -33,22 +43,28 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const username = (process.env.TOOLS_ADMIN_USERNAME ?? "").trim();
-  const password = (process.env.TOOLS_ADMIN_PASSWORD ?? "").trim();
+  const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
   const loginUrl = new URL("/tools/login", req.url);
+  loginUrl.searchParams.set("next", pathname);
 
-  if (!username || !password) {
+  if (!token) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const expected = await sha256Hex(`${username}:${password}`);
-  const value = req.cookies.get(COOKIE_NAME)?.value;
-  if (value && value === expected) {
-    return NextResponse.next();
+  try {
+    const tokenHash = await hashToken(token);
+    const { rows } = await sql`
+      SELECT 1 FROM admin_sessions WHERE token_hash = ${tokenHash} AND expires_at > now()
+    `;
+    if (rows.length === 0) {
+      return NextResponse.redirect(loginUrl);
+    }
+  } catch {
+    // DB unreachable from the Edge runtime: fail closed.
+    return NextResponse.redirect(loginUrl);
   }
 
-  loginUrl.searchParams.set("next", pathname);
-  return NextResponse.redirect(loginUrl);
+  return NextResponse.next();
 }
 
 export const config = {

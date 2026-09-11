@@ -46,6 +46,26 @@
   }
 }
 
+@layer components {
+  .hero-video {
+    display: none;
+  }
+
+  .hero-video-poster {
+    display: block;
+  }
+
+  @media (min-width: 768px) and (prefers-reduced-motion: no-preference) {
+    .hero-video-poster {
+      display: none;
+    }
+
+    .hero-video {
+      display: block;
+    }
+  }
+}
+
 @layer utilities {
   .container-content {
     @apply mx-auto w-full max-w-content px-4 md:px-8 lg:px-12;

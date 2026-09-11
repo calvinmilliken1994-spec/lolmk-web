@@ -7,6 +7,7 @@ import type {
   MayhemGroup,
   MayhemMatch,
   MayhemPlayer,
+  MayhemPublic,
   MayhemScene,
   MayhemStage,
   MayhemTeam,
@@ -188,3 +189,74 @@ export async function getMayhemFull(): Promise<MayhemFull> {
 }
 
 export { SINGLETON_EVENT_ID };
+
+// ---------------------------------------------------------------------------
+// Public read
+// ---------------------------------------------------------------------------
+
+/**
+ * The single read used by the public /tournaments/aram page.
+ *
+ * getMayhemFull() above is the admin/venue read and returns the whole event
+ * including presentation state; this projects it down to MayhemPublic and,
+ * more importantly, enforces the reveal gate:
+ *
+ *   stage === "collecting"  → no teams at all (the randomizer hasn't run)
+ *   scene  === "reveal"     → only the teams already shown on /mayhemlive
+ *   otherwise               → the full field
+ *
+ * Without that gate the website would publish the complete team list while
+ * the room is still watching them get revealed one by one, which is the
+ * entire point of the format.
+ */
+export async function getMayhemPublic(): Promise<MayhemPublic> {
+  const full = await getMayhemFull();
+  const { event, players, teams, matches } = full;
+
+  const revealing = event.scene === "reveal";
+  const visibleTeams =
+    event.stage === "collecting" ? [] : revealing ? teams.slice(0, event.reveal_index) : teams;
+
+  return {
+    title: event.title,
+    stage: event.stage,
+    // A champion id that points at a team we're deliberately not showing yet
+    // would be a leak of exactly the thing the reveal gate protects.
+    champion_team_id:
+      event.champion_team_id && visibleTeams.some((t) => t.id === event.champion_team_id)
+        ? event.champion_team_id
+        : null,
+    player_count: players.length,
+    teams: visibleTeams.map((t) => ({
+      id: t.id,
+      name: t.name,
+      icon_url: t.icon_url,
+      seed: t.seed,
+      players: t.players.map((p) => ({ display_name: p.display_name })),
+    })),
+    reveal_in_progress: revealing && visibleTeams.length < teams.length,
+    // Matches referencing a not-yet-revealed team are withheld wholesale
+    // rather than shown with blanked-out slots, which would still leak that
+    // a pairing exists.
+    matches: matches
+      .filter(
+        (m) =>
+          (!m.team_a_id || visibleTeams.some((t) => t.id === m.team_a_id)) &&
+          (!m.team_b_id || visibleTeams.some((t) => t.id === m.team_b_id)),
+      )
+      .map((m) => ({
+        id: m.id,
+        bracket: m.bracket,
+        round_number: m.round_number,
+        match_number: m.match_number,
+        best_of: m.best_of,
+        team_a_id: m.team_a_id,
+        team_b_id: m.team_b_id,
+        team_a_score: m.team_a_score,
+        team_b_score: m.team_b_score,
+        winner_id: m.winner_id,
+        status: m.status,
+      })),
+    updated_at: event.updated_at,
+  };
+}

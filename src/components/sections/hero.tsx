@@ -14,16 +14,34 @@ interface HeroProps {
 export function Hero({ nextEventLabel, nextEventIsLive, discordOnline }: HeroProps) {
   const hasPresence = Boolean(discordOnline && discordOnline !== "—");
   return (
-    <section className="relative overflow-hidden border-b border-line-subtle">
+    <section className="relative overflow-hidden border-b border-line-subtle bg-base">
+      <Image
+        src="/images/hero/hero-league-poster.webp"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        aria-hidden
+        className="hero-video-poster absolute inset-0 h-full w-full object-cover opacity-30"
+      />
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        poster="/images/hero/hero-league-poster.webp"
+        aria-hidden
+        className="hero-video absolute inset-0 h-full w-full object-cover opacity-35"
+      >
+        <source src="/videos/hero-league-loop.mp4" type="video/mp4" />
+      </video>
+      <div aria-hidden className="absolute inset-0 bg-base/60 pointer-events-none" />
       <div
         aria-hidden
         className="absolute inset-0 grain pointer-events-none"
       />
-      <div
-        aria-hidden
-        className="absolute -top-40 left-1/2 h-[640px] w-[1200px] -translate-x-1/2 bg-gradient-to-br from-brand-red/15 via-transparent to-brand-blue/15 blur-3xl pointer-events-none"
-      />
-      <div className="container-wide relative pt-24 pb-32 md:pt-32 md:pb-40">
+      <div className="container-wide relative z-10 pt-24 pb-32 md:pt-32 md:pb-40">
         <div className="grid lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 space-y-8">
             <div className="flex flex-wrap items-center gap-3">

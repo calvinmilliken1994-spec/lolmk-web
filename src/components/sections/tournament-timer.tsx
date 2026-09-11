@@ -30,7 +30,7 @@ const MINUTE = 60_000;
 const WARNING_MS = 5 * MINUTE; // amber-ish urgency
 const URGENT_MS = 60_000; // final minute
 
-type TimerState = {
+export type TimerState = {
   index: number;
   /** The segment's scheduled length — what Reset returns to, unaffected by +/- adjustments. */
   baseDurationMs: number;
@@ -40,6 +40,62 @@ type TimerState = {
   /** Wall-clock ms when the round hits 00:00. Null while paused. */
   endsAt: number | null;
 };
+
+/**
+ * Treat localStorage as untrusted input. A partial shape check is not enough:
+ * NaN, negative durations, fractional/out-of-range indexes, or an inconsistent
+ * running/endsAt pair can otherwise hydrate into a broken clock indefinitely.
+ */
+export function validatePersistedTimerState(
+  value: unknown,
+  schedule: TimerSegment[],
+  now = Date.now(),
+): TimerState | null {
+  if (!value || typeof value !== "object") return null;
+  const saved = value as Record<string, unknown>;
+  const index = saved.index;
+  if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= schedule.length) {
+    return null;
+  }
+
+  const segment = schedule[index as number];
+  const baseDurationMs = saved.baseDurationMs;
+  const durationMs = saved.durationMs;
+  const remainingMs = saved.remainingMs;
+  const running = saved.running;
+  const endsAt = saved.endsAt;
+
+  if (
+    typeof baseDurationMs !== "number" ||
+    !Number.isFinite(baseDurationMs) ||
+    baseDurationMs !== segment.minutes * MINUTE ||
+    typeof durationMs !== "number" ||
+    !Number.isFinite(durationMs) ||
+    durationMs < 0 ||
+    typeof remainingMs !== "number" ||
+    !Number.isFinite(remainingMs) ||
+    remainingMs < 0 ||
+    remainingMs > durationMs ||
+    typeof running !== "boolean"
+  ) {
+    return null;
+  }
+
+  if (running) {
+    if (
+      typeof endsAt !== "number" ||
+      !Number.isFinite(endsAt) ||
+      endsAt < 0 ||
+      endsAt > now + durationMs
+    ) {
+      return null;
+    }
+  } else if (endsAt !== null) {
+    return null;
+  }
+
+  return { index: index as number, baseDurationMs, durationMs, remainingMs, running, endsAt };
+}
 
 type Action =
   | { type: "toggle"; now: number }
@@ -194,23 +250,18 @@ export function TournamentTimer({ schedule }: { schedule: TimerSegment[] }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const saved = JSON.parse(raw) as TimerState;
-        if (
-          typeof saved.index === "number" &&
-          saved.index < schedule.length &&
-          typeof saved.baseDurationMs === "number" &&
-          typeof saved.durationMs === "number" &&
-          typeof saved.remainingMs === "number"
-        ) {
+        const saved = validatePersistedTimerState(JSON.parse(raw), schedule);
+        if (saved) {
           const now = Date.now();
-          let next: TimerState = { ...saved };
-          if (saved.running && saved.endsAt != null) {
-            const rem = Math.max(0, saved.endsAt - now);
+          let next: TimerState;
+          if (saved.running) {
+            // Validation guarantees a finite endsAt for running state.
+            const rem = Math.max(0, saved.endsAt! - now);
             next = rem <= 0
               ? { ...saved, running: false, endsAt: null, remainingMs: 0 }
               : { ...saved, remainingMs: rem };
           } else {
-            next = { ...saved, running: false, endsAt: null };
+            next = saved;
           }
           dispatch({ type: "hydrate", state: next });
         }

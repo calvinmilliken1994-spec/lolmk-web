@@ -124,3 +124,65 @@ export interface MayhemFull {
   groups: MayhemGroup[];
   matches: MayhemMatch[];
 }
+
+// ---------------------------------------------------------------------------
+// Public projection
+// ---------------------------------------------------------------------------
+//
+// What an unauthenticated visitor on /tournaments/aram may see. The shapes
+// above mirror DB rows and drive the admin tool + the venue screen; these
+// drop everything that is either presentation state for the venue screen or
+// simply nobody's business:
+//
+//   - `scene`, `reveal_index`, `countdown_ends_at`, `active_match_id`: stage
+//     direction for /mayhemlive. Publishing them would let anyone watch an
+//     admin cue the room in real time.
+//   - `format`: the admin's configuration object, not a result.
+//   - player `id` / `entry_order` / `team_id`: internal keys.
+//
+// The reveal gate below is the load-bearing part: ARAM Mayhem's whole format
+// is a live team reveal at the venue. Publishing the full team list on the
+// website while the room is still watching them appear one at a time would
+// spoil the event, so this page shows exactly as much as the venue screen
+// has already shown, and nothing before the randomizer has even run.
+
+export interface MayhemPublicPlayer {
+  display_name: string;
+}
+
+export interface MayhemPublicTeam {
+  id: string;
+  name: string;
+  icon_url: string;
+  seed: number | null;
+  players: MayhemPublicPlayer[];
+}
+
+export interface MayhemPublicMatch {
+  id: string;
+  bracket: MayhemMatchBracket;
+  round_number: number;
+  match_number: number;
+  best_of: SeriesLength;
+  team_a_id: string | null;
+  team_b_id: string | null;
+  team_a_score: number;
+  team_b_score: number;
+  winner_id: string | null;
+  status: MayhemMatchStatus;
+}
+
+export interface MayhemPublic {
+  title: string;
+  stage: MayhemStage;
+  /** Null until a champion is decided; always one of `teams` when set. */
+  champion_team_id: string | null;
+  /** Entrant count. Safe to show while teams are still hidden. */
+  player_count: number;
+  /** Empty while entrants are still being collected, or partially filled mid-reveal. */
+  teams: MayhemPublicTeam[];
+  /** True when `teams` is intentionally incomplete because the venue reveal is running. */
+  reveal_in_progress: boolean;
+  matches: MayhemPublicMatch[];
+  updated_at: string;
+}

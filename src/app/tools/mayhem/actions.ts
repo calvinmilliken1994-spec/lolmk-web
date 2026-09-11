@@ -6,6 +6,11 @@ import { isToolsSession } from "@/lib/tools-auth";
 import { ensureSchema, getMayhemFull, newId, SINGLETON_EVENT_ID } from "@/lib/mayhem-db";
 import { pickTeamIdentities, shuffle } from "@/lib/mayhem-icons";
 import { buildKnockoutBracket } from "@/lib/mayhem-bracket";
+import {
+  applyBracketResult,
+  retractBracketResult,
+  type BracketMatch,
+} from "@/lib/bracket-engine";
 import { buildGroupRoundRobin, computeGroupStandings } from "@/lib/mayhem-groups";
 import type { MayhemFormatConfig, MayhemScene } from "@/types/mayhem";
 
@@ -21,6 +26,26 @@ function touch() {
 function refresh() {
   revalidatePath("/tools/mayhem");
   revalidatePath("/mayhemlive");
+}
+
+async function persistMayhemBracket(matches: BracketMatch[]): Promise<void> {
+  for (const match of matches) {
+    await sql.query(
+      `UPDATE mayhem_matches SET team_a_id = $2, team_b_id = $3,
+         team_a_score = $4, team_b_score = $5, winner_id = $6, status = $7
+       WHERE id = $1 AND event_id = $8`,
+      [
+        match.id,
+        match.team_a_id,
+        match.team_b_id,
+        match.team_a_score,
+        match.team_b_score,
+        match.winner_id,
+        match.status,
+        SINGLETON_EVENT_ID,
+      ],
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +221,13 @@ export async function advanceReveal() {
 
 export async function updateFormat(format: MayhemFormatConfig) {
   await requireAdmin();
+  if (format.knockout.doubleElimination && format.knockout.thirdPlaceMatch) {
+    throw new Error("Third-place matches are not supported for double elimination.");
+  }
+  const full = await getMayhemFull();
+  if (full.matches.some((match) => match.bracket !== "group")) {
+    throw new Error("Knockout settings can't be changed after the bracket is generated.");
+  }
   await sql`
     UPDATE mayhem_events SET format = ${JSON.stringify(format)}::jsonb
     WHERE id = ${SINGLETON_EVENT_ID}
@@ -348,87 +380,43 @@ export async function setActiveMatch(matchId: string | null) {
   refresh();
 }
 
-/**
- * Record a match result. Winner takes the series (score is informational —
- * best_of just tells the admin/venue screen how many games to expect).
- * Auto-advances the winner and drops the loser per the match's links.
- */
+/** Record a clinching result and persist all advancement/reset/bye effects. */
 export async function recordMatchResult(matchId: string, teamAScore: number, teamBScore: number) {
   await requireAdmin();
   const full = await getMayhemFull();
-  const match = full.matches.find((m) => m.id === matchId);
-  if (!match || !match.team_a_id || !match.team_b_id) return;
+  const graph = full.matches as unknown as BracketMatch[];
+  const result = applyBracketResult(graph, matchId, teamAScore, teamBScore);
+  await persistMayhemBracket(graph);
 
-  const winnerId = teamAScore > teamBScore ? match.team_a_id : match.team_b_id;
-  const loserId = winnerId === match.team_a_id ? match.team_b_id : match.team_a_id;
-
-  await sql`
-    UPDATE mayhem_matches
-    SET team_a_score = ${teamAScore}, team_b_score = ${teamBScore},
-        winner_id = ${winnerId}, status = 'completed'
-    WHERE id = ${matchId}
-  `;
-
-  if (match.advances_to_match_id && match.advances_to_slot) {
-    const col = match.advances_to_slot === "a" ? "team_a_id" : "team_b_id";
-    await sql.query(
-      `UPDATE mayhem_matches SET ${col} = $1 WHERE id = $2`,
-      [winnerId, match.advances_to_match_id],
-    );
-  }
-  if (match.drops_to_match_id && match.drops_to_slot && loserId) {
-    const col = match.drops_to_slot === "a" ? "team_a_id" : "team_b_id";
-    await sql.query(
-      `UPDATE mayhem_matches SET ${col} = $1 WHERE id = $2`,
-      [loserId, match.drops_to_match_id],
-    );
-  }
-
-  // Champion detection: grand final (final one, no downstream) completed.
-  if (match.bracket === "grand_final" && !match.advances_to_match_id) {
+  if (result.championId) {
     await sql`
       UPDATE mayhem_events
-      SET champion_team_id = ${winnerId}, scene = 'champion', active_match_id = NULL, stage = 'completed'
+      SET champion_team_id = ${result.championId}, scene = 'champion', active_match_id = NULL, stage = 'completed'
       WHERE id = ${SINGLETON_EVENT_ID}
     `;
-  } else {
+  } else if (full.event.stage !== "completed") {
     await sql`UPDATE mayhem_events SET active_match_id = NULL, scene = 'bracket' WHERE id = ${SINGLETON_EVENT_ID}`;
   }
 
   refresh();
 }
 
-/** Undo a completed match's result — only safe while downstream matches haven't started. */
+/** Undo a result and retract dependent auto-resolved byes transitively. */
 export async function undoMatchResult(matchId: string) {
   await requireAdmin();
   const full = await getMayhemFull();
-  const match = full.matches.find((m) => m.id === matchId);
-  if (!match) return;
+  const graph = full.matches as unknown as BracketMatch[];
+  const match = graph.find((candidate) => candidate.id === matchId);
+  const previousWinner = match?.winner_id ?? null;
+  retractBracketResult(graph, matchId);
+  await persistMayhemBracket(graph);
 
-  const downstream = [match.advances_to_match_id, match.drops_to_match_id]
-    .filter(Boolean)
-    .map((id) => full.matches.find((m) => m.id === id))
-    .filter(Boolean);
-  const downstreamStarted = downstream.some(
-    (m) => m!.status === "completed" || (m!.team_a_id && m!.team_b_id),
-  );
-  if (downstreamStarted) {
-    throw new Error("Can't undo — a downstream match already has both teams or a result.");
+  if (previousWinner && full.event.champion_team_id === previousWinner) {
+    await sql`
+      UPDATE mayhem_events SET champion_team_id = NULL, stage = 'knockout',
+        scene = 'bracket', active_match_id = NULL
+      WHERE id = ${SINGLETON_EVENT_ID}
+    `;
   }
-
-  await sql`
-    UPDATE mayhem_matches
-    SET team_a_score = 0, team_b_score = 0, winner_id = NULL, status = 'pending'
-    WHERE id = ${matchId}
-  `;
-  if (match.advances_to_match_id && match.advances_to_slot) {
-    const col = match.advances_to_slot === "a" ? "team_a_id" : "team_b_id";
-    await sql.query(`UPDATE mayhem_matches SET ${col} = NULL WHERE id = $1`, [match.advances_to_match_id]);
-  }
-  if (match.drops_to_match_id && match.drops_to_slot) {
-    const col = match.drops_to_slot === "a" ? "team_a_id" : "team_b_id";
-    await sql.query(`UPDATE mayhem_matches SET ${col} = NULL WHERE id = $1`, [match.drops_to_match_id]);
-  }
-  await sql`UPDATE mayhem_events SET champion_team_id = NULL WHERE id = ${SINGLETON_EVENT_ID} AND champion_team_id = ${match.winner_id}`;
   refresh();
 }

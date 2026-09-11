@@ -75,11 +75,9 @@ export function resolveRsvp(event: CommunityEvent): ResolvedRsvp {
 // ---------------------------------------------------------------------------
 // Event tagging
 //
-// A single "tournament" kind isn't descriptive enough: an in-house night in a
-// Discord voice channel and an in-person League tournament read very
-// differently. We split them by location: Discord/online locations are the
-// casual online sessions; anything with a real venue is the competitive
-// tournament.
+// Keep primary labels broad and reliable: Tournament, Meetup, In-house, or
+// Scrim. Online status is derived separately from location and rendered as a
+// second badge, so an event can be both a Meetup and Online.
 // ---------------------------------------------------------------------------
 
 export type EventTone = "red" | "blue" | "warning" | "success" | "default";
@@ -96,26 +94,18 @@ export function isOnlineEvent(event: Pick<CommunityEvent, "location">): boolean 
   return ONLINE_LOCATION_RE.test(event.location);
 }
 
-/**
- * Derive a descriptive, colour-coded tag for an event. Tournaments split into
- * "Online <game>" (Discord-hosted, chill) vs "<game> Tournament" (IRL,
- * competitive); other kinds keep intuitive labels and distinct tones.
- */
+/** Derive a broad, colour-coded primary tag for an event. */
 export function classifyEvent(event: CommunityEvent): EventTag {
-  const online = isOnlineEvent(event);
   const game = event.game ?? "League of Legends";
 
   switch (event.kind) {
     case "tournament":
-      return online
-        ? { label: `Online ${game}`, tone: "blue" }
-        : { label: `${game} Tournament`, tone: "red" };
+      return { label: "Tournament", tone: "red" };
     case "in-house":
       return { label: `${game} In-house`, tone: "blue" };
     case "scrim":
       return { label: "Scrim", tone: "blue" };
     case "watch-party":
-      return { label: "Watch Party", tone: "warning" };
     case "meetup":
       return { label: "Meetup", tone: "success" };
     default:

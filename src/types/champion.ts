@@ -31,4 +31,19 @@ export interface ChampionRecord {
   links?: { label: string; href: string }[];
   /** Marks seeded sample data so the UI can flag it until real results land. */
   placeholder?: boolean;
+  /**
+   * Where this record came from.
+   *
+   *   "live"   — read out of the tournament DB (a real, completed tournament
+   *              run through the admin tool; the result is auditable).
+   *   "legacy" — read from src/data/champions.json: results that predate the
+   *              system, hand-entered as a backfill. A `legacy` record whose
+   *              `placeholder` is also true is SEEDED SAMPLE DATA and is not
+   *              a real historical winner at all — the two flags mean
+   *              different things and both must survive the merge.
+   *
+   * Optional so the raw JSON file doesn't have to carry it; the loader
+   * stamps it.
+   */
+  source?: "live" | "legacy";
 }
