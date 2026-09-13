@@ -23,6 +23,17 @@ import {
   touchCaptainVerified,
   type CaptainSession,
 } from "@/lib/captain-session-db";
+import {
+  consumeMemberOAuthState,
+  createMemberOAuthState,
+  createMemberSession,
+  deleteMemberSession,
+  deleteMemberSessionByHash,
+  getMemberSessionByToken,
+  touchMemberVerified,
+  type MemberSession,
+} from "@/lib/member-session-db";
+import { upsertLoginProfile } from "@/lib/member-db";
 
 /**
  * Discord OAuth admin login. No bot token, no privileged Server Members
@@ -297,28 +308,46 @@ const inFlightReverify = new Map<string, Promise<boolean>>();
  * handlers, server components). Fails closed: if Discord is unreachable or
  * rate-limited during a due re-check, access is DENIED, not silently
  * allowed through on a stale cached "yes".
+ *
+ * Two ways in: a dedicated admin session (lolmk-admin-session, unchanged
+ * from before), OR a verified-member session whose cached is_admin flag is
+ * true. The member fallback is never a bare trust of that cached flag in
+ * isolation — getMemberSession() itself re-verifies the Tournament Admin
+ * role against live Discord membership on the exact same
+ * REVERIFY_INTERVAL_MS cadence this function uses for its own admin
+ * sessions, and deletes the member session outright if the admin role (and
+ * the verified-member role) are both gone. A role revoked on Discord's side
+ * is caught the next time either session is due for recheck — there is no
+ * looser trust window for the member path than for the dedicated admin one.
+ * This is what lets someone who signed in once via "Verified members
+ * login" reach /tools without a second OAuth round-trip, without admin
+ * authorization ever depending on UI-only state.
  */
 export async function isToolsSession(): Promise<boolean> {
   const config = getConfig();
-  if (!config) return false;
-  const store = await cookies();
-  const rawToken = store.get(SESSION_COOKIE_NAME)?.value;
-  if (!rawToken) return false;
+  if (config) {
+    const store = await cookies();
+    const rawToken = store.get(SESSION_COOKIE_NAME)?.value;
+    if (rawToken) {
+      const session = await getSession(rawToken);
+      if (session) {
+        const dueForRecheck = Date.now() - session.lastVerifiedAt.getTime() > REVERIFY_INTERVAL_MS;
+        if (!dueForRecheck) return true;
 
-  const session = await getSession(rawToken);
-  if (!session) return false;
+        const inFlight = inFlightReverify.get(session.tokenHash);
+        if (inFlight) return inFlight;
 
-  const dueForRecheck = Date.now() - session.lastVerifiedAt.getTime() > REVERIFY_INTERVAL_MS;
-  if (!dueForRecheck) return true;
+        const promise = reverifySession(session, config).finally(() => {
+          inFlightReverify.delete(session.tokenHash);
+        });
+        inFlightReverify.set(session.tokenHash, promise);
+        return promise;
+      }
+    }
+  }
 
-  const inFlight = inFlightReverify.get(session.tokenHash);
-  if (inFlight) return inFlight;
-
-  const promise = reverifySession(session, config).finally(() => {
-    inFlightReverify.delete(session.tokenHash);
-  });
-  inFlightReverify.set(session.tokenHash, promise);
-  return promise;
+  const member = await getMemberSession();
+  return member?.isAdmin ?? false;
 }
 
 async function reverifySession(
@@ -424,10 +453,16 @@ async function reverifySession(
 export async function getCurrentAdmin(): Promise<{ username: string; avatar: string | null } | null> {
   const store = await cookies();
   const rawToken = store.get(SESSION_COOKIE_NAME)?.value;
-  if (!rawToken) return null;
-  const session = await getSession(rawToken);
-  if (!session) return null;
-  return { username: session.discordUsername, avatar: session.discordAvatar };
+  if (rawToken) {
+    const session = await getSession(rawToken);
+    if (session) return { username: session.discordUsername, avatar: session.discordAvatar };
+  }
+  // Fall back to a verified-member session that is currently admin. Mirrors
+  // isToolsSession()'s dual path — see its doc comment for why this never
+  // trusts a cached flag without getMemberSession()'s live re-verification.
+  const member = await getMemberSession();
+  if (member?.isAdmin) return { username: member.displayName, avatar: member.avatarUrl };
+  return null;
 }
 
 export async function endSession(rawToken: string): Promise<void> {
@@ -704,3 +739,378 @@ export async function endCaptainSession(rawToken: string): Promise<void> {
 }
 
 export { CAPTAIN_STATE_COOKIE_NAME };
+
+// ===========================================================================
+// Verified-member authentication — a THIRD, separate capability.
+// ===========================================================================
+//
+// Same isolation rule as the captain block above: its own config, its own
+// OAuth state cookie, its own session cookie, its own session table
+// (member-session-db.ts). A member session satisfies neither the admin gate
+// nor the captain gate, and vice versa.
+//
+// GATING TODAY: login succeeds only for a Discord account holding the
+// Tournament Admin role (DISCORD_ADMIN_ROLE_ID, the same role isToolsSession()
+// checks) OR the verified-member role once DISCORD_VERIFIED_ROLE_ID is set.
+// That second env var ships blank on purpose — dropping in its value later
+// is the ENTIRE migration needed to open member login to every verified
+// regular member; nothing else about this flow changes. Until then this is
+// admin-only by construction, not by a special-cased branch.
+//
+// A session's is_admin flag is for UI only ("show the Admin Tools nav
+// entry") — it is never consulted by isToolsSession() or any /tools code
+// path, which continue to authenticate purely through admin_sessions.
+// DISCORD_COORDINATOR_ROLE_ID (also blank by default) additionally
+// classifies a member's directory_category as "coordinator"; it grants no
+// login capability of its own, only a label.
+
+export const MEMBER_SESSION_COOKIE_NAME = "lolmk-member-session";
+export const MEMBER_SESSION_COOKIE_MAX_AGE = 60 * 60 * 24; // 24h
+const MEMBER_STATE_COOKIE_NAME = "lolmk-member-oauth-state";
+
+function getMemberConfig() {
+  const clientId = process.env.DISCORD_CLIENT_ID?.trim();
+  const clientSecret = process.env.DISCORD_CLIENT_SECRET?.trim();
+  const guildId = process.env.DISCORD_GUILD_ID?.trim();
+  const adminRoleId = process.env.DISCORD_ADMIN_ROLE_ID?.trim();
+  const verifiedRoleId = process.env.DISCORD_VERIFIED_ROLE_ID?.trim() || null;
+  const coordinatorRoleId = process.env.DISCORD_COORDINATOR_ROLE_ID?.trim() || null;
+  if (
+    !clientId ||
+    !clientSecret ||
+    !guildId ||
+    !adminRoleId ||
+    !hasValidEncryptionKey() ||
+    !configuredOrigin()
+  ) return null;
+  return { clientId, clientSecret, guildId, adminRoleId, verifiedRoleId, coordinatorRoleId };
+}
+
+export function isMemberAuthConfigured(): boolean {
+  return getMemberConfig() !== null;
+}
+
+function memberRedirectUri(): string {
+  return `${trustedOrigin()}/api/auth/member/callback`;
+}
+
+/**
+ * Only ever redirects back into a same-origin, in-app relative path — never
+ * off-origin, never protocol-relative. Unlike the admin/captain checks
+ * (which pin the destination to one fixed subtree), member login can return
+ * to wherever the visitor started — `/`, `/tournaments`, `/members`, etc. —
+ * so this validates shape instead of a fixed prefix: must start with a
+ * single `/`, never `//` or `/\` (both of which some browsers treat as
+ * protocol-relative), and contain no whitespace/control characters.
+ */
+function isSafeMemberNext(value: string): boolean {
+  if (!value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return false;
+  if (/[\s\u0000-\u001f\\]/.test(value)) return false;
+  return true;
+}
+
+/** Step 1 of the member OAuth round-trip. Returns null when member auth isn't configured. */
+export async function buildMemberAuthorize(nextPath: string): Promise<AuthorizeResult | null> {
+  const config = getMemberConfig();
+  if (!config) return null;
+  const safeNext = isSafeMemberNext(nextPath) ? nextPath : "/members";
+  const state = await createMemberOAuthState(safeNext);
+
+  const url = new URL("https://discord.com/oauth2/authorize");
+  url.searchParams.set("client_id", config.clientId);
+  url.searchParams.set("redirect_uri", memberRedirectUri());
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", "identify guilds.members.read");
+  url.searchParams.set("state", state);
+  return { url: url.toString(), stateCookieValue: state };
+}
+
+interface DiscordGuildMemberFull {
+  nick: string | null;
+  avatar: string | null; // guild-specific avatar hash
+  roles: string[];
+  user: {
+    id: string;
+    username: string;
+    global_name: string | null;
+    avatar: string | null; // global avatar hash
+  };
+}
+
+async function fetchFullMembership(
+  guildId: string,
+  accessToken: string,
+): Promise<DiscordGuildMemberFull | "not_member" | "error"> {
+  try {
+    const res = await fetch(`https://discord.com/api/users/@me/guilds/${guildId}/member`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+    });
+    if (res.status === 404) return "not_member";
+    if (!res.ok) return "error";
+    return (await res.json()) as DiscordGuildMemberFull;
+  } catch {
+    return "error";
+  }
+}
+
+/**
+ * Display name priority: guild nickname > global display name > username.
+ * Avatar priority: guild-specific avatar > global avatar > null (caller
+ * falls back to Discord's generic default avatar image).
+ */
+function resolveMemberIdentity(
+  guildId: string,
+  member: DiscordGuildMemberFull,
+): { displayName: string; avatarUrl: string | null } {
+  const displayName = member.nick?.trim() || member.user.global_name?.trim() || member.user.username;
+  const avatarUrl = member.avatar
+    ? `https://cdn.discordapp.com/guilds/${guildId}/users/${member.user.id}/avatars/${member.avatar}.png`
+    : member.user.avatar
+      ? `https://cdn.discordapp.com/avatars/${member.user.id}/${member.user.avatar}.png`
+      : null;
+  return { displayName, avatarUrl };
+}
+
+export type MemberCallbackResult =
+  | { ok: true; sessionToken: string; nextPath: string }
+  | { ok: false; reason: "config" | "state" | "denied" | "not_member" | "no_role" | "discord_error" };
+
+/** Step 2: validate state, exchange the code, require admin OR (if configured) verified-member role. */
+export async function handleMemberCallback(
+  params: { code?: string; state?: string; error?: string },
+  stateCookie: string | undefined,
+): Promise<MemberCallbackResult> {
+  const config = getMemberConfig();
+  if (!config) return { ok: false, reason: "config" };
+  if (params.error) return { ok: false, reason: "denied" };
+  if (!params.code || !params.state) return { ok: false, reason: "state" };
+  if (!stateCookie || stateCookie !== params.state) return { ok: false, reason: "state" };
+
+  const nextPath = await consumeMemberOAuthState(params.state);
+  if (!nextPath) return { ok: false, reason: "state" };
+
+  let tokenRes: Response;
+  try {
+    tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        grant_type: "authorization_code",
+        code: params.code,
+        redirect_uri: memberRedirectUri(),
+      }),
+      cache: "no-store",
+    });
+  } catch {
+    return { ok: false, reason: "discord_error" };
+  }
+  if (!tokenRes.ok) return { ok: false, reason: "discord_error" };
+  const token = (await tokenRes.json()) as DiscordTokenResponse;
+
+  const membership = await fetchFullMembership(config.guildId, token.access_token);
+  if (membership === "not_member") return { ok: false, reason: "not_member" };
+  if (membership === "error") return { ok: false, reason: "discord_error" };
+
+  const isAdmin = membership.roles.includes(config.adminRoleId);
+  const isVerified = Boolean(config.verifiedRoleId && membership.roles.includes(config.verifiedRoleId));
+  if (!isAdmin && !isVerified) return { ok: false, reason: "no_role" };
+
+  const isCoordinator = Boolean(
+    config.coordinatorRoleId && membership.roles.includes(config.coordinatorRoleId),
+  );
+  const directoryCategory: "admin" | "coordinator" | null = isAdmin
+    ? "admin"
+    : isCoordinator
+      ? "coordinator"
+      : null;
+
+  const { displayName, avatarUrl } = resolveMemberIdentity(config.guildId, membership);
+
+  // Enrollment happens here, on every successful login — see
+  // upsertLoginProfile's doc comment for why this is the only write path
+  // for cached identity, and why it never touches directory_opt_in.
+  await upsertLoginProfile({
+    discordUserId: membership.user.id,
+    displayName,
+    avatarUrl,
+    isAdmin,
+    directoryCategory,
+  });
+
+  const sessionToken = await createMemberSession({
+    discordUserId: membership.user.id,
+    displayName,
+    avatarUrl,
+    isAdmin,
+    directoryCategory,
+    accessToken: token.access_token,
+    refreshToken: token.refresh_token,
+    tokenExpiresAt: new Date(Date.now() + token.expires_in * 1000),
+  });
+
+  return { ok: true, sessionToken, nextPath };
+}
+
+export interface MemberIdentity {
+  discordUserId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  isAdmin: boolean;
+  directoryCategory: "admin" | "coordinator" | null;
+}
+
+const inFlightMemberReverify = new Map<string, Promise<MemberIdentity | null>>();
+
+/**
+ * Authoritative member check. Returns null — never throws — whenever member
+ * auth isn't configured, the cookie is missing/invalid, or reverification
+ * fails (fails closed on a Discord outage, same as the admin/captain gates).
+ */
+export async function getMemberSession(): Promise<MemberIdentity | null> {
+  const config = getMemberConfig();
+  if (!config) return null;
+  const store = await cookies();
+  const rawToken = store.get(MEMBER_SESSION_COOKIE_NAME)?.value;
+  if (!rawToken) return null;
+
+  const session = await getMemberSessionByToken(rawToken);
+  if (!session) return null;
+
+  const dueForRecheck = Date.now() - session.lastVerifiedAt.getTime() > REVERIFY_INTERVAL_MS;
+  if (!dueForRecheck) {
+    return {
+      discordUserId: session.discordUserId,
+      displayName: session.displayName,
+      avatarUrl: session.avatarUrl,
+      isAdmin: session.isAdmin,
+      directoryCategory: session.directoryCategory,
+    };
+  }
+
+  const inFlight = inFlightMemberReverify.get(session.tokenHash);
+  if (inFlight) return inFlight;
+
+  const promise = reverifyMember(session, config).finally(() => {
+    inFlightMemberReverify.delete(session.tokenHash);
+  });
+  inFlightMemberReverify.set(session.tokenHash, promise);
+  return promise;
+}
+
+export async function isMemberSession(): Promise<boolean> {
+  return (await getMemberSession()) !== null;
+}
+
+async function reverifyMember(
+  session: MemberSession,
+  config: {
+    guildId: string;
+    adminRoleId: string;
+    verifiedRoleId: string | null;
+    coordinatorRoleId: string | null;
+  },
+): Promise<MemberIdentity | null> {
+  let accessToken = session.accessToken;
+  let refreshToken = session.refreshToken;
+  let tokenExpiresAt = session.tokenExpiresAt;
+
+  if (tokenExpiresAt.getTime() < Date.now() + 60_000) {
+    const client = await sql.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows } = await client.query(
+        "SELECT * FROM member_sessions WHERE token_hash = $1 FOR UPDATE",
+        [session.tokenHash],
+      );
+      if (rows.length === 0) {
+        await client.query("ROLLBACK");
+        return null;
+      }
+      const row = rows[0];
+      const currentRefreshToken = decryptField(row.refresh_token_enc);
+      const currentTokenExpiresAt = new Date(row.token_expires_at);
+      if (
+        currentRefreshToken !== refreshToken ||
+        currentTokenExpiresAt.getTime() >= Date.now() + 60_000
+      ) {
+        accessToken = decryptField(row.access_token_enc);
+        refreshToken = currentRefreshToken;
+        tokenExpiresAt = currentTokenExpiresAt;
+        await client.query("COMMIT");
+      } else {
+        const refreshed = await refreshAccessToken(refreshToken);
+        if (!refreshed) {
+          await client.query("DELETE FROM member_sessions WHERE token_hash = $1", [session.tokenHash]);
+          await client.query("COMMIT");
+          return null;
+        }
+        accessToken = refreshed.accessToken;
+        refreshToken = refreshed.refreshToken;
+        tokenExpiresAt = refreshed.expiresAt;
+        await client.query(
+          `UPDATE member_sessions SET access_token_enc = $1, refresh_token_enc = $2, token_expires_at = $3
+           WHERE token_hash = $4`,
+          [encryptField(accessToken), encryptField(refreshToken), tokenExpiresAt.toISOString(), session.tokenHash],
+        );
+        await client.query("COMMIT");
+      }
+    } catch (e) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  const membership = await fetchFullMembership(config.guildId, accessToken);
+  if (membership === "not_member") {
+    await deleteMemberSessionByHash(session.tokenHash);
+    return null;
+  }
+  if (membership === "error") return null; // fail closed on a transient Discord outage
+
+  const isAdmin = membership.roles.includes(config.adminRoleId);
+  const isVerified = Boolean(config.verifiedRoleId && membership.roles.includes(config.verifiedRoleId));
+  if (!isAdmin && !isVerified) {
+    await deleteMemberSessionByHash(session.tokenHash);
+    return null;
+  }
+  const isCoordinator = Boolean(
+    config.coordinatorRoleId && membership.roles.includes(config.coordinatorRoleId),
+  );
+  const directoryCategory: "admin" | "coordinator" | null = isAdmin
+    ? "admin"
+    : isCoordinator
+      ? "coordinator"
+      : null;
+  const { displayName, avatarUrl } = resolveMemberIdentity(config.guildId, membership);
+
+  // Keep the cached identity (name/avatar/roles) fresh on every successful
+  // reverify, not just at login — a nickname or role change should surface
+  // without forcing a full re-login.
+  await upsertLoginProfile({
+    discordUserId: membership.user.id,
+    displayName,
+    avatarUrl,
+    isAdmin,
+    directoryCategory,
+  });
+  await touchMemberVerified(session.tokenHash, { displayName, avatarUrl, isAdmin, directoryCategory });
+
+  return {
+    discordUserId: session.discordUserId,
+    displayName,
+    avatarUrl,
+    isAdmin,
+    directoryCategory,
+  };
+}
+
+export async function endMemberSession(rawToken: string): Promise<void> {
+  await deleteMemberSession(rawToken);
+}
+
+export { MEMBER_STATE_COOKIE_NAME };

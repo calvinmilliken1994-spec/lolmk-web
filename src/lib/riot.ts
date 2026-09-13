@@ -30,6 +30,38 @@ const PLATFORM_HOST = "https://kr.api.riotgames.com";
 
 const REQUEST_TIMEOUT_MS = 6000;
 
+/**
+ * Platform (e.g. "na1", "euw1") -> regional routing host for account-v1.
+ * account-v1 and champion-mastery-v4 live on different host families:
+ * account-v1 is REGIONAL (americas/asia/europe), everything else
+ * (league-v4, champion-mastery-v4, summoner-v4) is PLATFORM-specific. This
+ * map exists because member profiles let a member pick their own platform
+ * (unlike the KR-only roster lookup above), so the regional host can no
+ * longer be hardcoded to "asia".
+ */
+const REGIONAL_ROUTING: Record<string, string> = {
+  na1: "americas",
+  br1: "americas",
+  la1: "americas",
+  la2: "americas",
+  euw1: "europe",
+  eun1: "europe",
+  tr1: "europe",
+  ru: "europe",
+  kr: "asia",
+  jp1: "asia",
+  oc1: "sea",
+};
+
+function platformHost(platform: string): string {
+  return `https://${platform}.api.riotgames.com`;
+}
+
+function regionalHost(platform: string): string {
+  const region = REGIONAL_ROUTING[platform] ?? "americas";
+  return `https://${region}.api.riotgames.com`;
+}
+
 export function isRiotConfigured(): boolean {
   return Boolean(process.env.RIOT_API_KEY?.trim());
 }
@@ -127,4 +159,102 @@ export async function lookupKrRank(riotId: string): Promise<RiotLookupResult> {
     leaguePoints: solo.leaguePoints ?? 0,
     summonerName: riotId,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Member profile Riot enrichment — separate from the KR-only roster lookup
+// above. These functions take an explicit platform (member's own choice, any
+// region) rather than hardcoding KR, and never touch sr_team_players.
+// ---------------------------------------------------------------------------
+
+export type RiotAccountResult = { ok: true; puuid: string } | { ok: false; reason: string };
+
+/** Resolve a Riot ID ("gameName#tagLine") + platform to a PUUID. Corroboration only — see file header. */
+export async function resolveRiotAccount(
+  gameName: string,
+  tagLine: string,
+  platform: string,
+): Promise<RiotAccountResult> {
+  const key = process.env.RIOT_API_KEY?.trim();
+  if (!key) return { ok: false, reason: "Rank lookup isn't configured on this site yet (no Riot API key)." };
+
+  const res = await riotFetch(
+    `${regionalHost(platform)}/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+    key,
+  );
+  if (!res) return { ok: false, reason: "Riot's API didn't respond. Try again in a moment." };
+  if (res.status === 404) return { ok: false, reason: "No account found with that Riot ID in that region." };
+  if (res.status === 429) return { ok: false, reason: "Riot's API is rate-limiting right now. Try again in a minute." };
+  if (!res.ok) return { ok: false, reason: "Riot's API didn't respond. Try again in a moment." };
+  const account = (await res.json()) as { puuid?: string };
+  if (!account.puuid) return { ok: false, reason: "Riot's API didn't respond. Try again in a moment." };
+  return { ok: true, puuid: account.puuid };
+}
+
+export interface ChampionMasteryEntry {
+  championId: number;
+  championPoints: number;
+  championLevel: number;
+}
+
+export interface RiotEnrichment {
+  profileIconId: number | null;
+  topMasteries: ChampionMasteryEntry[];
+}
+
+export type RiotEnrichmentResult = { ok: true; data: RiotEnrichment } | { ok: false; reason: string };
+
+/**
+ * Summoner icon + top-3 champion masteries for an already-resolved PUUID.
+ * Read-only, best-effort: a Riot outage or rate-limit here must never break
+ * a profile page — callers render whatever partial data comes back (e.g.
+ * icon present, masteries empty) rather than treating this as all-or-nothing.
+ */
+export async function getRiotEnrichment(puuid: string, platform: string): Promise<RiotEnrichmentResult> {
+  const key = process.env.RIOT_API_KEY?.trim();
+  if (!key) return { ok: false, reason: "not_configured" };
+
+  const host = platformHost(platform);
+  const [summonerRes, masteryRes] = await Promise.all([
+    riotFetch(`${host}/lol/summoner/v4/summoners/by-puuid/${encodeURIComponent(puuid)}`, key),
+    riotFetch(
+      `${host}/lol/champion-mastery/v4/champion-masteries/by-puuid/${encodeURIComponent(puuid)}/top?count=3`,
+      key,
+    ),
+  ]);
+
+  // 429/5xx on either call: report the failure rather than a silently
+  // empty-looking success — the profile UI distinguishes "Riot is down" from
+  // "genuinely no mastery data yet".
+  if (summonerRes?.status === 429 || masteryRes?.status === 429) {
+    return { ok: false, reason: "rate_limited" };
+  }
+
+  let profileIconId: number | null = null;
+  if (summonerRes?.ok) {
+    const summoner = (await summonerRes.json()) as { profileIconId?: number };
+    profileIconId = summoner.profileIconId ?? null;
+  }
+
+  let topMasteries: ChampionMasteryEntry[] = [];
+  if (masteryRes?.ok) {
+    const entries = (await masteryRes.json()) as Array<{
+      championId?: number;
+      championPoints?: number;
+      championLevel?: number;
+    }>;
+    topMasteries = entries
+      .filter((e): e is Required<typeof e> => typeof e.championId === "number")
+      .map((e) => ({
+        championId: e.championId!,
+        championPoints: e.championPoints ?? 0,
+        championLevel: e.championLevel ?? 0,
+      }));
+  }
+
+  if (!summonerRes?.ok && !masteryRes?.ok) {
+    return { ok: false, reason: "riot_error" };
+  }
+
+  return { ok: true, data: { profileIconId, topMasteries } };
 }
