@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X, BadgeCheck } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Menu, X, BadgeCheck, ShieldCheck } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
 
@@ -16,9 +17,17 @@ const NAV_LINKS = [
   { href: "/about", label: "About" },
 ];
 
-export function Header() {
+interface HeaderMemberState {
+  displayName: string;
+  avatarUrl: string | null;
+  isAdmin: boolean;
+}
+
+export function Header({ member }: { member?: HeaderMemberState | null }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+  const loginHref = `/api/auth/member/login?next=${encodeURIComponent(pathname || "/members")}`;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 4);
@@ -76,16 +85,45 @@ export function Header() {
           </nav>
 
           <div className="hidden lg:flex items-center gap-3">
-            <a
-              href="https://discord.gg/lolmk"
-              target="_blank"
-              rel="noreferrer"
-              className={cn(buttonVariants({ variant: "discord", size: "sm" }))}
-            >
-              <DiscordIcon className="h-5 w-5" />
-              Log in with Discord
-              <BadgeCheck strokeWidth={2} className="h-4 w-4 text-success" />
-            </a>
+            {member ? (
+              <>
+                {member.isAdmin && (
+                  <Link
+                    href="/tools"
+                    className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
+                  >
+                    <ShieldCheck strokeWidth={1.5} className="h-4 w-4" />
+                    Admin Tools
+                  </Link>
+                )}
+                <Link
+                  href="/members/profile"
+                  className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "pl-2")}
+                >
+                  {member.avatarUrl ? (
+                    <Image
+                      src={member.avatarUrl}
+                      alt=""
+                      width={24}
+                      height={24}
+                      className="h-6 w-6 rounded-full"
+                    />
+                  ) : (
+                    <span className="h-6 w-6 rounded-full bg-elevated" aria-hidden />
+                  )}
+                  Profile
+                </Link>
+              </>
+            ) : (
+              <a
+                href={loginHref}
+                className={cn(buttonVariants({ variant: "discord", size: "sm" }))}
+              >
+                <DiscordIcon className="h-5 w-5" />
+                Verified members login
+                <BadgeCheck strokeWidth={2} className="h-4 w-4 text-success" />
+              </a>
+            )}
           </div>
 
           <button

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk, Bebas_Neue, Chakra_Petch } from "next/font/google";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { getMemberSession } from "@/lib/discord-auth";
 import "./globals.css";
 
 const inter = Inter({
@@ -54,7 +55,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const member = await getMemberSession();
   return (
     <html
       lang="en"
@@ -74,7 +76,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="bg-base text-ink min-h-screen">
-        <Header />
+        <Header
+          member={
+            member
+              ? { displayName: member.displayName, avatarUrl: member.avatarUrl, isAdmin: member.isAdmin }
+              : null
+          }
+        />
         <main className="pt-16">{children}</main>
         <Footer />
       </body>
