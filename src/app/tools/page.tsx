@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Lock, Swords, Timer, Trophy } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { isDiscordAuthConfigured, isToolsSession } from "@/lib/tools-auth";
+import { Swords, Timer, Trophy } from "lucide-react";
+import { isToolsSession } from "@/lib/tools-auth";
 
 export const metadata: Metadata = {
   title: "Tools",
@@ -44,100 +42,43 @@ const TOOLS: ToolEntry[] = [
 ];
 
 export default async function ToolsPage() {
-  const configured = isDiscordAuthConfigured();
-  const signedIn = configured && (await isToolsSession());
+  const signedIn = await isToolsSession();
+
+  if (!signedIn) {
+    return (
+      <section className="container-wide pt-16 pb-24 md:pt-20">
+        <div className="max-w-3xl space-y-5">
+          <h1 className="font-heading text-display-md text-ink leading-tight">Tools</h1>
+          <p className="text-body-lg text-ink-secondary max-w-[55ch]">
+            Admin access only. Regular members do not have access to these tools.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-line-subtle">
-        <div aria-hidden className="absolute inset-0 grain pointer-events-none" />
-        <div
-          aria-hidden
-          className="absolute -top-40 left-1/2 h-[560px] w-[1100px] -translate-x-1/2 bg-gradient-to-br from-brand-red/15 via-transparent to-brand-blue/15 blur-3xl pointer-events-none"
-        />
-        <div className="container-wide relative py-20 md:py-28">
-          <div className="max-w-3xl space-y-6">
-            <p className="text-label uppercase text-ink-muted">Admin tools</p>
-            <h1 className="font-display text-display-lg md:text-display-xl text-ink leading-[0.95]">
-              The tool chest.
-            </h1>
-            <p className="text-body-lg text-ink-secondary max-w-[55ch]">
-              Tournament timers and event utilities used by LoLMK admins. The
-              door is open for everyone to look; everything past it needs a
-              key.
-            </p>
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              {configured ? (
-                signedIn ? (
-                  <form action="/tools/logout" method="post">
-                    <button
-                      type="submit"
-                      className={cn(buttonVariants({ variant: "secondary", size: "lg" }))}
-                    >
-                      <Lock strokeWidth={1.5} className="h-5 w-5" />
-                      Sign out
-                    </button>
-                  </form>
-                ) : (
-                  <Link
-                    href="/tools/login"
-                    className={cn(buttonVariants({ variant: "primary", size: "lg" }))}
-                  >
-                    <Lock strokeWidth={1.5} className="h-5 w-5" />
-                    Admin sign in
-                    <ArrowRight strokeWidth={2} className="h-5 w-5" />
-                  </Link>
-                )
-              ) : (
-                <p className="text-body-sm text-warning border border-warning/50 bg-warning/10 px-4 py-2.5 rounded-sm">
-                  Login is not configured yet. Set the Discord OAuth env vars
-                  (DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_GUILD_ID,
-                  DISCORD_ADMIN_ROLE_ID).
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="container-wide py-24">
-        <div className="max-w-2xl mb-12">
-          <p className="text-label uppercase text-ink-muted mb-4">Available</p>
-          <h2 className="font-heading text-display-sm text-ink">Tools</h2>
-          <p className="mt-4 text-body-md text-ink-secondary">
-            Each tool lives at <span className="font-mono">/tools/[name]</span>
-            . Anything past this page is behind the admin login wall.
+      <section className="container-wide pt-16 pb-24 md:pt-20">
+        <div className="max-w-3xl space-y-5 mb-10">
+          <h1 className="font-heading text-display-md text-ink leading-tight">Tools</h1>
+          <p className="text-body-lg text-ink-secondary max-w-[55ch]">
+            Tournament timers and event utilities used by LoLMK admins.
           </p>
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {TOOLS.map((tool) => {
             const Icon = tool.icon;
-            const locked = !signedIn;
             return (
               <Link
                 key={tool.slug}
                 href={`/tools/${tool.slug}`}
                 className="group bg-surface border border-line p-6 flex flex-col gap-4 hover:border-line-strong hover:-translate-y-0.5 hover:bg-elevated/40 transition-all duration-200 ease-out-soft"
               >
-                <div className="flex items-center justify-between">
-                  <span className="flex h-12 w-12 items-center justify-center border border-line bg-elevated text-brand-red-bright">
-                    <Icon strokeWidth={1.5} className="h-6 w-6" />
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-caption font-mono uppercase tracking-wider text-ink-muted">
-                    {locked ? (
-                      <>
-                        <Lock strokeWidth={1.5} className="h-3.5 w-3.5" />
-                        Locked
-                      </>
-                    ) : (
-                      <>
-                        <ArrowRight strokeWidth={1.5} className="h-3.5 w-3.5" />
-                        Open
-                      </>
-                    )}
-                  </span>
-                </div>
+                <span className="flex h-12 w-12 items-center justify-center border border-line bg-elevated text-brand-red-bright">
+                  <Icon strokeWidth={1.5} className="h-6 w-6" />
+                </span>
                 <div>
                   <p className="font-heading text-heading-md text-ink group-hover:text-brand-red-bright transition-colors">
                     {tool.name}

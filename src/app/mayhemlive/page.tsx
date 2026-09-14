@@ -7,7 +7,6 @@ export const metadata: Metadata = {
   description: "Live venue screen for LoLMK ARAM Mayhem tournaments.",
   robots: { index: false, follow: false },
 };
-
 export const dynamic = "force-dynamic";
 
 export default async function MayhemLivePage() {

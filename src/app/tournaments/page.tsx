@@ -71,46 +71,37 @@ export default async function TournamentsPage() {
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-line-subtle">
-        <div aria-hidden className="absolute inset-0 grain pointer-events-none" />
-        <div
-          aria-hidden
-          className="absolute -top-40 left-1/2 h-[560px] w-[1100px] -translate-x-1/2 bg-gradient-to-br from-brand-red/15 via-transparent to-brand-blue/15 blur-3xl pointer-events-none"
-        />
-        <div className="container-wide relative py-20 md:py-28">
-          <div className="max-w-3xl space-y-6">
-            <Badge variant="red">Tournaments</Badge>
-            <h1 className="font-display text-display-lg md:text-display-xl text-ink leading-[0.95]">
-              League tournaments, played for keeps.
-            </h1>
-            <p className="text-body-lg text-ink-secondary max-w-[55ch]">
-              Three formats, one community. Pick the one you want to play — each
-              has its own page with the live bracket, the field, and how to get
-              in.
-            </p>
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <a
-                href="https://discord.gg/lolmk"
-                target="_blank"
-                rel="noreferrer"
-                className={cn(buttonVariants({ variant: "discord", size: "lg" }))}
-              >
-                <DiscordIcon className="h-6 w-6" />
-                Enter via Discord
-              </a>
-              <Link
-                href="/#events"
-                className={cn(buttonVariants({ variant: "secondary", size: "lg" }))}
-              >
-                Upcoming events
-                <ArrowRight strokeWidth={1.5} className="h-5 w-5" />
-              </Link>
-            </div>
+      <section className="container-wide pt-16 pb-24 md:pt-20">
+        <div className="max-w-3xl space-y-5 mb-16">
+          <Badge variant="red">Tournaments</Badge>
+          <h1 className="font-heading text-display-md text-ink leading-tight">
+            League tournaments, played for keeps.
+          </h1>
+          <p className="text-body-lg text-ink-secondary max-w-[55ch]">
+            Three formats, one community. Pick the one you want to play. Each
+            has its own page with the live bracket, the field, and how to get
+            in.
+          </p>
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <a
+              href="https://discord.gg/lolmk"
+              target="_blank"
+              rel="noreferrer"
+              className={cn(buttonVariants({ variant: "discord", size: "lg" }))}
+            >
+              <DiscordIcon className="h-6 w-6" />
+              Enter via Discord
+            </a>
+            <Link
+              href="/#events"
+              className={cn(buttonVariants({ variant: "secondary", size: "lg" }))}
+            >
+              Upcoming events
+              <ArrowRight strokeWidth={1.5} className="h-5 w-5" />
+            </Link>
           </div>
         </div>
-      </section>
 
-      <section className="container-wide py-24">
         <div className="max-w-2xl mb-12">
           <p className="text-label uppercase text-ink-muted mb-4">Pick your format</p>
           <h2 className="font-heading text-display-sm text-ink">Three ways to play.</h2>

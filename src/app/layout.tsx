@@ -49,6 +49,12 @@ export const metadata: Metadata = {
       "The largest English-speaking League of Legends community in Korea.",
     type: "website",
     locale: "en_US",
+    siteName: "LoLMK",
+    images: [{ url: "/logo.png", width: 1044, height: 1044, alt: "LoLMK logo" }],
+  },
+  twitter: {
+    card: "summary",
+    images: ["/logo.png"],
   },
   icons: {
     icon: "/logo.svg",

@@ -15,24 +15,21 @@ export const metadata: Metadata = {
 export default function ClientEnglishPage() {
   return (
     <>
-      <section className="relative overflow-hidden border-b border-line-subtle">
-        <div aria-hidden className="absolute inset-0 grain pointer-events-none" />
-        <div className="container-wide relative py-16 md:py-20">
-          <div className="flex flex-wrap items-center gap-3 mb-6">
-            <Link href="/how-tos" className="text-body-sm text-ink-muted hover:text-ink">
-              How-tos
-            </Link>
-            <span className="text-ink-muted">/</span>
-            <Badge variant="outline">Client to English</Badge>
-          </div>
-          <h1 className="font-display text-display-lg md:text-display-xl text-ink leading-[0.95] max-w-3xl">
-            Switching the client to English.
-          </h1>
-          <p className="mt-6 text-body-lg text-ink-secondary max-w-[60ch]">
-            A KR account defaults to Korean. Language is a client setting, separate from your
-            account region, so switching it doesn&apos;t move your server or reset your rank.
-          </p>
+      <section className="container-wide pt-16 pb-16 md:pt-20 border-b border-line-subtle">
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <Link href="/how-tos" className="text-body-sm text-ink-muted hover:text-ink">
+            How-tos
+          </Link>
+          <span className="text-ink-muted">/</span>
+          <Badge variant="outline">Client to English</Badge>
         </div>
+        <h1 className="font-heading text-display-md text-ink leading-tight max-w-3xl">
+          Switching the client to English.
+        </h1>
+        <p className="mt-6 text-body-lg text-ink-secondary max-w-[60ch]">
+          A KR account defaults to Korean. Language is a client setting, separate from your
+          account region, so switching it doesn&apos;t move your server or reset your rank.
+        </p>
       </section>
 
       <section className="container-wide py-16 border-b border-line-subtle">
