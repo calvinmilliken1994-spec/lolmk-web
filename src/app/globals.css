@@ -84,3 +84,53 @@
       radial-gradient(circle at 85% 30%, rgba(40, 61, 116, 0.12), transparent 45%);
   }
 }
+
+/* ---------------------------------------------------------------------
+ * Design-preview scaffolding (/design-preview/*) — reskin exploration.
+ * Scoped under [data-preview-root] so it can never leak into the live
+ * site's own styles. Safe to delete this whole block if previews are
+ * removed later.
+ * --------------------------------------------------------------------- */
+[data-preview-root] {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-preview-root] {
+    scroll-behavior: auto;
+  }
+}
+
+[data-preview-root] [data-reveal] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-preview-root] [data-reveal] {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  [data-preview-root] [data-reveal].is-revealed {
+    opacity: 1;
+    transform: none;
+  }
+  [data-preview-root] [data-reveal="1"] { transition-delay: 0ms; }
+  [data-preview-root] [data-reveal="2"] { transition-delay: 90ms; }
+  [data-preview-root] [data-reveal="3"] { transition-delay: 180ms; }
+  [data-preview-root] [data-reveal="4"] { transition-delay: 270ms; }
+}
+
+[data-preview-root] * {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 0.35s;
+}
+
+/* No-JS fallback: if the reveal observer script never runs, content must
+   still render instead of staying invisible forever. */
+noscript.preview-noscript-reveal-fallback + [data-preview-root] [data-reveal],
+html:not(.js) [data-preview-root] [data-reveal] {
+  opacity: 1 !important;
+  transform: none !important;
+}

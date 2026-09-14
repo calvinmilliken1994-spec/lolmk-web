@@ -1,14 +1,16 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { Trophy, Calendar, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BracketFlow } from "@/components/sections/bracket-flow";
 import { TeamGrid } from "@/components/sections/team-grid";
 import { getTournamentBySlug } from "@/lib/tournaments";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "2026 LoLMK Spring Tournament — Preview",
   description:
     "8-team double-elim preview using the integrated bracket layout.",
+  robots: { index: false, follow: false },
 };
 
 const KST_DATE = new Intl.DateTimeFormat("en-US", {

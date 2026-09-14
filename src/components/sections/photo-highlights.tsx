@@ -27,7 +27,6 @@ export function PhotoHighlights({ posts }: PhotoHighlightsProps) {
     <section className="py-24 border-y border-line-subtle bg-surface">
       <div className="container-wide mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
         <div className="max-w-2xl">
-          <p className="text-label uppercase text-ink-muted mb-4">Out in the wild</p>
           <h2 className="font-heading text-display-md text-ink">Photo highlights</h2>
           <p className="mt-4 text-body-md text-ink-secondary">
             Latest from{" "}
@@ -39,8 +38,7 @@ export function PhotoHighlights({ posts }: PhotoHighlightsProps) {
             >
               @lolmeetupkorea
             </a>
-            . Real meetups, real people. Tournaments at Gen.G GGX, watch parties in Hongdae,
-            in-houses in Gangnam.
+            . Real meetups, real people. Tournaments at Gen.G GGX and watch parties in Hongdae.
           </p>
         </div>
         <a

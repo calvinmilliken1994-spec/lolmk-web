@@ -44,9 +44,8 @@ export default async function MembersPage({
   return (
     <section className="container-wide py-20 md:py-28 space-y-16">
       <div className="max-w-2xl space-y-4">
-        <p className="text-label uppercase text-ink-muted">Members</p>
         <h1 className="font-display text-display-lg text-ink leading-[0.95]">
-          Who runs LoLMK.
+          Members
         </h1>
         <p className="text-body-lg text-ink-secondary">
           The admins and game coordinators behind the tournaments, events, and the Discord itself.

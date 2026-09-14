@@ -4,7 +4,6 @@ import { StatsStrip } from "@/components/sections/stats-strip";
 import { EventCalendar } from "@/components/sections/event-calendar";
 import { PhotoHighlights } from "@/components/sections/photo-highlights";
 import { Socials } from "@/components/sections/socials";
-import { AboutBlurb } from "@/components/sections/about-blurb";
 // FinalCta ("Ready when you are") hidden for now — uncomment to bring back.
 // import { FinalCta } from "@/components/sections/final-cta";
 import { getCommunityStats } from "@/lib/stats";
@@ -67,8 +66,26 @@ export default async function HomePage() {
       ? "Upcoming tournament"
       : "Next event";
 
+  // Organization JSON-LD, sourced from the same socials data the page
+  // already renders — never invent URLs that aren't shown on the page.
+  const orgJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "LoLMK",
+    url: "https://lolmk.gg",
+    logo: "https://lolmk.gg/logo.png",
+    description:
+      "The largest English-speaking League of Legends community in Korea.",
+    sameAs: socials.map((s) => s.href),
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger -- static, server-derived JSON-LD only.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd).replace(/</g, "\\u003c") }}
+      />
       <Hero
         nextEventLabel={nextEventLabel}
         nextEventIsLive={nextEventIsLive}
@@ -79,7 +96,6 @@ export default async function HomePage() {
       <EventCalendar upcoming={upcoming} recurring={recurring} />
       <PhotoHighlights posts={igPosts} />
       <Socials socials={socials} />
-      <AboutBlurb />
       {/* <FinalCta /> */}
     </>
   );

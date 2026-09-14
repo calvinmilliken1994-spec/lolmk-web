@@ -168,16 +168,42 @@ export function Header({ member }: { member?: HeaderMemberState | null }) {
                 {link.label}
               </Link>
             ))}
-            <a
-              href="https://discord.gg/lolmk"
-              target="_blank"
-              rel="noreferrer"
-              className={cn(buttonVariants({ variant: "discord", size: "lg" }), "mt-8 w-full")}
-            >
-              <DiscordIcon className="h-6 w-6" />
-              Log in with Discord
-              <BadgeCheck strokeWidth={2} className="h-5 w-5 text-success" />
-            </a>
+            {member ? (
+              <>
+                {member.isAdmin && (
+                  <Link
+                    href="/tools"
+                    onClick={() => setMobileOpen(false)}
+                    className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "mt-8 w-full")}
+                  >
+                    <ShieldCheck strokeWidth={1.5} className="h-5 w-5" />
+                    Admin Tools
+                  </Link>
+                )}
+                <Link
+                  href="/members/profile"
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    buttonVariants({ variant: "secondary", size: "lg" }),
+                    "w-full",
+                    member.isAdmin ? "mt-3" : "mt-8",
+                  )}
+                >
+                  Profile
+                </Link>
+              </>
+            ) : (
+              <a
+                href="https://discord.gg/lolmk"
+                target="_blank"
+                rel="noreferrer"
+                className={cn(buttonVariants({ variant: "discord", size: "lg" }), "mt-8 w-full")}
+              >
+                <DiscordIcon className="h-6 w-6" />
+                Log in with Discord
+                <BadgeCheck strokeWidth={2} className="h-5 w-5 text-success" />
+              </a>
+            )}
           </nav>
         </div>
       )}

@@ -11,7 +11,6 @@ export function EventCalendar({ upcoming, recurring }: EventCalendarProps) {
   return (
     <section id="events" className="container-wide py-24 scroll-mt-20">
       <div className="max-w-2xl mb-12">
-        <p className="text-label uppercase text-ink-muted mb-4">On the calendar</p>
         <h2 className="font-heading text-display-md text-ink">Upcoming events</h2>
         <p className="mt-4 text-body-md text-ink-secondary">
           Online in-house nights, in-person tournaments, watch parties, and

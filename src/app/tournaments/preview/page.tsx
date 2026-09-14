@@ -1,14 +1,16 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { Trophy, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BracketFlow } from "@/components/sections/bracket-flow";
 import { TeamGrid } from "@/components/sections/team-grid";
 import { getTournamentBySlug } from "@/lib/tournaments";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Q1 2026 Tournament — Preview",
   description:
     "Placeholder preview of the tournament page. Real data ships when the bot HTTP API is wired up.",
+  robots: { index: false, follow: false },
 };
 
 const KST_DATE = new Intl.DateTimeFormat("en-US", {

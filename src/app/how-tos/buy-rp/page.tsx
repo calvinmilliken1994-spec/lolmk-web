@@ -15,25 +15,22 @@ export const metadata: Metadata = {
 export default function BuyRpPage() {
   return (
     <>
-      <section className="relative overflow-hidden border-b border-line-subtle">
-        <div aria-hidden className="absolute inset-0 grain pointer-events-none" />
-        <div className="container-wide relative py-16 md:py-20">
-          <div className="flex flex-wrap items-center gap-3 mb-6">
-            <Link href="/how-tos" className="text-body-sm text-ink-muted hover:text-ink">
-              How-tos
-            </Link>
-            <span className="text-ink-muted">/</span>
-            <Badge variant="outline">Buy RP</Badge>
-          </div>
-          <h1 className="font-display text-display-lg md:text-display-xl text-ink leading-[0.95] max-w-3xl">
-            Buying RP on the KR server.
-          </h1>
-          <p className="mt-6 text-body-lg text-ink-secondary max-w-[60ch]">
-            Riot Korea&apos;s payment menu looks nothing like NA or EUW&apos;s. Here&apos;s what
-            actually clears for a foreign resident, and what almost always fails. Last checked:
-            September 2026.
-          </p>
+      <section className="container-wide pt-16 pb-16 md:pt-20 border-b border-line-subtle">
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <Link href="/how-tos" className="text-body-sm text-ink-muted hover:text-ink">
+            How-tos
+          </Link>
+          <span className="text-ink-muted">/</span>
+          <Badge variant="outline">Buy RP</Badge>
         </div>
+        <h1 className="font-heading text-display-md text-ink leading-tight max-w-3xl">
+          Buying RP on the KR server.
+        </h1>
+        <p className="mt-6 text-body-lg text-ink-secondary max-w-[60ch]">
+          Riot Korea&apos;s payment menu looks nothing like NA or EUW&apos;s. Here&apos;s what
+          actually clears for a foreign resident, and what almost always fails. Last checked:
+          September 2026.
+        </p>
       </section>
 
       <section className="container-wide py-16 border-b border-line-subtle">

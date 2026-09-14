@@ -42,8 +42,7 @@ export function Socials({ socials }: SocialsProps) {
   return (
     <section className="container-wide py-24">
       <div className="mb-12 max-w-2xl">
-        <p className="text-label uppercase text-ink-muted mb-4">Stay connected</p>
-        <h2 className="font-heading text-display-md text-ink">Where the community lives</h2>
+        <h2 className="font-heading text-display-md text-ink">Community links</h2>
         <p className="mt-4 text-body-md text-ink-secondary">
           Discord is the home base. Kakao is the fastest way to reach an admin.
           The rest is where the events and clips end up.

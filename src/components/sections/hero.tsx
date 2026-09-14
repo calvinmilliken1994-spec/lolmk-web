@@ -61,8 +61,7 @@ export function Hero({ nextEventLabel, nextEventIsLive, discordOnline }: HeroPro
             </h1>
 
             <p className="text-body-lg text-ink-secondary max-w-[52ch]">
-              League of Legends | Valorant | 2XKO | TFT
-              Inhouses | Tournaments | Watch Parties | Meetups
+              League of Legends | Riftbound | Tournaments | TFT | Valorant | Watch Parties | Meetups.
             </p>
 
             <div className="flex flex-wrap items-center gap-3">

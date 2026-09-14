@@ -28,7 +28,7 @@ export function CursorToggle() {
       className="flex items-center gap-2 text-caption text-ink-muted hover:text-ink-secondary transition-colors"
     >
       <MousePointer2 strokeWidth={1.5} className="h-3.5 w-3.5" />
-      <span>LoLMK cursor</span>
+      <span>LoL cursor</span>
       <span
         className={cn(
           "relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors",
