@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getMayhemFull } from "@/lib/mayhem-db";
+import { getMayhemVenueState } from "@/lib/mayhem-db";
 import { MayhemLiveScreen } from "@/components/mayhem/mayhem-live-screen";
 
 export const metadata: Metadata = {
@@ -10,6 +10,6 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function MayhemLivePage() {
-  const data = await getMayhemFull();
+  const data = await getMayhemVenueState();
   return <MayhemLiveScreen initial={data} />;
 }

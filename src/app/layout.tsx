@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk, Bebas_Neue, Chakra_Petch } from "next/font/google";
 import { Header } from "@/components/layout/header";
-import { Footer } from "@/components/layout/footer";
+import { ConditionalFooter } from "@/components/layout/conditional-footer";
 import { getMemberSession } from "@/lib/discord-auth";
 import "./globals.css";
 
@@ -90,7 +90,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }
         />
         <main className="pt-16">{children}</main>
-        <Footer />
+        <ConditionalFooter />
       </body>
     </html>
   );

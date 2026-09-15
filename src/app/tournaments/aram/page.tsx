@@ -6,12 +6,14 @@ import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
 import { getMayhemPublic } from "@/lib/mayhem-db";
+import { getMemberSession } from "@/lib/discord-auth";
 import type { MayhemPublic, MayhemPublicTeam } from "@/types/mayhem";
+import { AramSignupPanel } from "@/components/mayhem/aram-signup-panel";
 
 export const metadata: Metadata = {
   title: "ARAM Mayhem",
   description:
-    "LoLMK's ARAM tournament format: turn up solo, get randomised into a team, play a bracket the same night.",
+    "LoLMK's ARAM meetup tournament: sign up solo or bring a full premade team, teams drawn live, bracket runs the same day.",
 };
 
 // This route depends on a live singleton event. Rendering it dynamically keeps
@@ -22,6 +24,9 @@ export const dynamic = "force-dynamic";
 const EMPTY_MAYHEM: MayhemPublic = {
   title: "ARAM Mayhem",
   stage: "collecting",
+  team_format: "randomized",
+  registration_open: false,
+  registration_generation: 0,
   champion_team_id: null,
   player_count: 0,
   teams: [],
@@ -54,7 +59,12 @@ const STAGE_COPY: Record<
 };
 
 export default async function AramPublicPage() {
-  const data = await loadMayhemPublic();
+  const [data, member] = await Promise.all([
+    loadMayhemPublic(),
+    // Never let a Discord/session failure take the whole public page down —
+    // an unauthenticated visitor just sees the signed-out signup state.
+    getMemberSession().catch(() => null),
+  ]);
   const stage = STAGE_COPY[data.stage];
   const champion = data.champion_team_id
     ? data.teams.find((t) => t.id === data.champion_team_id) ?? null
@@ -62,20 +72,21 @@ export default async function AramPublicPage() {
   const knockoutMatches = data.matches.filter((m) => m.bracket !== "group");
   const groupMatches = data.matches.filter((m) => m.bracket === "group");
   const teamById = new Map(data.teams.map((t) => [t.id, t]));
-  // An event that has never been run reads as "collecting" with nobody in
-  // it — that is the empty state, not a live event with zero entrants.
-  const neverRun = data.stage === "collecting" && data.player_count === 0;
+  // An event that has never had signups opened reads the same as a fresh
+  // collecting-stage event with nobody in it — show the "nothing running"
+  // placeholder ONLY then. The moment an admin opens registration, real
+  // people need to be ABLE to be the first signup — gating on player_count
+  // would make that structurally impossible (0 players -> hidden signup ->
+  // stays 0 forever). registration_open is the actual signal for "is this
+  // page live right now", not player_count.
+  const neverRun = data.stage === "collecting" && data.player_count === 0 && !data.registration_open;
+  const canSignUp = data.stage === "collecting";
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-line-subtle">
-        <div aria-hidden className="absolute inset-0 grain pointer-events-none" />
-        <div
-          aria-hidden
-          className="absolute -top-40 left-1/2 h-[560px] w-[1100px] -translate-x-1/2 bg-gradient-to-br from-brand-blue/15 via-transparent to-brand-red/15 blur-3xl pointer-events-none"
-        />
-        <div className="container-wide relative py-20 md:py-28">
-          <div className="max-w-3xl space-y-6">
+      <section className="border-b border-line-subtle">
+        <div className="container-wide py-10 md:py-14">
+          <div className="max-w-3xl space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <Link href="/tournaments" className="text-body-sm text-ink-muted hover:text-ink">
                 Tournaments
@@ -88,30 +99,30 @@ export default async function AramPublicPage() {
                 </Badge>
               )}
             </div>
-            <h1 className="font-display text-display-lg md:text-display-xl text-ink leading-[0.95]">
-              Turn up alone. Leave with a team.
-            </h1>
-            <p className="text-body-lg text-ink-secondary max-w-[55ch]">
-              ARAM Mayhem is the meetup tournament: no roster, no signup form.
-              You put your name in at the venue, the randomiser draws teams live
-              on the big screen, and the whole bracket runs the same night.
+            <h1 className="font-heading text-heading-xl text-ink">ARAM meetup tournament</h1>
+            <p className="text-body-md text-ink-secondary max-w-[62ch]">
+              LoLMK's ARAM Mayhem is a meetup tournament, usually run over the
+              course of a day. Bring a full premade team, or sign up solo and
+              get placed into a team — solo signups are genuinely encouraged,
+              especially if you haven't put a friend group together in Korea
+              yet. Small prizes are up for grabs.
             </p>
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-3 pt-1">
               <a
                 href="https://discord.gg/lolmk"
                 target="_blank"
                 rel="noreferrer"
-                className={cn(buttonVariants({ variant: "discord", size: "lg" }))}
+                className={cn(buttonVariants({ variant: "discord", size: "md" }))}
               >
-                <DiscordIcon className="h-6 w-6" />
+                <DiscordIcon className="h-5 w-5" />
                 Find the next one
               </a>
               {stage.live && !neverRun && (
                 <Link
                   href="/mayhemlive"
-                  className={cn(buttonVariants({ variant: "secondary", size: "lg" }))}
+                  className={cn(buttonVariants({ variant: "secondary", size: "md" }))}
                 >
-                  <Tv strokeWidth={1.5} className="h-5 w-5" />
+                  <Tv strokeWidth={1.5} className="h-4 w-4" />
                   Venue screen
                 </Link>
               )}
@@ -130,14 +141,28 @@ export default async function AramPublicPage() {
               </p>
               <p className="text-body-md text-ink-secondary max-w-lg mx-auto">
                 Mayhem runs at meetups, announced in Discord a few days out.
-                When one is live this page fills in with the teams and the
-                bracket as they happen.
+                When one is live this page fills in with signup, then the
+                teams and bracket as they happen.
               </p>
             </div>
           </div>
         </section>
       ) : (
         <>
+          {canSignUp && (
+            <section className="container-wide py-12 border-b border-line-subtle">
+              <AramSignupPanel
+                teamFormat={data.team_format}
+                registrationOpen={data.registration_open}
+                member={
+                  member
+                    ? { discordUserId: member.discordUserId, displayName: member.displayName, avatarUrl: member.avatarUrl }
+                    : null
+                }
+              />
+            </section>
+          )}
+
           {champion && (
             <section className="container-wide py-16 border-b border-line-subtle">
               <div className="border border-warning/50 bg-warning/10 p-8 flex flex-col sm:flex-row sm:items-center gap-6">

@@ -118,6 +118,12 @@ function trustedOrigin(): string {
   return configuredOrigin() ?? "http://localhost:3001";
 }
 
+// Exported for building absolute links from contexts that aren't part of an
+// OAuth flow (e.g. the DM invite confirmation URL in mayhem actions) but
+// still need the same trusted, deployment-configured origin — never derived
+// from a request Host header, for the same reason redirectUri() isn't.
+export { trustedOrigin };
+
 function redirectUri(): string {
   return `${trustedOrigin()}/api/auth/discord/callback`;
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import {
   useCallback,
   useEffect,
@@ -20,12 +19,15 @@ import {
   Play,
   Plus,
   RotateCcw,
+  Settings,
   Trophy,
 } from "lucide-react";
 import type { TimerSegment } from "@/types/timer";
 import { cn } from "@/lib/utils";
+import { TimerBackground } from "@/components/sections/timer-background";
+import type { TimerBackgroundId } from "@/lib/timer-schedule";
 
-const STORAGE_KEY = "lolmk-poro-cup-timer-v2";
+export const STORAGE_KEY = "lolmk-poro-cup-timer-v2";
 const MINUTE = 60_000;
 const WARNING_MS = 5 * MINUTE; // amber-ish urgency
 const URGENT_MS = 60_000; // final minute
@@ -196,7 +198,17 @@ function urgencyFor(ms: number): Urgency {
   return "normal";
 }
 
-export function TournamentTimer({ schedule }: { schedule: TimerSegment[] }) {
+export function TournamentTimer({
+  schedule,
+  title,
+  background,
+  onEditSetup,
+}: {
+  schedule: TimerSegment[];
+  title: string;
+  background: TimerBackgroundId;
+  onEditSetup?: () => void;
+}) {
   const [state, dispatch] = useReducer(reducer, schedule, initState);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -367,11 +379,19 @@ export function TournamentTimer({ schedule }: { schedule: TimerSegment[] }) {
   const status = getStatus(state.running, state.remainingMs, state.durationMs);
 
   const indexed = schedule.map((s, i) => ({ seg: s, i }));
-  const groups: { phase: TimerSegment["phase"]; items: typeof indexed }[] = [
-    { phase: "rounds", items: indexed.filter((x) => x.seg.phase === "rounds") },
-    { phase: "break", items: indexed.filter((x) => x.seg.phase === "break") },
-    { phase: "topcut", items: indexed.filter((x) => x.seg.phase === "topcut") },
-  ];
+  // Group by contiguous runs of the same phase, in schedule order, so
+  // multiple intermissions render at their real position on the rail
+  // instead of every break clumping together after all round chips.
+  type Group = { phase: TimerSegment["phase"]; items: typeof indexed };
+  const groups: Group[] = [];
+  for (const item of indexed) {
+    const last = groups[groups.length - 1];
+    if (last && last.phase === item.seg.phase) {
+      last.items.push(item);
+    } else {
+      groups.push({ phase: item.seg.phase, items: [item] });
+    }
+  }
 
   return (
     <div
@@ -392,18 +412,7 @@ export function TournamentTimer({ schedule }: { schedule: TimerSegment[] }) {
         aria-hidden
         className="pointer-events-none absolute -left-24 -top-24 h-[45vh] w-[40vw] rounded-full bg-brand-blue/10 blur-[130px]"
       />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 flex items-center justify-center"
-      >
-        <Image
-          src="/logo.svg"
-          alt=""
-          width={620}
-          height={697}
-          className="h-[64vh] w-auto max-h-[1080px] opacity-[0.02]"
-        />
-      </div>
+      <TimerBackground backgroundId={background} />
 
       <div className="relative flex min-h-full flex-col px-5 py-5 sm:px-8 md:px-12 md:py-7">
         {/* Utility row */}
@@ -413,32 +422,40 @@ export function TournamentTimer({ schedule }: { schedule: TimerSegment[] }) {
             className="group inline-flex items-center gap-2.5 text-ink-muted transition-colors hover:text-ink"
             aria-label="Back to lolmk.gg"
           >
-            <Image src="/logo.svg" alt="" width={28} height={28} className="h-7 w-7" />
             <span className="font-mono text-body-sm tracking-tight">lolmk.gg</span>
           </Link>
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="inline-flex items-center gap-2 rounded-md border border-line-strong px-3.5 py-2 text-label uppercase text-ink-secondary transition-colors hover:border-brand-red hover:text-ink"
-            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-          >
-            {isFullscreen ? (
-              <Minimize strokeWidth={1.75} className="h-4 w-4" />
-            ) : (
-              <Maximize strokeWidth={1.75} className="h-4 w-4" />
+          <div className="flex items-center gap-2.5">
+            {onEditSetup && (
+              <button
+                type="button"
+                onClick={onEditSetup}
+                className="inline-flex items-center gap-2 rounded-md border border-line-strong px-3.5 py-2 text-label uppercase text-ink-secondary transition-colors hover:border-brand-red hover:text-ink"
+                aria-label="Edit tournament setup"
+              >
+                <Settings strokeWidth={1.75} className="h-4 w-4" />
+                <span className="hidden sm:inline">Setup</span>
+              </button>
             )}
-            <span className="hidden sm:inline">{isFullscreen ? "Exit" : "Fullscreen"}</span>
-          </button>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="inline-flex items-center gap-2 rounded-md border border-line-strong px-3.5 py-2 text-label uppercase text-ink-secondary transition-colors hover:border-brand-red hover:text-ink"
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            >
+              {isFullscreen ? (
+                <Minimize strokeWidth={1.75} className="h-4 w-4" />
+              ) : (
+                <Maximize strokeWidth={1.75} className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">{isFullscreen ? "Exit" : "Fullscreen"}</span>
+            </button>
+          </div>
         </div>
 
         {/* Event identity */}
         <header className="mt-3 flex flex-col items-center gap-2 text-center sm:mt-5">
-          <p className="font-medium uppercase text-ink-muted text-[0.6rem] tracking-[0.16em] sm:text-label sm:tracking-[0.26em]">
-            Riftbound&nbsp;·&nbsp;League of Legends TCG
-          </p>
-          <h1 className="font-display text-[clamp(2.25rem,6vw,5rem)] leading-[0.9] tracking-[0.02em]">
-            <span className="text-ink">LoLMK </span>
-            <span className="text-brand-red-bright">Poro Cup</span>
+          <h1 className="font-display text-[clamp(2.25rem,6vw,5rem)] leading-[0.9] tracking-[0.02em] text-ink">
+            {title}
           </h1>
         </header>
 
@@ -557,7 +574,7 @@ export function TournamentTimer({ schedule }: { schedule: TimerSegment[] }) {
         <div className="flex flex-col items-center gap-5">
           <div className="flex flex-wrap items-end justify-center gap-x-4 gap-y-5 sm:gap-x-8">
             {groups.map((group, gi) => (
-              <div key={group.phase} className="flex items-end gap-4 sm:gap-8">
+              <div key={group.items[0].seg.id} className="flex items-end gap-4 sm:gap-8">
                 <div className="flex flex-col items-center gap-2.5">
                   <div className="flex items-center gap-2 sm:gap-2.5">
                     {group.items.map(({ seg: s, i }) => (
