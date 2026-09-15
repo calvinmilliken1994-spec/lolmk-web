@@ -11,8 +11,10 @@ import type {
   MayhemScene,
   MayhemStage,
   MayhemTeam,
+  MayhemTeamFormat,
 } from "@/types/mayhem";
-import { DEFAULT_FORMAT_CONFIG } from "@/types/mayhem";
+import { DEFAULT_FORMAT_CONFIG, PREMADE_ROSTER_SIZE } from "@/types/mayhem";
+import { computeAutoRevealIndex } from "@/lib/mayhem-reveal";
 
 /**
  * ARAM Mayhem persistence layer (Vercel Postgres).
@@ -41,18 +43,45 @@ export function ensureSchema(): Promise<void> {
           format jsonb NOT NULL,
           active_match_id text,
           champion_team_id text,
-          updated_at timestamptz NOT NULL DEFAULT now()
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          team_format text NOT NULL DEFAULT 'randomized',
+          registration_open boolean NOT NULL DEFAULT false,
+          registration_generation integer NOT NULL DEFAULT 0
         );
       `;
+      // Additive migrations for events created before these columns existed —
+      // safe to run every cold start; a no-op once applied.
+      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS team_format text NOT NULL DEFAULT 'randomized';`;
+      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS registration_open boolean NOT NULL DEFAULT false;`;
+      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS registration_generation integer NOT NULL DEFAULT 0;`;
+      // Auto-reveal: a persisted start timestamp is the single source of
+      // truth for "how many teams are visible" — every reader (admin,
+      // venue screen, public page) derives the count from elapsed time via
+      // computeAutoRevealIndex(), so this keeps advancing correctly even if
+      // no admin browser tab is open. reveal_index remains the source of
+      // truth for MANUAL mode and doubles as the frozen value the moment
+      // auto-reveal is paused.
+      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS auto_reveal boolean NOT NULL DEFAULT false;`;
+      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS reveal_started_at timestamptz;`;
+      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS reveal_interval_ms integer NOT NULL DEFAULT 10000;`;
+      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS reveal_start_on_countdown boolean NOT NULL DEFAULT false;`;
       await sql`
         CREATE TABLE IF NOT EXISTS mayhem_players (
           id text PRIMARY KEY,
           event_id text NOT NULL REFERENCES mayhem_events(id) ON DELETE CASCADE,
           display_name text NOT NULL,
           entry_order integer NOT NULL,
-          team_id text
+          team_id text,
+          member_discord_id text
         );
       `;
+      await sql`ALTER TABLE mayhem_players ADD COLUMN IF NOT EXISTS member_discord_id text;`;
+      // A verified member can only hold one entrant row per event — without
+      // this, a double-submitted join request (e.g. a rapid double-click)
+      // could enroll the same Discord account twice under the display name
+      // they had at each moment.
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_players_member_unique
+        ON mayhem_players (event_id, member_discord_id) WHERE member_discord_id IS NOT NULL;`;
       await sql`
         CREATE TABLE IF NOT EXISTS mayhem_teams (
           id text PRIMARY KEY,
@@ -61,9 +90,17 @@ export function ensureSchema(): Promise<void> {
           icon_url text NOT NULL DEFAULT '',
           seed integer,
           reveal_order integer NOT NULL,
-          group_id text
+          group_id text,
+          is_ready boolean NOT NULL DEFAULT true,
+          captain_discord_id text
         );
       `;
+      await sql`ALTER TABLE mayhem_teams ADD COLUMN IF NOT EXISTS is_ready boolean NOT NULL DEFAULT true;`;
+      await sql`ALTER TABLE mayhem_teams ADD COLUMN IF NOT EXISTS captain_discord_id text;`;
+      // One premade team per captain per event — a captain re-submitting
+      // "create team" must not silently spawn a second roster.
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_teams_captain_unique
+        ON mayhem_teams (event_id, captain_discord_id) WHERE captain_discord_id IS NOT NULL;`;
       await sql`
         CREATE TABLE IF NOT EXISTS mayhem_groups (
           id text PRIMARY KEY,
@@ -93,6 +130,60 @@ export function ensureSchema(): Promise<void> {
           drops_to_slot text
         );
       `;
+      // Pending premade applications — never counted as registered teams
+      // until every slot is confirmed. See confirmPremadeApplicationSlot()
+      // in actions.ts for the promotion path into mayhem_teams/mayhem_players.
+      await sql`
+        CREATE TABLE IF NOT EXISTS mayhem_team_applications (
+          id text PRIMARY KEY,
+          event_id text NOT NULL REFERENCES mayhem_events(id) ON DELETE CASCADE,
+          team_name text NOT NULL,
+          captain_discord_id text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          registration_generation integer NOT NULL DEFAULT 0,
+          roster_version integer NOT NULL DEFAULT 0,
+          send_in_progress boolean NOT NULL DEFAULT false
+        );
+      `;
+      await sql`ALTER TABLE mayhem_team_applications ADD COLUMN IF NOT EXISTS roster_version integer NOT NULL DEFAULT 0;`;
+      await sql`ALTER TABLE mayhem_team_applications ADD COLUMN IF NOT EXISTS send_in_progress boolean NOT NULL DEFAULT false;`;
+      // One open application per captain per event — matches the same
+      // one-team-per-captain rule as mayhem_teams' own unique index.
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_team_applications_captain_unique
+        ON mayhem_team_applications (event_id, captain_discord_id);`;
+      await sql`
+        CREATE TABLE IF NOT EXISTS mayhem_team_application_slots (
+          id text PRIMARY KEY,
+          application_id text NOT NULL REFERENCES mayhem_team_applications(id) ON DELETE CASCADE,
+          member_discord_id text,
+          display_name text,
+          avatar_url text,
+          status text NOT NULL DEFAULT 'draft',
+          is_captain boolean NOT NULL DEFAULT false,
+          confirm_token_hash text,
+          confirm_token_expires_at timestamptz,
+          delivery_status text NOT NULL DEFAULT 'not_sent',
+          token_roster_version integer,
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          created_at timestamptz NOT NULL DEFAULT now()
+        );
+      `;
+      await sql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS confirm_token_expires_at timestamptz;`;
+      await sql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS delivery_status text NOT NULL DEFAULT 'not_sent';`;
+      await sql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS token_roster_version integer;`;
+      await sql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();`;
+      await sql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS delivery_error text;`;
+      // A given Discord account can only be invited into ONE slot of a
+      // given application (no duplicate invites to the same person), and
+      // — critically — only one PENDING-OR-CONFIRMED slot across ALL
+      // applications for the event, enforced by the reservation check in
+      // actions.ts rather than a DB constraint (which can't easily express
+      // "across applications" without a separate reservation table; the
+      // event-lock transaction is what actually prevents the race).
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_application_slots_member_unique
+        ON mayhem_team_application_slots (application_id, member_discord_id) WHERE member_discord_id IS NOT NULL;`;
+      await sql`CREATE INDEX IF NOT EXISTS mayhem_application_slots_application_idx
+        ON mayhem_team_application_slots (application_id);`;
       // Ensure the singleton event row exists.
       await sql`
         INSERT INTO mayhem_events (id, title, format)
@@ -124,19 +215,43 @@ export async function getMayhemFull(): Promise<MayhemFull> {
   ]);
 
   const row = eventRes.rows[0];
+  const rawRevealIndex: number = row.reveal_index;
+  const autoReveal = Boolean(row.auto_reveal);
+  const revealStartedAt = row.reveal_started_at ? new Date(row.reveal_started_at).toISOString() : null;
+  const revealIntervalMs = row.reveal_interval_ms ?? 10_000;
+  const revealStartOnCountdown = Boolean(row.reveal_start_on_countdown);
+  const countdownEndsAt = row.countdown_ends_at ? new Date(row.countdown_ends_at).toISOString() : null;
+
   const event: MayhemEvent = {
     id: row.id,
     title: row.title,
     stage: row.stage as MayhemStage,
     scene: row.scene as MayhemScene,
-    countdown_ends_at: row.countdown_ends_at
-      ? new Date(row.countdown_ends_at).toISOString()
-      : null,
-    reveal_index: row.reveal_index,
+    countdown_ends_at: countdownEndsAt,
+    // Auto mode: reveal_index is DERIVED here at read time from elapsed
+    // wall-clock time, not the raw column — see computeAutoRevealIndex's
+    // doc comment for why this is the only reveal_index every consumer
+    // (admin dashboard, venue screen poll, public page) ever sees.
+    reveal_index: computeAutoRevealIndex({
+      teamCount: teamsRes.rows.length,
+      manualIndex: rawRevealIndex,
+      auto: autoReveal,
+      revealStartedAt,
+      countdownEndsAt,
+      startOnCountdownEnd: revealStartOnCountdown,
+      intervalMs: revealIntervalMs,
+    }),
     format: row.format as MayhemFormatConfig,
     active_match_id: row.active_match_id,
     champion_team_id: row.champion_team_id,
     updated_at: new Date(row.updated_at).toISOString(),
+    team_format: (row.team_format as MayhemTeamFormat) ?? "randomized",
+    registration_open: Boolean(row.registration_open),
+    registration_generation: row.registration_generation ?? 0,
+    auto_reveal: autoReveal,
+    reveal_started_at: revealStartedAt,
+    reveal_interval_ms: revealIntervalMs,
+    reveal_start_on_countdown: revealStartOnCountdown,
   };
 
   const players: MayhemPlayer[] = playersRes.rows.map((p) => ({
@@ -145,6 +260,7 @@ export async function getMayhemFull(): Promise<MayhemFull> {
     display_name: p.display_name,
     entry_order: p.entry_order,
     team_id: p.team_id,
+    member_discord_id: p.member_discord_id ?? null,
   }));
 
   const teams: MayhemTeam[] = teamsRes.rows.map((t) => ({
@@ -156,6 +272,8 @@ export async function getMayhemFull(): Promise<MayhemFull> {
     reveal_order: t.reveal_order,
     group_id: t.group_id,
     players: players.filter((p) => p.team_id === t.id),
+    is_ready: Boolean(t.is_ready),
+    captain_discord_id: t.captain_discord_id ?? null,
   }));
 
   const groups: MayhemGroup[] = groupsRes.rows.map((g) => ({
@@ -191,6 +309,79 @@ export async function getMayhemFull(): Promise<MayhemFull> {
 export { SINGLETON_EVENT_ID };
 
 // ---------------------------------------------------------------------------
+// Venue-safe read (no admin/session data, no Discord identities)
+// ---------------------------------------------------------------------------
+
+/**
+ * Venue-safe projection of MayhemFull's team/player shape — strips
+ * member_discord_id and captain_discord_id, which getMayhemFull() carries
+ * for the admin tool but which have no business reaching /mayhemlive or its
+ * polling API. Distinct from MayhemPublic: this keeps admin-only fields
+ * like `scene`, `reveal_index`, and `format` (the venue screen and its
+ * poll loop need those to render), it only removes the specific
+ * Discord-identity columns added for self-service signup.
+ */
+export interface MayhemVenuePlayer {
+  id: string;
+  display_name: string;
+  entry_order: number;
+  team_id: string | null;
+}
+
+export interface MayhemVenueTeam {
+  id: string;
+  name: string;
+  icon_url: string;
+  seed: number | null;
+  reveal_order: number;
+  group_id: string | null;
+  players: MayhemVenuePlayer[];
+  is_ready: boolean;
+}
+
+export interface MayhemVenueState {
+  event: MayhemEvent;
+  players: MayhemVenuePlayer[];
+  teams: MayhemVenueTeam[];
+  groups: MayhemGroup[];
+  matches: MayhemMatch[];
+}
+
+/**
+ * What /mayhemlive and its polling API (/api/mayhem/state) are allowed to
+ * serve. Never returns member_discord_id or captain_discord_id — those
+ * identify a real Discord account and have no reason to ride a payload
+ * polled by anyone who opens the venue-screen URL. Built by re-fetching
+ * full state and stripping fields, not by reusing a cached getMayhemFull()
+ * result, so this is always in sync with what admins see.
+ */
+export async function getMayhemVenueState(): Promise<MayhemVenueState> {
+  const full = await getMayhemFull();
+  const stripPlayer = (p: MayhemPlayer): MayhemVenuePlayer => ({
+    id: p.id,
+    display_name: p.display_name,
+    entry_order: p.entry_order,
+    team_id: p.team_id,
+  });
+  return {
+    event: full.event,
+    players: full.players.map(stripPlayer),
+    teams: full.teams.map((t) => ({
+      id: t.id,
+      name: t.name,
+      icon_url: t.icon_url,
+      seed: t.seed,
+      reveal_order: t.reveal_order,
+      group_id: t.group_id,
+      players: t.players.map(stripPlayer),
+      is_ready: t.is_ready,
+    })),
+    groups: full.groups,
+    matches: full.matches,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Public read
 // ---------------------------------------------------------------------------
 
@@ -220,6 +411,9 @@ export async function getMayhemPublic(): Promise<MayhemPublic> {
   return {
     title: event.title,
     stage: event.stage,
+    team_format: event.team_format,
+    registration_open: event.registration_open,
+    registration_generation: event.registration_generation,
     // A champion id that points at a team we're deliberately not showing yet
     // would be a leak of exactly the thing the reveal gate protects.
     champion_team_id:
