@@ -19,9 +19,10 @@ import { shuffle } from "@/lib/mayhem-icons";
 import type {
   SrBracketFormat,
   SrMatch,
+  SrMatchScene,
   SrTournamentStatus,
 } from "@/types/sr-tournament";
-import { SR_MAX_TEAMS, SR_MIN_TEAMS } from "@/types/sr-tournament";
+import { SR_MAX_TEAMS, SR_MIN_TEAMS, SR_SCENES } from "@/types/sr-tournament";
 
 /**
  * Summoner's Rift admin write layer. Every mutation:
@@ -83,7 +84,14 @@ function refresh(slug?: string) {
   // at a top-level /summoners-rift that was never built).
   revalidatePath("/tournaments");
   revalidatePath("/tournaments/summoners-rift");
-  if (slug) revalidatePath(`/tournaments/summoners-rift/${slug}`);
+  if (slug) {
+    revalidatePath(`/tournaments/summoners-rift/${slug}`);
+    // The live screen is per-tournament, so it can only be revalidated when
+    // the slug is known. It polls /api/sr/state anyway (which is
+    // force-dynamic and never cached), so this is belt-and-braces for the
+    // server-rendered first paint, not the mechanism the screen relies on.
+    revalidatePath(`/srlive/${slug}`);
+  }
 }
 
 /** Load and lock a tournament's match graph in engine-compatible form. */
@@ -239,6 +247,7 @@ export async function updateTournament(
     bestOf: 1 | 3 | 5;
     thirdPlaceMatch: boolean;
     grandFinalReset: boolean;
+    grandFinalBestOf: 1 | 3 | 5 | null;
     startAt: string | null;
     endAt: string | null;
   }>,
@@ -260,7 +269,8 @@ export async function updateTournament(
     const bracketSettingSupplied =
       input.bestOf !== undefined ||
       input.thirdPlaceMatch !== undefined ||
-      input.grandFinalReset !== undefined;
+      input.grandFinalReset !== undefined ||
+      input.grandFinalBestOf !== undefined;
     if (bracketSettingSupplied) {
       const { rows: matchRows } = await client.query(
         `SELECT 1 FROM sr_matches WHERE tournament_id = $1 LIMIT 1`,
@@ -280,12 +290,18 @@ export async function updateTournament(
     const name = input.name?.trim();
     if (input.name !== undefined && !name) throw new Error("Tournament name cannot be blank.");
 
+    // grandFinalBestOf is nullable by design ("same as best_of"), so it
+    // can't reuse the COALESCE($n, col) pattern every other optional field
+    // here uses — COALESCE would make "clear it back to null" impossible.
+    // The explicit CASE WHEN $set THEN $value pattern (matching startAt/
+    // endAt below) lets `null` be written on purpose.
     await client.query(
       `UPDATE sr_tournaments SET
          name = COALESCE($2, name),
          best_of = COALESCE($3, best_of),
          third_place_match = COALESCE($4, third_place_match),
          grand_final_reset = COALESCE($5, grand_final_reset),
+         grand_final_best_of = CASE WHEN $10 THEN $11 ELSE grand_final_best_of END,
          start_at = CASE WHEN $6 THEN $7 ELSE start_at END,
          end_at = CASE WHEN $8 THEN $9 ELSE end_at END,
          updated_at = now()
@@ -300,6 +316,8 @@ export async function updateTournament(
         input.startAt ?? null,
         input.endAt !== undefined,
         input.endAt ?? null,
+        input.grandFinalBestOf !== undefined,
+        input.grandFinalBestOf ?? null,
       ],
     );
     await client.query(
@@ -360,6 +378,14 @@ export async function addTeam(
     if (countRows[0].c >= (tournament.max_teams as number)) {
       throw new Error(`Tournament is capped at ${tournament.max_teams} teams.`);
     }
+    const { rows: applicationClash } = await client.query(
+      `SELECT id FROM sr_team_applications
+       WHERE tournament_id = $1 AND lower(team_name) = lower($2)`,
+      [tournamentId, name],
+    );
+    if (applicationClash.length > 0) {
+      throw new Error(`A team named "${name}" already has an application in progress.`);
+    }
 
     const id = newId("srteam");
     try {
@@ -397,12 +423,22 @@ export async function updateTeam(
     const { rows } = await client.sql`
       SELECT t.*, tr.slug as tournament_slug FROM sr_teams t
       JOIN sr_tournaments tr ON tr.id = t.tournament_id
-      WHERE t.id = ${teamId} FOR UPDATE OF t
+      WHERE t.id = ${teamId} FOR UPDATE OF t, tr
     `;
     if (rows.length === 0) throw new Error("Team not found.");
     const team = rows[0];
     const name = input.name?.trim();
     if (input.name !== undefined && !name) throw new Error("Team name cannot be blank.");
+    if (name) {
+      const { rows: applicationClash } = await client.query(
+        `SELECT id FROM sr_team_applications
+         WHERE tournament_id = $1 AND lower(team_name) = lower($2)`,
+        [team.tournament_id, name],
+      );
+      if (applicationClash.length > 0) {
+        throw new Error(`A team named "${name}" already has an application in progress.`);
+      }
+    }
 
     try {
       await client.query(
@@ -577,6 +613,19 @@ export async function generateBracket(tournamentId: string): Promise<void> {
       throw new Error(`Need at least ${tournament.min_teams} seeded teams.`);
     }
 
+    // Drop the presentation's pointer into the old bracket FIRST. The
+    // sr_tournaments_active_match_fkey composite FK is ON DELETE NO ACTION,
+    // so deleting a match that active_match_id still references would abort
+    // the whole transaction. Demote the scene with it — "match" with nothing
+    // to show is a blank screen on the stream.
+    await client.query(
+      `UPDATE sr_tournaments
+       SET active_match_id = NULL,
+           scene = CASE WHEN scene = 'match' THEN 'bracket' ELSE scene END
+       WHERE id = $1`,
+      [tournamentId],
+    );
+
     // Clear any prior (all-pending) bracket before regenerating.
     await client.query(`DELETE FROM sr_matches WHERE tournament_id = $1`, [tournamentId]);
 
@@ -588,6 +637,7 @@ export async function generateBracket(tournamentId: string): Promise<void> {
         doubleElimination: tournament.format === "double_elim",
         thirdPlaceMatch: tournament.third_place_match as boolean,
         grandFinalReset: tournament.grand_final_reset as boolean,
+        grandFinalBestOf: tournament.grand_final_best_of as 1 | 3 | 5 | null,
         idFactory: () => newId("srmatch"),
       }),
     );
@@ -643,6 +693,19 @@ export async function generateBracket(tournamentId: string): Promise<void> {
       `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'bracket.generate', $2::jsonb)`,
       [tournamentId, JSON.stringify({ matchCount: built.length })],
     );
+    // New bracket, new reveal: reset UBR1 progress and bump the generation
+    // so a stale client can never mistake old reveal progress for new-bracket
+    // progress. Default is fully-revealed-looking (count starts at 0, but
+    // the live screen treats generation mismatch as "show everything") is
+    // NOT what we want here — a fresh bracket always starts unrevealed, and
+    // the admin explicitly clicks Start to begin the staged reveal.
+    await client.query(
+      `UPDATE sr_tournaments
+       SET ubr1_revealed_count = 0, ubr1_reveal_generation = ubr1_reveal_generation + 1,
+           ubr1_reveal_started_at = NULL, ubr1_reveal_run_id = NULL
+       WHERE id = $1`,
+      [tournamentId],
+    );
     return tournament.slug as string;
   });
   refresh(slug);
@@ -677,7 +740,11 @@ export async function reportMatchResult(
 
     if (result.championId) {
       await client.query(
-        `UPDATE sr_tournaments SET status = 'completed', champion_team_id = $2, updated_at = now() WHERE id = $1`,
+        `UPDATE sr_tournaments
+         SET status = 'completed', champion_team_id = $2,
+             scene = 'champion', active_match_id = NULL, countdown_ends_at = NULL,
+             updated_at = now()
+         WHERE id = $1`,
         [match.tournament_id, result.championId],
       );
     } else {
@@ -687,6 +754,17 @@ export async function reportMatchResult(
         `UPDATE sr_tournaments SET status = 'in_progress', updated_at = now()
          WHERE id = $1 AND status = 'bracket_published'`,
         [match.tournament_id],
+      );
+      // Clear the live screen's pointer only if it was pointing at THIS
+      // match. Scoping it matters: an operator reporting a side-bracket
+      // result while the stream is showing the feature match shouldn't have
+      // the scene yanked out from under them. (ARAM Mayhem clears
+      // unconditionally; SR runs several matches concurrently, so it can't.)
+      await client.query(
+        `UPDATE sr_tournaments
+         SET active_match_id = NULL, scene = CASE WHEN scene = 'match' THEN 'bracket' ELSE scene END
+         WHERE id = $1 AND active_match_id = $2`,
+        [match.tournament_id, matchId],
       );
     }
 
@@ -719,16 +797,216 @@ export async function undoMatchResult(matchId: string): Promise<void> {
     retractBracketResult(graph, matchId);
     await persistBracketState(client, graph);
 
+    // Un-crowning also has to take the champion scene down with it, or the
+    // live screen keeps celebrating a winner the bracket no longer has.
     await client.query(
-      `UPDATE sr_tournaments SET champion_team_id = NULL, status = 'in_progress', updated_at = now()
+      `UPDATE sr_tournaments
+       SET champion_team_id = NULL, status = 'in_progress',
+           scene = CASE WHEN scene = 'champion' THEN 'bracket' ELSE scene END,
+           updated_at = now()
        WHERE id = $1 AND champion_team_id = $2`,
       [match.tournament_id, previousWinner],
+    );
+    // An undone match can't be the feature match any more — it has no result
+    // and its downstream advancement was just retracted.
+    await client.query(
+      `UPDATE sr_tournaments
+       SET active_match_id = NULL, scene = CASE WHEN scene = 'match' THEN 'bracket' ELSE scene END
+       WHERE id = $1 AND active_match_id = $2`,
+      [match.tournament_id, matchId],
     );
     await client.query(
       `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'match.undo', $2::jsonb)`,
       [match.tournament_id, JSON.stringify({ matchId })],
     );
     return match.tournament_slug as string;
+  });
+  refresh(slug);
+}
+
+// ---------------------------------------------------------------------------
+// Presentation desk (drives /srlive/[slug])
+// ---------------------------------------------------------------------------
+//
+// Scene state is deliberately separate from `status`. `status` is what the
+// tournament IS (draft / seeding / bracket_published / in_progress /
+// completed) and is derived from real progress; `scene` is only what the
+// stream overlay is currently SHOWING, and an operator flips it freely
+// without changing a single fact about the tournament. Nothing in the
+// bracket engine, seeding, or signup gating reads these columns.
+//
+// Every scene mutation and its audit row share one transaction. Active-match
+// selection also performs an application-level tournament ownership check so
+// bad input yields a clear error before the composite FK is reached.
+
+export async function setScene(tournamentId: string, scene: SrMatchScene): Promise<void> {
+  await requireAdmin();
+  if (!SR_SCENES.includes(scene)) throw new Error("Unknown scene.");
+
+  const slug = await withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `UPDATE sr_tournaments SET scene = $2, updated_at = now()
+       WHERE id = $1 RETURNING slug`,
+      [tournamentId, scene],
+    );
+    if (rows.length === 0) throw new Error("Tournament not found.");
+    await client.query(
+      `INSERT INTO sr_audit_log (tournament_id, action, detail)
+       VALUES ($1, 'scene.set', $2::jsonb)`,
+      [tournamentId, JSON.stringify({ scene })],
+    );
+    return rows[0].slug as string;
+  });
+  refresh(slug);
+}
+
+/** Start a server-timestamped starting-soon countdown. */
+export async function startCountdown(tournamentId: string, seconds: number): Promise<void> {
+  await requireAdmin();
+  if (!Number.isInteger(seconds) || seconds < 1 || seconds > 3600) {
+    throw new Error("Countdown must be between 1 and 3600 seconds.");
+  }
+  const endsAt = new Date(Date.now() + seconds * 1000).toISOString();
+  const slug = await withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `UPDATE sr_tournaments
+       SET scene = 'starting_soon', countdown_ends_at = $2, updated_at = now()
+       WHERE id = $1 RETURNING slug`,
+      [tournamentId, endsAt],
+    );
+    if (rows.length === 0) throw new Error("Tournament not found.");
+    await client.query(
+      `INSERT INTO sr_audit_log (tournament_id, action, detail)
+       VALUES ($1, 'scene.set', $2::jsonb)`,
+      [tournamentId, JSON.stringify({ scene: "starting_soon", seconds })],
+    );
+    return rows[0].slug as string;
+  });
+  refresh(slug);
+}
+
+/** Select a tournament-owned match for the live screen, or return to bracket. */
+export async function setActiveMatch(tournamentId: string, matchId: string | null): Promise<void> {
+  await requireAdmin();
+  const slug = await withTransaction(async (client) => {
+    const { rows: tournamentRows } = await client.query(
+      `SELECT slug FROM sr_tournaments WHERE id = $1 FOR UPDATE`,
+      [tournamentId],
+    );
+    if (tournamentRows.length === 0) throw new Error("Tournament not found.");
+    if (matchId) {
+      const { rows: matchRows } = await client.query(
+        `SELECT id FROM sr_matches WHERE id = $1 AND tournament_id = $2`,
+        [matchId, tournamentId],
+      );
+      if (matchRows.length === 0) throw new Error("Match not found in this tournament.");
+    }
+    await client.query(
+      `UPDATE sr_tournaments
+       SET active_match_id = $2, scene = $3, updated_at = now()
+       WHERE id = $1`,
+      [tournamentId, matchId, matchId ? "match" : "bracket"],
+    );
+    await client.query(
+      `INSERT INTO sr_audit_log (tournament_id, action, detail)
+       VALUES ($1, 'scene.set', $2::jsonb)`,
+      [tournamentId, JSON.stringify({ scene: matchId ? "match" : "bracket", matchId })],
+    );
+    return tournamentRows[0].slug as string;
+  });
+  refresh(slug);
+}
+
+/** Admin override for deleting a stalled application and releasing reservations. */
+export async function withdrawTeamApplication(applicationId: string): Promise<void> {
+  await requireAdmin();
+  await ensureSchema();
+  const slug = await withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `SELECT a.tournament_id, a.team_name, t.slug
+       FROM sr_team_applications a
+       JOIN sr_tournaments t ON t.id = a.tournament_id
+       WHERE a.id = $1
+       FOR UPDATE OF a, t`,
+      [applicationId],
+    );
+    if (rows.length === 0) throw new Error("Application not found.");
+    await client.query(`DELETE FROM sr_team_applications WHERE id = $1`, [applicationId]);
+    await client.query(
+      `INSERT INTO sr_audit_log (tournament_id, action, detail)
+       VALUES ($1, 'team.application_withdraw', $2::jsonb)`,
+      [
+        rows[0].tournament_id,
+        JSON.stringify({ applicationId, name: rows[0].team_name, by: "admin" }),
+      ],
+    );
+    return rows[0].slug as string;
+  });
+  refresh(slug);
+}
+
+// ---------------------------------------------------------------------------
+// Upper-bracket Round 1 staged reveal
+// ---------------------------------------------------------------------------
+//
+// Admin-controlled, persisted (see sr-db.ts ubr1_revealed_count /
+// ubr1_reveal_generation). Start/Next/Reset all lock the tournament row and
+// write their audit entry in the same transaction as the mutation.
+
+/**
+ * Starts (or replays) the automatic Round 1 reveal on the live screen. The
+ * whole sequence is timed client-side off `ubr1_reveal_started_at` — this
+ * action's only job is to stamp a fresh server timestamp and a fresh
+ * `ubr1_reveal_run_id` so every connected client (and one that reconnects
+ * mid-sequence) computes the exact same animation frame from elapsed time,
+ * never from a manually-clicked step count.
+ */
+export async function startUbr1Reveal(tournamentId: string): Promise<void> {
+  await requireAdmin();
+  const slug = await withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `SELECT slug FROM sr_tournaments WHERE id = $1 FOR UPDATE`,
+      [tournamentId],
+    );
+    if (rows.length === 0) throw new Error("Tournament not found.");
+    const { rows: countRows } = await client.query(
+      `SELECT count(*)::int AS c FROM sr_matches WHERE tournament_id = $1 AND bracket = 'upper' AND round_number = 1`,
+      [tournamentId],
+    );
+    const total = countRows[0].c as number;
+    if (total === 0) throw new Error("No upper-bracket Round 1 matchups exist yet.");
+    const runId = newId("srreveal");
+    await client.query(
+      `UPDATE sr_tournaments
+       SET ubr1_revealed_count = $2, ubr1_reveal_started_at = now(), ubr1_reveal_run_id = $3, updated_at = now()
+       WHERE id = $1`,
+      [tournamentId, total, runId],
+    );
+    await client.query(
+      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'reveal.start', $2::jsonb)`,
+      [tournamentId, JSON.stringify({ runId, total })],
+    );
+    return rows[0].slug as string;
+  });
+  refresh(slug);
+}
+
+/** Hides every Round 1 matchup again and shows the full bracket immediately — does NOT bump the generation, so this is a true rewind, not a new bracket. */
+export async function resetUbr1Reveal(tournamentId: string): Promise<void> {
+  await requireAdmin();
+  const slug = await withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `UPDATE sr_tournaments
+       SET ubr1_revealed_count = 0, ubr1_reveal_started_at = NULL, ubr1_reveal_run_id = NULL, updated_at = now()
+       WHERE id = $1 RETURNING slug`,
+      [tournamentId],
+    );
+    if (rows.length === 0) throw new Error("Tournament not found.");
+    await client.query(
+      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'reveal.reset', '{}'::jsonb)`,
+      [tournamentId],
+    );
+    return rows[0].slug as string;
   });
   refresh(slug);
 }
@@ -850,12 +1128,24 @@ export async function setTeamStatus(
 ): Promise<void> {
   await requireAdmin();
   const slug = await withTransaction(async (client) => {
+    // Lock the tournament first, then the team — same order every other
+    // application/team code path uses, so this can never deadlock against
+    // withTournamentLock in captain/actions.ts.
+    const { rows: preRows } = await client.query(
+      `SELECT tournament_id FROM sr_teams WHERE id = $1`,
+      [teamId],
+    );
+    if (preRows.length === 0) throw new Error("Team not found.");
+    await client.query(`SELECT id FROM sr_tournaments WHERE id = $1 FOR UPDATE`, [
+      preRows[0].tournament_id,
+    ]);
+
     const { rows } = await client.sql`
       SELECT t.*, tr.slug as tournament_slug, tr.status as tournament_status,
              tr.max_teams as tournament_max_teams
       FROM sr_teams t
       JOIN sr_tournaments tr ON tr.id = t.tournament_id
-      WHERE t.id = ${teamId} FOR UPDATE OF t, tr
+      WHERE t.id = ${teamId} FOR UPDATE OF t
     `;
     if (rows.length === 0) throw new Error("Team not found.");
     const team = rows[0];
@@ -873,6 +1163,46 @@ export async function setTeamStatus(
       }
     }
     await client.query(`UPDATE sr_teams SET status = $2 WHERE id = $1`, [teamId, status]);
+    if (status !== "rejected" && team.status === "rejected") {
+      // Reactivating a rejected team: re-check every player against the SAME
+      // reservation surface addRosterPlayer/isDiscordIdReserved use (active
+      // rosters + live application slots) before flipping reservations back
+      // on, so a person who joined elsewhere while this team was rejected
+      // can't be silently double-booked.
+      const { rows: playerRows } = await client.query(
+        `SELECT id, discord_id FROM sr_team_players WHERE team_id = $1`,
+        [teamId],
+      );
+      for (const p of playerRows) {
+        const { rows: conflictRows } = await client.query(
+          `SELECT 1 FROM sr_team_players
+           WHERE tournament_id = $1 AND discord_id = $2 AND reservation_active AND id <> $3
+           UNION ALL
+           SELECT 1 FROM sr_team_application_slots s
+           JOIN sr_team_applications a ON a.id = s.application_id
+           WHERE a.tournament_id = $1 AND s.member_discord_id = $2
+             AND (s.status = 'confirmed'
+                  OR (s.status = 'pending' AND (s.confirm_token_expires_at IS NULL OR s.confirm_token_expires_at > now())))`,
+          [team.tournament_id, p.discord_id, p.id],
+        );
+        if (conflictRows.length > 0) {
+          throw new Error(
+            "Can't reactivate: one or more players joined another team or application while this team was rejected.",
+          );
+        }
+      }
+    }
+    try {
+      await client.query(
+        `UPDATE sr_team_players SET reservation_active = $2 WHERE team_id = $1`,
+        [teamId, status !== "rejected"],
+      );
+    } catch (error) {
+      if ((error as Error).message.includes("sr_team_players_active_team_per_tournament")) {
+        throw new Error("One or more players joined another team while this team was rejected.");
+      }
+      throw error;
+    }
     await client.query(
       `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'team.status', $2::jsonb)`,
       [team.tournament_id, JSON.stringify({ teamId, name: team.name, status })],

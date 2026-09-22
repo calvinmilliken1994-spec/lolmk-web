@@ -98,6 +98,24 @@ const config: Config = {
           "0%": { opacity: "0", transform: "translateY(12px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        // Bracket card entrance (SR live screen) — referenced via the
+        // arbitrary `animate-[reveal-fade-in_...]` utility, which needs a
+        // matching keyframes name here even though there's no `reveal-fade-in`
+        // entry in the `animation` map below.
+        "reveal-fade-in": {
+          "0%": { opacity: "0", transform: "translateY(6px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        // Round 1 reveal rows (SR live screen) — whole-row entrance,
+        // alternating left/right by row index.
+        "reveal-from-left": {
+          "0%": { opacity: "0", transform: "translateX(-60px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        "reveal-from-right": {
+          "0%": { opacity: "0", transform: "translateX(60px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
       },
       animation: {
         "pulse-dot": "pulse-dot 1.6s ease-in-out infinite",

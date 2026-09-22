@@ -1,10 +1,16 @@
 import { sql, type VercelPoolClient } from "@vercel/postgres";
 import { randomUUID } from "node:crypto";
 import type {
+  SrApplicationSlotStatus,
   SrAuditAction,
   SrAuditLogEntry,
+  SrDeliveryStatus,
   SrMatch,
+  SrMatchScene,
   SrTeam,
+  SrTeamApplication,
+  SrTeamApplicationSlot,
+  SrTeamApplicationView,
   SrTeamPlayer,
   SrTournament,
   SrTournamentFull,
@@ -93,6 +99,9 @@ export function ensureSchema(): Promise<void> {
           best_of integer NOT NULL DEFAULT 1,
           third_place_match boolean NOT NULL DEFAULT false,
           grand_final_reset boolean NOT NULL DEFAULT true,
+          grand_final_best_of integer,
+          ubr1_reveal_started_at timestamptz,
+          ubr1_reveal_run_id text,
           min_teams integer NOT NULL DEFAULT ${MIN_TEAMS},
           max_teams integer NOT NULL DEFAULT ${MAX_TEAMS},
           start_at timestamptz,
@@ -107,6 +116,8 @@ export function ensureSchema(): Promise<void> {
             CHECK (format IN ('single_elim','double_elim')),
           CONSTRAINT sr_tournaments_best_of_check
             CHECK (best_of IN (1, 3, 5)),
+          CONSTRAINT sr_tournaments_grand_final_best_of_check
+            CHECK (grand_final_best_of IS NULL OR grand_final_best_of IN (1, 3, 5)),
           CONSTRAINT sr_tournaments_team_bounds_check
             CHECK (min_teams >= ${MIN_TEAMS} AND max_teams <= ${MAX_TEAMS} AND min_teams <= max_teams),
           CONSTRAINT sr_tournaments_dates_check
@@ -340,11 +351,156 @@ export function ensureSchema(): Promise<void> {
       await sql`
         CREATE INDEX IF NOT EXISTS sr_team_players_team_idx ON sr_team_players(team_id);
       `;
-      // A person can only be on one team per tournament — the check that
-      // stops a player being rostered by two captains at once.
+      await sql`ALTER TABLE sr_team_players ADD COLUMN IF NOT EXISTS reservation_active boolean NOT NULL DEFAULT true`;
+      // Rejected teams release their Discord-account reservations without
+      // deleting roster/history rows. Backfill keeps existing databases aligned.
       await sql`
-        CREATE UNIQUE INDEX IF NOT EXISTS sr_team_players_one_team_per_tournament
-          ON sr_team_players (tournament_id, discord_id);
+        UPDATE sr_team_players p
+        SET reservation_active = (t.status <> 'rejected')
+        FROM sr_teams t
+        WHERE t.id = p.team_id AND p.reservation_active IS DISTINCT FROM (t.status <> 'rejected');
+      `;
+      await sql`DROP INDEX IF EXISTS sr_team_players_one_team_per_tournament`;
+      await sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS sr_team_players_active_team_per_tournament
+          ON sr_team_players (tournament_id, discord_id) WHERE reservation_active;
+      `;
+
+      // ---------------------------------------------------------------
+      // Verified premade signup — team applications
+      // ---------------------------------------------------------------
+      //
+      // An application is NOT a team. It holds a captain's intent plus five
+      // slots, and only becomes an sr_teams row once every slot's own Discord
+      // account has confirmed (see confirmApplicationSlot in
+      // src/app/captain/actions.ts). Nothing in the bracket, seeding or public
+      // projection layers can see these rows, which is what structurally
+      // guarantees a half-confirmed application can never be played.
+      //
+      // tournament_id is the scoping column everywhere: unlike ARAM Mayhem's
+      // singleton event, SR runs many tournaments at once and every query
+      // against these tables carries an explicit tournament predicate.
+      await sql`
+        CREATE TABLE IF NOT EXISTS sr_team_applications (
+          id text PRIMARY KEY,
+          tournament_id text NOT NULL REFERENCES sr_tournaments(id) ON DELETE CASCADE,
+          team_name text NOT NULL,
+          captain_discord_id text NOT NULL,
+          roster_version integer NOT NULL DEFAULT 0,
+          send_in_progress boolean NOT NULL DEFAULT false,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          CONSTRAINT sr_team_applications_name_nonblank_check CHECK (trim(team_name) <> ''),
+          CONSTRAINT sr_team_applications_captain_nonblank_check CHECK (trim(captain_discord_id) <> '')
+        );
+      `;
+      // One open application per captain per tournament — the application-side
+      // mirror of sr_teams_captain_unique.
+      await sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS sr_team_applications_captain_unique
+          ON sr_team_applications (tournament_id, captain_discord_id);
+      `;
+      // Case-insensitive name uniqueness WITHIN applications. Note this index
+      // cannot see sr_teams, so it is only half the rule: the write path also
+      // runs an explicit UNION check against sr_teams.name, because a name
+      // must not collide with an already-registered team either and no single
+      // index can span two tables.
+      await sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS sr_team_applications_name_unique
+          ON sr_team_applications (tournament_id, lower(team_name));
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS sr_team_applications_tournament_idx
+          ON sr_team_applications (tournament_id);
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS sr_team_application_slots (
+          id text PRIMARY KEY,
+          application_id text NOT NULL REFERENCES sr_team_applications(id) ON DELETE CASCADE,
+          member_discord_id text,
+          display_name text,
+          avatar_url text,
+          status text NOT NULL DEFAULT 'draft',
+          is_captain boolean NOT NULL DEFAULT false,
+          -- Only ever the SHA-256 of the token that went out in the DM. The
+          -- raw token exists in exactly one place: that Discord message.
+          confirm_token_hash text,
+          confirm_token_expires_at timestamptz,
+          delivery_status text NOT NULL DEFAULT 'not_sent',
+          delivery_error text,
+          token_roster_version integer,
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          created_at timestamptz NOT NULL DEFAULT now(),
+          CONSTRAINT sr_application_slots_status_check
+            CHECK (status IN ('draft','pending','confirmed','declined')),
+          CONSTRAINT sr_application_slots_delivery_check
+            CHECK (delivery_status IN ('not_sent','sending','sent','failed'))
+        );
+      `;
+      // One slot per person per application. The stronger "one
+      // pending-or-confirmed slot across ALL applications in this tournament"
+      // rule can't be expressed as an index across two tables either, so it
+      // lives in isDiscordIdReserved() under the per-tournament row lock —
+      // the lock, not the index, is what closes the race.
+      await sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS sr_application_slots_member_unique
+          ON sr_team_application_slots (application_id, member_discord_id)
+          WHERE member_discord_id IS NOT NULL;
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS sr_application_slots_application_idx
+          ON sr_team_application_slots (application_id);
+      `;
+
+      // ---------------------------------------------------------------
+      // Presentation / scene state (per tournament)
+      // ---------------------------------------------------------------
+      //
+      // Same additive ALTER pattern as the captain columns above, and for the
+      // same reason: sr_tournaments already has real rows, so this must be
+      // ADD COLUMN IF NOT EXISTS with a default, never a CREATE TABLE. An
+      // existing tournament comes back as scene='idle', countdown_ends_at
+      // NULL, active_match_id NULL — i.e. exactly the state it would have had
+      // if it had been created after this migration and nobody had touched
+      // the presentation desk yet.
+      await sql`
+        ALTER TABLE sr_tournaments ADD COLUMN IF NOT EXISTS scene text NOT NULL DEFAULT 'idle'
+      `;
+      await sql`ALTER TABLE sr_tournaments ADD COLUMN IF NOT EXISTS countdown_ends_at timestamptz`;
+      await sql`ALTER TABLE sr_tournaments ADD COLUMN IF NOT EXISTS active_match_id text`;
+
+      // Upper-bracket Round 1 staged reveal. Persisted (not client-only
+      // React state) so it survives a live-screen refresh/reconnect and so
+      // two admins on different tabs see the same reveal progress. `revealed_count`
+      // is the number of UBR1 matchups currently shown, in match_number order;
+      // it never exceeds the real UBR1 match count. `generation` is bumped
+      // every time the bracket is (re)generated so a reveal from a previous
+      // bracket can never be misread as progress on a new one.
+      await sql`
+        ALTER TABLE sr_tournaments ADD COLUMN IF NOT EXISTS ubr1_revealed_count integer NOT NULL DEFAULT 0
+      `;
+      await sql`
+        ALTER TABLE sr_tournaments ADD COLUMN IF NOT EXISTS ubr1_reveal_generation integer NOT NULL DEFAULT 0
+      `;
+      // Grand-final series-length override, added after the initial column
+      // set above — existing databases need this ALTER since CREATE TABLE
+      // IF NOT EXISTS is a no-op once the table already exists.
+      await sql`
+        ALTER TABLE sr_tournaments ADD COLUMN IF NOT EXISTS grand_final_best_of integer
+      `;
+      // Reveal-run identity: `ubr1_reveal_started_at` is the server
+      // timestamp Start was clicked, and the live screen derives how many
+      // rows are visible purely from elapsed time against it — never from
+      // ubr1_revealed_count, which existed for the old manual-Advance flow
+      // and is kept only for the audit trail / admin progress readout.
+      // `ubr1_reveal_run_id` changes on every Start/Restart so a client that
+      // was mid-animation for a previous run can tell the run changed and
+      // restart its own local sequence instead of misreading stale timing.
+      await sql`
+        ALTER TABLE sr_tournaments ADD COLUMN IF NOT EXISTS ubr1_reveal_started_at timestamptz
+      `;
+      await sql`
+        ALTER TABLE sr_tournaments ADD COLUMN IF NOT EXISTS ubr1_reveal_run_id text
       `;
 
       // Compatibility migrations for databases created by earlier releases.
@@ -376,6 +532,33 @@ export function ensureSchema(): Promise<void> {
             ALTER TABLE sr_teams
               ADD CONSTRAINT sr_teams_status_check
               CHECK (status IN ('pending','approved','rejected'))
+          `);
+        }
+
+        // Scene enum + active-match reference. ADD COLUMN IF NOT EXISTS above
+        // is idempotent on its own, but ADD CONSTRAINT is not, so these are
+        // guarded by a catalog lookup under the same advisory lock.
+        if (!(await constraintDefinition("sr_tournaments", "sr_tournaments_scene_check"))) {
+          await client.query(`
+            ALTER TABLE sr_tournaments
+              ADD CONSTRAINT sr_tournaments_scene_check
+              CHECK (scene IN ('idle','starting_soon','teams','bracket','match','champion'))
+          `);
+        }
+        // Composite FK, same shape and same reasoning as the sr_matches
+        // participant FKs: the active match must belong to THIS tournament, a
+        // bare REFERENCES sr_matches(id) would let it point into another one.
+        // NO ACTION rather than SET NULL because a composite SET NULL would
+        // also try to null the NOT NULL `id` column. Bracket regeneration
+        // clears active_match_id explicitly before deleting match rows.
+        if (
+          !(await constraintDefinition("sr_tournaments", "sr_tournaments_active_match_fkey"))
+        ) {
+          await client.query(`
+            ALTER TABLE sr_tournaments
+              ADD CONSTRAINT sr_tournaments_active_match_fkey
+              FOREIGN KEY (id, active_match_id) REFERENCES sr_matches (tournament_id, id)
+              ON DELETE NO ACTION
           `);
         }
 
@@ -428,6 +611,7 @@ function rowToTournament(row: Record<string, unknown>): SrTournament {
     best_of: row.best_of as SrTournament["best_of"],
     third_place_match: row.third_place_match as boolean,
     grand_final_reset: row.grand_final_reset as boolean,
+    grand_final_best_of: (row.grand_final_best_of as SrTournament["grand_final_best_of"]) ?? null,
     min_teams: row.min_teams as number,
     max_teams: row.max_teams as number,
     start_at: row.start_at ? new Date(row.start_at as string).toISOString() : null,
@@ -435,8 +619,58 @@ function rowToTournament(row: Record<string, unknown>): SrTournament {
     seed_locked: row.seed_locked as boolean,
     champion_team_id: (row.champion_team_id as string) ?? null,
     signups_open: (row.signups_open as boolean) ?? false,
-    created_at: new Date(row.created_at as string).toISOString(),
+    // `?? "idle"` is not redundant defensiveness: a row read by an instance
+    // that has the new code but reached a database whose ALTER hasn't landed
+    // yet would otherwise surface `undefined` as a scene name.
+    scene: (row.scene as SrMatchScene) ?? "idle",
+    countdown_ends_at: row.countdown_ends_at
+      ? new Date(row.countdown_ends_at as string).toISOString()
+      : null,
+    active_match_id: (row.active_match_id as string) ?? null,
+      ubr1_revealed_count: Number(row.ubr1_revealed_count ?? 0),
+      ubr1_reveal_generation: Number(row.ubr1_reveal_generation ?? 0),
+      ubr1_reveal_started_at: row.ubr1_reveal_started_at
+        ? new Date(row.ubr1_reveal_started_at as string).toISOString()
+        : null,
+      ubr1_reveal_run_id: (row.ubr1_reveal_run_id as string) ?? null,
+      created_at: new Date(row.created_at as string).toISOString(),
     updated_at: new Date(row.updated_at as string).toISOString(),
+  };
+}
+
+function rowToApplication(row: Record<string, unknown>): SrTeamApplication {
+  return {
+    id: row.id as string,
+    tournament_id: row.tournament_id as string,
+    team_name: row.team_name as string,
+    captain_discord_id: row.captain_discord_id as string,
+    roster_version: Number(row.roster_version ?? 0),
+    send_in_progress: Boolean(row.send_in_progress),
+    created_at: new Date(row.created_at as string).toISOString(),
+  };
+}
+
+/** Projects a slot row. confirm_token_hash is never carried onto the shape. */
+function rowToApplicationSlot(row: Record<string, unknown>): SrTeamApplicationSlot {
+  return {
+    id: row.id as string,
+    application_id: row.application_id as string,
+    member_discord_id: (row.member_discord_id as string) ?? null,
+    display_name: (row.display_name as string) ?? null,
+    avatar_url: (row.avatar_url as string) ?? null,
+    status: (row.status as SrApplicationSlotStatus) ?? "draft",
+    is_captain: Boolean(row.is_captain),
+    confirm_token_expires_at: row.confirm_token_expires_at
+      ? new Date(row.confirm_token_expires_at as string).toISOString()
+      : null,
+    delivery_status: (row.delivery_status as SrDeliveryStatus) ?? "not_sent",
+    delivery_error: (row.delivery_error as string) ?? null,
+    token_roster_version:
+      row.token_roster_version === null || row.token_roster_version === undefined
+        ? null
+        : Number(row.token_roster_version),
+    updated_at: new Date(row.updated_at as string).toISOString(),
+    created_at: new Date(row.created_at as string).toISOString(),
   };
 }
 
@@ -594,12 +828,24 @@ function toPublicTournament(t: SrTournament): SrPublicTournament {
     best_of: t.best_of,
     third_place_match: t.third_place_match,
     grand_final_reset: t.grand_final_reset,
+    grand_final_best_of: t.grand_final_best_of,
+    ubr1_revealed_count: t.ubr1_revealed_count,
+    ubr1_reveal_generation: t.ubr1_reveal_generation,
+    ubr1_reveal_started_at: t.ubr1_reveal_started_at,
+    ubr1_reveal_run_id: t.ubr1_reveal_run_id,
     min_teams: t.min_teams,
     max_teams: t.max_teams,
     start_at: t.start_at,
     end_at: t.end_at,
     champion_team_id: t.champion_team_id,
     signups_open: t.signups_open,
+    // Presentation state, not admin workflow — /srlive/[slug] is public and
+    // these three fields are the whole of what it needs. See the doc comment
+    // on SrPublicTournament for why `seed_locked` stays private and these
+    // don't.
+    scene: t.scene,
+    countdown_ends_at: t.countdown_ends_at,
+    active_match_id: t.active_match_id,
   };
 }
 
@@ -640,6 +886,10 @@ function toPublicMatch(m: SrMatch): SrPublicMatch {
     team_b_score: m.team_b_score,
     winner_id: m.winner_id,
     status: m.status,
+    advances_to_match_id: m.advances_to_match_id,
+    advances_to_slot: m.advances_to_slot,
+    drops_to_match_id: m.drops_to_match_id,
+    drops_to_slot: m.drops_to_slot,
   };
 }
 
@@ -888,4 +1138,96 @@ export async function getCaptainTeam(
     players: playerRes.rows.map(rowToPlayer),
     tournament: rowToTournament(tournamentRes.rows[0]),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Team application reads
+// ---------------------------------------------------------------------------
+//
+// Same rule as the captain reads above: these take the id to scope by as an
+// ARGUMENT, so they must never be re-exported through a "use server" module —
+// that would turn "read my own application" into "read anyone's application
+// by passing their id". They are imported directly by server components that
+// have already proven who the caller is.
+
+async function loadSlots(applicationIds: string[]): Promise<Map<string, SrTeamApplicationSlot[]>> {
+  const byApplication = new Map<string, SrTeamApplicationSlot[]>();
+  if (applicationIds.length === 0) return byApplication;
+  const { rows } = await sql.query(
+    `SELECT * FROM sr_team_application_slots
+     WHERE application_id = ANY($1::text[])
+     ORDER BY is_captain DESC, created_at ASC`,
+    [applicationIds],
+  );
+  for (const row of rows) {
+    const slot = rowToApplicationSlot(row);
+    const list = byApplication.get(slot.application_id);
+    if (list) list.push(slot);
+    else byApplication.set(slot.application_id, [slot]);
+  }
+  return byApplication;
+}
+
+function zipApplications(
+  applications: SrTeamApplication[],
+  slotsByApplication: Map<string, SrTeamApplicationSlot[]>,
+): SrTeamApplicationView[] {
+  return applications.map((application) => ({
+    application,
+    slots: slotsByApplication.get(application.id) ?? [],
+  }));
+}
+
+/**
+ * This captain's in-progress application for ONE tournament, if any. Returns
+ * an array rather than a single view purely so the caller doesn't have to
+ * special-case null; the captain-unique index means it holds 0 or 1 entries.
+ */
+export async function getMyPremadeApplications(
+  tournamentId: string,
+  captainDiscordId: string,
+): Promise<SrTeamApplicationView[]> {
+  await ensureSchema();
+  const { rows } = await sql`
+    SELECT * FROM sr_team_applications
+    WHERE tournament_id = ${tournamentId} AND captain_discord_id = ${captainDiscordId}
+  `;
+  const applications = rows.map(rowToApplication);
+  return zipApplications(applications, await loadSlots(applications.map((a) => a.id)));
+}
+
+/**
+ * Every in-progress application this captain owns, across tournaments —
+ * what the /captain dashboard lists alongside their already-registered teams.
+ */
+export async function getApplicationsForCaptain(
+  captainDiscordId: string,
+): Promise<SrTeamApplicationView[]> {
+  await ensureSchema();
+  const { rows } = await sql`
+    SELECT * FROM sr_team_applications
+    WHERE captain_discord_id = ${captainDiscordId}
+    ORDER BY created_at DESC
+  `;
+  const applications = rows.map(rowToApplication);
+  return zipApplications(applications, await loadSlots(applications.map((a) => a.id)));
+}
+
+/**
+ * Every in-flight application for one tournament — the admin dashboard's
+ * read-only view of signups that haven't become teams yet. Admin-only by
+ * virtue of who imports it (the isToolsSession()-gated tool page and API
+ * route); nothing here filters by captain.
+ */
+export async function listTournamentApplications(
+  tournamentId: string,
+): Promise<SrTeamApplicationView[]> {
+  await ensureSchema();
+  const { rows } = await sql`
+    SELECT * FROM sr_team_applications
+    WHERE tournament_id = ${tournamentId}
+    ORDER BY created_at ASC
+  `;
+  const applications = rows.map(rowToApplication);
+  return zipApplications(applications, await loadSlots(applications.map((a) => a.id)));
 }

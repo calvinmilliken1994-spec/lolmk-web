@@ -6,12 +6,10 @@ import { searchGuildMembers, isBotSearchConfigured } from "@/lib/discord-bot";
 export const dynamic = "force-dynamic";
 
 /**
- * Guild member search for premade-team invite UI. Requires a signed-in
- * caller (admin OR verified member — captains inviting teammates are
- * verified members, not admins) so this can never be hit anonymously.
- * Returns minimal candidate data only (id/displayName/avatarUrl) — no
- * roles, no full directory dump. Results are candidates only; every real
- * authorization check happens server-side again in inviteToApplication().
+ * Guild member search for ARAM Mayhem premade-team invite UI.
+ *
+ * Requires an admin or verified-member session. Summoner's Rift captains use
+ * the separate `/api/sr/member-search` boundary.
  */
 export async function GET(req: Request) {
   const [admin, member] = await Promise.all([isToolsSession(), getMemberSession()]);

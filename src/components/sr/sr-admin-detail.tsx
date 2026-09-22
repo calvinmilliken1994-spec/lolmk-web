@@ -10,16 +10,19 @@ import {
   ImageOff,
   Loader2,
   Lock,
-  Plus,
+  Play,
   RotateCcw,
   Save,
   ScrollText,
   Trash2,
   Trophy,
+  Tv,
   Unlock,
   Workflow,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
+import { SrLivePreview } from "@/components/sr/sr-live-preview";
 import { cn } from "@/lib/utils";
 import {
   ErrorBanner,
@@ -34,25 +37,38 @@ import { TeamLogoUpload } from "@/components/sr/team-logo-upload";
 import type {
   SrAuditLogEntry,
   SrMatch,
+  SrMatchScene,
   SrTeam,
+  SrTeamApplicationView,
   SrTournamentFull,
 } from "@/types/sr-tournament";
 import {
-  addTeam,
   generateBracket,
   removeTeam,
   reportMatchResult,
   rollSeeds,
+  setActiveMatch,
+  setScene,
   setSignupsOpen,
   setTeamStatus,
+  startCountdown,
+  startUbr1Reveal,
+  resetUbr1Reveal,
   undoMatchResult,
   unlockSeeds,
   updateTeam,
   updateTournament,
+  withdrawTeamApplication,
 } from "@/app/tools/summoners-rift/actions";
 
-const TABS = ["Setup", "Teams", "Bracket", "Audit"] as const;
-type Tab = (typeof TABS)[number];
+const SCENE_LABELS: Record<SrMatchScene, string> = {
+  idle: "Idle",
+  starting_soon: "Starting soon",
+  teams: "Teams",
+  bracket: "Bracket",
+  match: "Match",
+  champion: "Champion",
+};
 
 const BRACKET_LABEL: Record<SrMatch["bracket"], string> = {
   upper: "Upper",
@@ -64,104 +80,274 @@ const BRACKET_LABEL: Record<SrMatch["bracket"], string> = {
 export function SrAdminDetail({
   initial,
   audit,
+  applications,
   blobConfigured,
 }: {
   initial: SrTournamentFull;
   audit: SrAuditLogEntry[];
+  applications: SrTeamApplicationView[];
   blobConfigured: boolean;
 }) {
   const router = useRouter();
   const { pending, error, setError, run } = useRunner();
-  const [tab, setTab] = useState<Tab>("Setup");
 
   // Props come straight from the server component on every render. Every
-  // action in actions.ts calls revalidatePath("/tools/summoners-rift") after
-  // COMMIT, so the RSC payload for this route is re-fetched and these props
-  // update on their own — deliberately NOT copied into useState, which
-  // would freeze the first render's snapshot and go stale the moment an
-  // action succeeded.
+  // action calls revalidatePath after COMMIT, so router.refresh() keeps this
+  // single-page desk current without shadow copies of server state.
   const { tournament, teams, matches } = initial;
   const refresh = () => router.refresh();
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
 
   return (
     <div className="min-h-screen bg-base text-ink">
-      <header className="sticky top-0 z-10 border-b border-line-subtle bg-base/90 backdrop-blur-md">
-        <div className="container-wide flex flex-wrap items-center justify-between gap-4 py-4">
-          <div className="flex items-center gap-4 min-w-0">
-            <Link
-              href="/tools/summoners-rift"
-              className="inline-flex items-center gap-1.5 text-body-sm text-ink-muted hover:text-ink shrink-0"
-            >
+      <header className="sticky top-0 z-20 border-b border-line-subtle bg-base/95 backdrop-blur-md">
+        <div className="w-full px-4 xl:px-6 2xl:px-8 flex flex-wrap items-center justify-between gap-3 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link href="/tools/summoners-rift" className="inline-flex shrink-0 items-center gap-1.5 text-body-sm text-ink-muted hover:text-ink">
               <ArrowLeft strokeWidth={1.75} className="h-4 w-4" />
-              All tournaments
+              Tournaments
             </Link>
-            <div className="h-4 w-px bg-line shrink-0" />
-            <h1 className="font-display text-heading-lg leading-none truncate">
-              {tournament.name}
-            </h1>
+            <div className="h-4 w-px bg-line" />
+            <h1 className="truncate font-display text-heading-lg leading-none">{tournament.name}</h1>
             <StatusBadge status={tournament.status} pulse />
+            <span className="hidden text-caption text-ink-muted sm:inline">
+              {teams.length} teams · {applications.length} pending
+            </span>
           </div>
-          <a
-            href={`/tournaments/summoners-rift/${tournament.slug}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 text-body-sm text-brand-blue-bright hover:text-ink"
-          >
-            <ExternalLink strokeWidth={1.75} className="h-4 w-4" />
-            Public page
-          </a>
+          <div className="flex items-center gap-4">
+            <a href={`/tournaments/summoners-rift/${tournament.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-body-sm text-brand-blue-bright hover:text-ink">
+              <ExternalLink strokeWidth={1.75} className="h-4 w-4" /> Public bracket
+            </a>
+            <a href={`/srlive/${tournament.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-body-sm text-brand-red-bright hover:text-ink">
+              <Tv strokeWidth={1.75} className="h-4 w-4" /> Live screen
+            </a>
+          </div>
         </div>
-        <nav className="container-wide flex gap-1 overflow-x-auto pb-2">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={cn(
-                "shrink-0 rounded-sm px-3.5 py-2 text-label uppercase tracking-wider transition-colors",
-                tab === t
-                  ? "bg-brand-red text-ink"
-                  : "text-ink-secondary hover:bg-elevated hover:text-ink",
-              )}
-            >
-              {t}
-              {t === "Teams" && ` (${teams.length})`}
-            </button>
-          ))}
-        </nav>
       </header>
 
-      <main className="container-wide py-8 space-y-6">
+      <div className="w-full px-4 xl:px-6 2xl:px-8 py-6 space-y-6">
         <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
-        {tab === "Setup" && (
-          <SetupPanel
-            data={initial}
-            pending={pending}
-            run={run}
-            refresh={refresh}
-          />
-        )}
-        {tab === "Teams" && (
-          <TeamsPanel
-            data={initial}
-            pending={pending}
-            run={run}
-            refresh={refresh}
-            blobConfigured={blobConfigured}
-          />
-        )}
-        {tab === "Bracket" && (
-          <BracketPanel
-            data={initial}
-            teamById={teamById}
-            pending={pending}
-            run={run}
-            refresh={refresh}
-          />
-        )}
-        {tab === "Audit" && <AuditPanel entries={audit} />}
-      </main>
+        {/* Three columns, each stacking its own content independently, mirroring
+            ARAM Mayhem's operator desk: left is setup/roster prep, center is the
+            presentation desk (scenes + live preview — the widest column since
+            it's the primary "on-air" surface), right is match ops down through
+            applications and audit. Long lists get their own bounded scroll area
+            (max-h-*) so no single panel can push the others off a normal desktop
+            viewport (1366x768/1920x1080) — the page itself may still scroll on
+            narrower screens, same as Mayhem. */}
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.4fr)_minmax(340px,1.15fr)] xl:items-start">
+          <div className="min-w-0 space-y-4">
+            <SetupPanel data={initial} pending={pending} run={run} refresh={refresh} />
+            <TeamsPanel data={initial} pending={pending} run={run} refresh={refresh} blobConfigured={blobConfigured} applications={applications} />
+          </div>
+
+          <div className="min-w-0">
+            <PresentationDesk data={initial} pending={pending} run={run} refresh={refresh} />
+          </div>
+
+          <div className="min-w-0 space-y-4">
+            <BracketPanel data={initial} teamById={teamById} pending={pending} run={run} refresh={refresh} />
+            <AuditPanel entries={audit} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Presentation desk + applications
+// ---------------------------------------------------------------------------
+
+function PresentationDesk({ data, pending, run, refresh }: PanelProps) {
+  const { tournament, matches, teams } = data;
+  const [countdownMinutes, setCountdownMinutes] = useState(10);
+  const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
+  const playable = matches.filter((match) => match.team_a_id && match.team_b_id && match.status !== "bye");
+
+  return (
+    <div className="space-y-4 border border-line-strong bg-surface p-4">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-label uppercase tracking-wider text-ink-secondary">Live preview</p>
+          <a href={`/srlive/${tournament.slug}`} target="_blank" rel="noreferrer" className="text-caption text-brand-blue-bright hover:text-ink">Open full screen</a>
+        </div>
+        <SrLivePreview slug={tournament.slug} />
+      </div>
+
+      <div className="space-y-4 border-t border-line-subtle pt-4">
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-label uppercase tracking-wider text-brand-red-bright">Presentation desk</p>
+              <h2 className="font-heading text-heading-md text-ink">Live scene controls</h2>
+            </div>
+            <span className="border border-line-strong bg-elevated px-2 py-1 text-caption font-mono uppercase text-ink-secondary">
+              {SCENE_LABELS[tournament.scene]}
+            </span>
+          </div>
+          <p className="mt-2 text-caption text-ink-muted">
+            Changes publish to this tournament&apos;s live screen only. They never change bracket state.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {(["idle", "teams", "bracket", "champion"] as SrMatchScene[]).map((scene) => (
+            <Tooltip key={scene} content={scene === "champion" ? "Show winner stored by bracket completion." : `Show ${SCENE_LABELS[scene].toLowerCase()} scene.`} className="w-full">
+              <Button className="w-full" size="sm" variant={tournament.scene === scene ? "primary" : "secondary"} disabled={pending || (scene === "champion" && !tournament.champion_team_id)} onClick={() => run(() => setScene(tournament.id, scene), refresh)}>
+                {SCENE_LABELS[scene]}
+              </Button>
+            </Tooltip>
+          ))}
+        </div>
+
+        <div className="grid gap-4 border-t border-line-subtle pt-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label htmlFor="sr-countdown" className="text-label uppercase tracking-wider text-ink-secondary">Starting-soon timer</label>
+            <div className="flex gap-2">
+              <input id="sr-countdown" type="number" min={1} max={60} value={countdownMinutes} onChange={(event) => setCountdownMinutes(Number(event.target.value))} className={cn(inputClass, "w-24")} />
+              <Tooltip content="Starts an absolute server-timestamped countdown, safe across refreshes.">
+                <Button size="sm" variant="secondary" disabled={pending || !Number.isInteger(countdownMinutes) || countdownMinutes < 1 || countdownMinutes > 60} onClick={() => run(() => startCountdown(tournament.id, countdownMinutes * 60), refresh)}>
+                  Start {countdownMinutes}m
+                </Button>
+              </Tooltip>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="sr-live-match" className="text-label uppercase tracking-wider text-ink-secondary">Featured match</label>
+            <select id="sr-live-match" className={inputClass} value={tournament.active_match_id ?? ""} disabled={pending || playable.length === 0} onChange={(event) => run(() => setActiveMatch(tournament.id, event.target.value || null), refresh)}>
+              <option value="">Show bracket</option>
+              {playable.map((match) => (
+                <option key={match.id} value={match.id}>
+                  {BRACKET_LABEL[match.bracket]} R{match.round_number} M{match.match_number}: {teamById.get(match.team_a_id ?? "")?.name ?? "TBD"} vs {teamById.get(match.team_b_id ?? "")?.name ?? "TBD"}
+                </option>
+              ))}
+            </select>
+            <p className="text-caption text-ink-muted">Selecting a match switches live screen to match scene. Clearing returns to bracket.</p>
+          </div>
+        </div>
+
+        <Ubr1RevealControls tournament={tournament} matches={matches} pending={pending} run={run} refresh={refresh} />
+      </div>
+    </div>
+  );
+}
+
+function Ubr1RevealControls({
+  tournament,
+  matches,
+  pending,
+  run,
+  refresh,
+}: {
+  tournament: SrTournamentFull["tournament"];
+  matches: SrTournamentFull["matches"];
+  pending: boolean;
+  run: (fn: () => Promise<unknown>, onDone?: () => void) => void;
+  refresh: () => void;
+}) {
+  const ubr1Total = matches.filter((m) => m.bracket === "upper" && m.round_number === 1).length;
+  if (ubr1Total === 0) return null;
+  const inProgress = tournament.ubr1_reveal_started_at !== null;
+
+  return (
+    <div className="border-t border-line-subtle pt-4 space-y-2">
+      <label className="text-label uppercase tracking-wider text-ink-secondary">Round 1 reveal (upper bracket)</label>
+      <p className="text-caption text-ink-muted">
+        {inProgress
+          ? `Playing automatically on the live screen — ${ubr1Total} matchups, a few seconds apart.`
+          : `Not started. ${ubr1Total} matchups will reveal automatically, alternating in from either side.`}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Tooltip content="Starts the automatic reveal sequence on the live screen — one matchup every few seconds, boom-drop cue on each.">
+          <Button size="sm" variant="secondary" disabled={pending} onClick={() => run(() => startUbr1Reveal(tournament.id), refresh)}>
+            <Play className="h-3.5 w-3.5" /> {inProgress ? "Replay" : "Start"}
+          </Button>
+        </Tooltip>
+        <Tooltip content="Hides every Round 1 matchup again so the reveal can be re-run from the top.">
+          <Button size="sm" variant="ghost" disabled={pending || !inProgress} onClick={() => run(() => resetUbr1Reveal(tournament.id), refresh)}>
+            <RotateCcw className="h-3.5 w-3.5" /> Reset
+          </Button>
+        </Tooltip>
+      </div>
+      <p className="text-caption text-ink-muted">
+        Automatic and animated — each matchup slides in from alternating sides with its own boom-drop cue, centered on the live screen. The full bracket fades in once every matchup has shown.
+      </p>
+    </div>
+  );
+}
+
+function ApplicationsPanel({
+  applications,
+  pending,
+  run,
+  refresh,
+  draftOnly,
+  atCap,
+}: {
+  applications: SrTeamApplicationView[];
+  pending: boolean;
+  run: (fn: () => Promise<unknown>, onDone?: () => void) => void;
+  refresh: () => void;
+  draftOnly: boolean;
+  atCap: boolean;
+}) {
+  return (
+    <div className="border border-line bg-surface p-4 space-y-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h2 className="font-heading text-heading-sm text-ink">Pending applications</h2>
+          <p className="mt-1 text-caption text-ink-muted">Not seeded or bracketed until all five members confirm.</p>
+        </div>
+        <span className="text-caption font-mono text-ink-muted">{applications.length}</span>
+      </div>
+      {!draftOnly && (
+        <p className="inline-flex items-center gap-2 border border-warning/40 bg-warning/10 text-warning px-3 py-2 rounded-sm text-body-sm">
+          <Lock className="h-4 w-4 shrink-0" />
+          Roster is locked — applications can only be reviewed while the
+          tournament is in draft.
+        </p>
+      )}
+      {atCap && draftOnly && (
+        <p className="text-caption text-ink-muted">At the team cap — confirmed applications will queue until a slot opens.</p>
+      )}
+      {applications.length === 0 ? (
+        <p className="border border-dashed border-line-strong p-5 text-center text-body-sm text-ink-muted">No pending applications.</p>
+      ) : (
+        <ul className="space-y-3">
+          {applications.map(({ application, slots }) => {
+            const confirmed = slots.filter((slot) => slot.status === "confirmed").length;
+            return (
+              <li key={application.id} className="border border-line-subtle bg-base/50 p-3 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-heading text-body-md text-ink">{application.team_name}</p>
+                    <p className="text-caption text-ink-muted">{confirmed}/5 confirmed · {slots.length}/5 selected</p>
+                  </div>
+                  <Tooltip content="Delete stalled application and release every reserved player.">
+                    <button type="button" disabled={pending} onClick={() => { if (confirm(`Withdraw application for “${application.team_name}”?`)) run(() => withdrawTeamApplication(application.id), refresh); }} className="inline-flex items-center gap-1 text-caption text-ink-muted hover:text-danger disabled:opacity-40">
+                      <Trash2 className="h-3.5 w-3.5" /> Withdraw
+                    </button>
+                  </Tooltip>
+                </div>
+                <ol className="space-y-1.5">
+                  {slots.map((slot, index) => (
+                    <li key={slot.id} className="flex items-center gap-2 text-caption">
+                      <span className="w-4 font-mono text-ink-muted">{index + 1}</span>
+                      <span className="min-w-0 flex-1 truncate text-ink-secondary">{slot.display_name ?? "Empty slot"}{slot.is_captain ? " (captain)" : ""}</span>
+                      <span className={cn("font-mono uppercase", slot.status === "confirmed" ? "text-success" : slot.delivery_status === "failed" ? "text-danger" : "text-warning")}>
+                        {slot.status === "draft" ? slot.delivery_status.replace("_", " ") : slot.status}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
@@ -183,6 +369,12 @@ function SetupPanel({ data, pending, run, refresh }: PanelProps) {
   const [bestOf, setBestOf] = useState<1 | 3 | 5>(tournament.best_of);
   const [thirdPlaceMatch, setThirdPlaceMatch] = useState(tournament.third_place_match);
   const [grandFinalReset, setGrandFinalReset] = useState(tournament.grand_final_reset);
+  // "" means "same as series length" (grand_final_best_of NULL) — kept as a
+  // string sentinel rather than reusing bestOf's value so an admin can tell
+  // "explicitly set to match" apart from "inherits whatever bestOf becomes".
+  const [grandFinalBestOf, setGrandFinalBestOf] = useState<"" | 1 | 3 | 5>(
+    tournament.grand_final_best_of ?? "",
+  );
   const [startAt, setStartAt] = useState(isoToLocalInput(tournament.start_at));
   const [endAt, setEndAt] = useState(isoToLocalInput(tournament.end_at));
 
@@ -192,7 +384,7 @@ function SetupPanel({ data, pending, run, refresh }: PanelProps) {
   const canGenerate = tournament.seed_locked && tournament.status === "seeding";
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] items-start">
+    <div className="space-y-4">
       <form
         className="border border-line bg-surface p-6 space-y-5"
         onSubmit={(e) => {
@@ -202,7 +394,12 @@ function SetupPanel({ data, pending, run, refresh }: PanelProps) {
               updateTournament(tournament.id, {
                 name,
                 ...(!hasBracket
-                  ? { bestOf, thirdPlaceMatch, grandFinalReset }
+                  ? {
+                      bestOf,
+                      thirdPlaceMatch,
+                      grandFinalReset,
+                      grandFinalBestOf: grandFinalBestOf === "" ? null : grandFinalBestOf,
+                    }
                   : {}),
                 // Dates are only submitted while in draft — actions.ts
                 // rejects any date change afterward, so sending them
@@ -244,6 +441,24 @@ function SetupPanel({ data, pending, run, refresh }: PanelProps) {
               disabled
               readOnly
             />
+          </Field>
+          <Field
+            label="Grand final length"
+            hint="Overrides series length for the grand final (and reset, if enabled) only."
+          >
+            <select
+              className={inputClass}
+              value={grandFinalBestOf}
+              disabled={hasBracket}
+              onChange={(e) =>
+                setGrandFinalBestOf(e.target.value === "" ? "" : (Number(e.target.value) as 1 | 3 | 5))
+              }
+            >
+              <option value="">Same as series length</option>
+              <option value={1}>Best of 1</option>
+              <option value={3}>Best of 3</option>
+              <option value={5}>Best of 5</option>
+            </select>
           </Field>
           <Field
             label="Starts (local)"
@@ -435,18 +650,27 @@ function TeamsPanel({
   run,
   refresh,
   blobConfigured,
-}: PanelProps & { blobConfigured: boolean }) {
+  applications,
+}: PanelProps & { blobConfigured: boolean; applications: SrTeamApplicationView[] }) {
   const { tournament, teams } = data;
-  const [newName, setNewName] = useState("");
   const draftOnly = tournament.status === "draft";
   const activeTeamCount = teams.filter((team) => team.status !== "rejected").length;
   const atCap = activeTeamCount >= tournament.max_teams;
 
   return (
     <div className="space-y-6">
-      <div className="border border-line bg-surface p-6 space-y-4">
+      <ApplicationsPanel
+        applications={applications}
+        pending={pending}
+        run={run}
+        refresh={refresh}
+        draftOnly={draftOnly}
+        atCap={atCap}
+      />
+
+      <div className="space-y-4">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <p className="font-heading text-heading-md text-ink">Teams</p>
+          <p className="font-heading text-heading-md text-ink">Roster</p>
           <p className="text-caption font-mono uppercase tracking-wide text-ink-muted">
             {teams.length} / {tournament.max_teams} · min {tournament.min_teams}
           </p>
@@ -454,64 +678,30 @@ function TeamsPanel({
         {!draftOnly && (
           <p className="inline-flex items-center gap-2 border border-warning/40 bg-warning/10 text-warning px-3 py-2 rounded-sm text-body-sm">
             <Lock className="h-4 w-4 shrink-0" />
-            Roster is locked — teams can only be added or removed while the
-            tournament is in draft. Unlock seeding from Setup to go back.
+            Roster is locked — teams can only be approved, rejected, or removed
+            while the tournament is in draft. Unlock seeding from Setup to go back.
           </p>
         )}
-        <form
-          className="flex flex-wrap gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const name = newName.trim();
-            if (!name) return;
-            run(() => addTeam(tournament.id, { name }), () => {
-              setNewName("");
-              refresh();
-            });
-          }}
-        >
-          <input
-            className={cn(inputClass, "max-w-xs")}
-            placeholder="Team name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            disabled={!draftOnly || atCap}
-          />
-          <Button
-            type="submit"
-            size="sm"
-            disabled={pending || !draftOnly || atCap || !newName.trim()}
-          >
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Add team
-          </Button>
-          {atCap && (
-            <span className="self-center text-caption text-ink-muted">
-              At the {tournament.max_teams}-team cap.
-            </span>
-          )}
-        </form>
+        {teams.length === 0 ? (
+          <p className="border border-dashed border-line-strong bg-surface p-10 text-center text-body-sm text-ink-secondary">
+            No teams yet — teams appear here once a captain&apos;s application is fully confirmed.
+          </p>
+        ) : (
+          <ul className="grid gap-4 md:grid-cols-2">
+            {teams.map((team) => (
+              <TeamRow
+                key={team.id}
+                team={team}
+                draftOnly={draftOnly}
+                pending={pending}
+                run={run}
+                refresh={refresh}
+                blobConfigured={blobConfigured}
+              />
+            ))}
+          </ul>
+        )}
       </div>
-
-      {teams.length === 0 ? (
-        <p className="border border-dashed border-line-strong bg-surface p-10 text-center text-body-sm text-ink-secondary">
-          No teams yet.
-        </p>
-      ) : (
-        <ul className="grid gap-4 md:grid-cols-2">
-          {teams.map((team) => (
-            <TeamRow
-              key={team.id}
-              team={team}
-              draftOnly={draftOnly}
-              pending={pending}
-              run={run}
-              refresh={refresh}
-              blobConfigured={blobConfigured}
-            />
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
@@ -735,7 +925,7 @@ function BracketPanel({
       {(waiting.length > 0 || byes.length > 0) && (
         <section className="space-y-3">
           <h2 className="font-heading text-heading-md text-ink">Not yet playable</h2>
-          <ul className="divide-y divide-line-subtle border border-line bg-surface text-body-sm">
+          <ul className="h-80 min-h-0 divide-y divide-line-subtle overflow-y-auto border border-line bg-surface text-body-sm">
             {[...waiting, ...byes].map((m) => (
               <li key={m.id} className="flex items-center gap-3 px-4 py-2.5">
                 <span className="text-caption font-mono uppercase text-ink-muted w-28 shrink-0">
@@ -869,7 +1059,7 @@ function AuditPanel({ entries }: { entries: SrAuditLogEntry[] }) {
         Admin-only. Written in the same transaction as the mutation it records,
         newest first, times in KST.
       </p>
-      <ul className="divide-y divide-line-subtle border border-line bg-surface font-mono text-caption">
+      <ul className="h-80 min-h-0 divide-y divide-line-subtle overflow-y-auto border border-line bg-surface font-mono text-caption">
         {entries.map((e) => (
           <li key={e.id} className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2.5">
             <span className="text-ink-muted w-32 shrink-0">

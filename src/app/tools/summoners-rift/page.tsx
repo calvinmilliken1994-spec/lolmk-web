@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { isToolsSession } from "@/lib/tools-auth";
-import { getTournamentFull, listAudit, listTournaments } from "@/lib/sr-db";
+import {
+  getTournamentFull,
+  listAudit,
+  listTournamentApplications,
+  listTournaments,
+} from "@/lib/sr-db";
 import { isBlobConfigured } from "@/lib/team-logo";
 import { SrAdminList } from "@/components/sr/sr-admin-list";
 import { SrAdminDetail } from "@/components/sr/sr-admin-detail";
@@ -38,13 +43,19 @@ export default async function SummonersRiftToolPage({
   const params = await searchParams;
 
   if (params.t) {
-    const [full, audit] = await Promise.all([
+    const [full, audit, applications] = await Promise.all([
       getTournamentFull(params.t),
       listAudit(params.t),
+      listTournamentApplications(params.t),
     ]);
     if (full) {
       return (
-        <SrAdminDetail initial={full} audit={audit} blobConfigured={isBlobConfigured()} />
+        <SrAdminDetail
+          initial={full}
+          audit={audit}
+          applications={applications}
+          blobConfigured={isBlobConfigured()}
+        />
       );
     }
     // Unknown/deleted id: fall through to the list rather than 404ing the

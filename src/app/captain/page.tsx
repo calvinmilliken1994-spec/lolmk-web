@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCaptainSession } from "@/lib/discord-auth";
-import { getTeamsForCaptain, listSignupOpenTournaments } from "@/lib/sr-db";
+import {
+  getApplicationsForCaptain,
+  getTeamsForCaptain,
+  listSignupOpenTournaments,
+} from "@/lib/sr-db";
 import { isBlobConfigured } from "@/lib/team-logo";
 import { isRiotConfigured } from "@/lib/riot";
 import { CaptainDashboard } from "@/components/sr/captain-dashboard";
@@ -42,8 +46,9 @@ export default async function CaptainPage() {
   const captain = await getCaptainSession();
   if (!captain) redirect("/captain/login?next=/captain");
 
-  const [teams, openTournaments] = await Promise.all([
+  const [teams, applications, openTournaments] = await Promise.all([
     getTeamsForCaptain(captain.discordUserId),
+    getApplicationsForCaptain(captain.discordUserId),
     listSignupOpenTournaments(),
   ]);
 
@@ -51,6 +56,7 @@ export default async function CaptainPage() {
     <CaptainDashboard
       username={captain.username}
       teams={teams}
+      applications={applications}
       openTournaments={openTournaments}
       blobConfigured={isBlobConfigured()}
       riotConfigured={isRiotConfigured()}
