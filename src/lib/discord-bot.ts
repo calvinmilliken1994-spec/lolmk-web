@@ -29,6 +29,19 @@ export function isBotSearchConfigured(): boolean {
   return Boolean(botToken() && guildId());
 }
 
+/**
+ * Matches verified-member OAuth eligibility: Tournament Admin OR configured
+ * verified-member role. Fails closed when neither configured role is present.
+ */
+export function isVerifiedMemberCandidate(member: Pick<BotMemberResult, "roles">): boolean {
+  const adminRoleId = process.env.DISCORD_ADMIN_ROLE_ID?.trim();
+  const verifiedRoleId = process.env.DISCORD_VERIFIED_ROLE_ID?.trim();
+  return Boolean(
+    (adminRoleId && member.roles.includes(adminRoleId)) ||
+      (verifiedRoleId && member.roles.includes(verifiedRoleId)),
+  );
+}
+
 interface DiscordApiMember {
   user: { id: string; username: string; global_name: string | null; avatar: string | null; bot?: boolean };
   nick: string | null;

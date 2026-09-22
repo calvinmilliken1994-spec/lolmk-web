@@ -69,6 +69,12 @@ export interface BuildOptions {
   doubleElimination: boolean;
   thirdPlaceMatch: boolean;
   grandFinalReset: boolean;
+  /**
+   * Grand final (and reset, if enabled) series length override. `null`/
+   * `undefined` means "same as knockoutBestOf" — the pre-existing behavior,
+   * so tournaments created before this field existed are unaffected.
+   */
+  grandFinalBestOf?: 1 | 3 | 5 | null;
   groupId?: string | null;
   /** Starting match_number so group + knockout numbers don't collide. */
   startMatchNumber?: number;
@@ -167,7 +173,7 @@ export function buildKnockoutBracket(
         matches.push(thirdPlace);
       }
     }
-    return resolveByes(retagFinal(matches));
+    return resolveByes(retagFinal(matches, opts.grandFinalBestOf));
   }
 
   // ---- Lower bracket (double elimination) ----
@@ -305,6 +311,7 @@ function finishGrandFinal(
   makeMatch: (bracket: BracketSide, roundNumber: number) => BracketMatch,
 ): BracketMatch[] {
   const grandFinal = makeMatch("grand_final", 1);
+  if (opts.grandFinalBestOf) grandFinal.best_of = opts.grandFinalBestOf;
   wbFinal.advances_to_match_id = grandFinal.id;
   wbFinal.advances_to_slot = "a";
   if (lbChamp.length === 1) {
@@ -315,6 +322,9 @@ function finishGrandFinal(
 
   if (opts.grandFinalReset) {
     const reset = makeMatch("grand_final", grandFinal.round_number + 1);
+    // Reset is the same series length as the first grand final — a
+    // deciding game shouldn't be shorter than the match that forced it.
+    if (opts.grandFinalBestOf) reset.best_of = opts.grandFinalBestOf;
     matches.push(reset);
     // Reset is only played (UI-side) if the LB champion wins the first GF —
     // recordMatchResult() (mayhem-db.ts / sr-db.ts) handles that conditional
@@ -324,13 +334,13 @@ function finishGrandFinal(
   return matches;
 }
 
-function retagFinal(matches: BracketMatch[]): BracketMatch[] {
+function retagFinal(matches: BracketMatch[], grandFinalBestOf?: 1 | 3 | 5 | null): BracketMatch[] {
   // Single-elim: the WB final IS the grand final. Retag it for consistent
   // rendering/labels on the live screen. Grand-final rounds are local to
   // that bracket section: GF1 is always round 1 and a reset is round 2.
   return matches.map((m) =>
     m.advances_to_match_id === null && m.bracket === "upper" && m.drops_to_match_id === null
-      ? { ...m, bracket: "grand_final" as BracketSide, round_number: 1 }
+      ? { ...m, bracket: "grand_final" as BracketSide, round_number: 1, best_of: grandFinalBestOf ?? m.best_of }
       : m,
   );
 }

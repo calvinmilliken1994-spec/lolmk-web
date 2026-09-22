@@ -22,6 +22,36 @@ export type SrBracketFormat = "single_elim" | "double_elim";
 export type SrMatchBracket = "upper" | "lower" | "grand_final" | "third_place";
 export type SrMatchStatus = "pending" | "scheduled" | "in_progress" | "completed" | "bye";
 
+/**
+ * What the public live screen (/srlive/[slug]) is currently showing.
+ *
+ * Presentation state, deliberately separate from `status`: `status` is the
+ * tournament's lifecycle (draft → seeding → … → completed) and drives who
+ * may do what, while `scene` is only "what is on the venue projector right
+ * now" and an admin flips it back and forth freely during a broadcast. The
+ * two are orthogonal — an `in_progress` tournament can be showing `idle`
+ * between games — which is exactly why this isn't folded into `status`.
+ *
+ * Named SrMatchScene for symmetry with MayhemScene; it covers every scene,
+ * not just the match one.
+ */
+export type SrMatchScene =
+  | "idle"
+  | "starting_soon"
+  | "teams"
+  | "bracket"
+  | "match"
+  | "champion";
+
+export const SR_SCENES: SrMatchScene[] = [
+  "idle",
+  "starting_soon",
+  "teams",
+  "bracket",
+  "match",
+  "champion",
+];
+
 export interface SrTournament {
   id: string;
   slug: string;
@@ -31,6 +61,12 @@ export interface SrTournament {
   best_of: 1 | 3 | 5;
   third_place_match: boolean;
   grand_final_reset: boolean;
+  /**
+   * Grand final series length override. `null` means "same as best_of" —
+   * the pre-existing behavior, so tournaments created before this field
+   * existed are unaffected. Applies to the reset match too when enabled.
+   */
+  grand_final_best_of: 1 | 3 | 5 | null;
   min_teams: number; // enforced 8
   max_teams: number; // enforced 16
   start_at: string | null; // ISO — tournament kickoff
@@ -42,6 +78,40 @@ export interface SrTournament {
   // Orthogonal to `status`: a tournament is typically `draft` while signups
   // are open, and signups close before seeding.
   signups_open: boolean;
+  /** Presentation state for /srlive/[slug]. See SrMatchScene. */
+  scene: SrMatchScene;
+  /** ISO — when the `starting_soon` countdown clock reaches zero. */
+  countdown_ends_at: string | null;
+  /**
+   * The match the `match` scene renders. Composite-FK'd to
+   * sr_matches(tournament_id, id), so it can only ever point at a match in
+   * THIS tournament, and cleared whenever that match completes or is undone.
+   */
+  active_match_id: string | null;
+  /**
+   * Upper-bracket Round 1 staged reveal — admin-controlled, persisted so a
+   * refresh/reconnect resumes at the current step rather than replaying.
+   * `ubr1_revealed_count` is how many UBR1 matchups (in match_number order)
+   * are currently shown; `ubr1_reveal_generation` bumps every bracket
+   * (re)generation so a stale client can't misread old progress as current.
+   */
+  ubr1_revealed_count: number;
+  ubr1_reveal_generation: number;
+  /**
+   * Server timestamp the current reveal run started, or null if no reveal
+   * is in progress / it finished. The live screen derives how many Round 1
+   * rows are visible purely from elapsed time against this — never from
+   * polling cadence — so every viewer (and a reconnecting one) sees the
+   * same animation state.
+   */
+  ubr1_reveal_started_at: string | null;
+  /**
+   * Opaque id that changes on every Start/Replay. Lets a client mid
+   * animation for a previous run detect the run changed (as opposed to a
+   * routine poll of the same run) and restart its local sequence instead
+   * of misreading stale elapsed-time math against a new start timestamp.
+   */
+  ubr1_reveal_run_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -163,7 +233,16 @@ export type SrAuditAction =
   | "match.report"
   | "match.undo"
   | "tournament.complete"
-  | "tournament.archive";
+  | "tournament.archive"
+  // Verified premade signup flow (src/app/captain/actions.ts)
+  | "team.application_create"
+  | "team.application_withdraw"
+  | "roster.invite_send"
+  | "roster.invite_retry"
+  | "roster.slot_confirm"
+  | "roster.slot_decline"
+  // Presentation desk (src/app/tools/summoners-rift/actions.ts)
+  | "scene.set";
 
 export interface SrAuditLogEntry {
   id: number;
@@ -187,6 +266,78 @@ export interface SrTournamentFull {
 
 export const SR_MIN_TEAMS = 8;
 export const SR_MAX_TEAMS = 16;
+
+// ---------------------------------------------------------------------------
+// Verified premade signup (team applications)
+// ---------------------------------------------------------------------------
+//
+// A captain does not create an sr_teams row directly any more. They open an
+// APPLICATION, fill five slots (their own plus four picked out of live Discord
+// guild search), and send each pick a DM with a confirmation link. Only once
+// all five slots read `confirmed` is the application promoted — atomically —
+// into a real sr_teams + sr_team_players roster awaiting admin approval.
+//
+// The point of the indirection: before this, a captain typed teammates'
+// Discord IDs by hand and the system had no evidence any of those people had
+// agreed to anything. Now every roster row traces back to that person's own
+// click on a link only they received.
+
+/** Exactly five confirmed members before an application becomes a team. */
+export const SR_PREMADE_ROSTER_SIZE = 5;
+
+/**
+ * - `draft`     — picked by the captain, nothing sent, reserves nobody.
+ * - `pending`   — an invite DM went out and a live token exists; reserves.
+ * - `confirmed` — the invitee signed in and accepted; reserves.
+ * - `declined`  — terminal. In practice declined slots are DELETED rather
+ *   than kept (that is the unambiguous way to free the reservation), so this
+ *   value exists for completeness of the CHECK constraint more than for rows
+ *   you will actually observe.
+ */
+export type SrApplicationSlotStatus = "draft" | "pending" | "confirmed" | "declined";
+
+/** Per-slot Discord DM delivery outcome. `failed` slots offer a retry. */
+export type SrDeliveryStatus = "not_sent" | "sending" | "sent" | "failed";
+
+export interface SrTeamApplication {
+  id: string;
+  tournament_id: string;
+  team_name: string;
+  captain_discord_id: string;
+  /** Bumped on every invite batch; stamped into each token so a stale link is identifiable. */
+  roster_version: number;
+  /** Claimed for the duration of a DM batch so two concurrent sends can't both fire. */
+  send_in_progress: boolean;
+  created_at: string;
+}
+
+/**
+ * One roster slot on an application.
+ *
+ * `confirm_token_hash` is deliberately ABSENT from this shape: the raw token
+ * only ever exists in the DM, and its hash never leaves the database layer.
+ */
+export interface SrTeamApplicationSlot {
+  id: string;
+  application_id: string;
+  member_discord_id: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  status: SrApplicationSlotStatus;
+  is_captain: boolean;
+  confirm_token_expires_at: string | null;
+  delivery_status: SrDeliveryStatus;
+  delivery_error: string | null;
+  token_roster_version: number | null;
+  updated_at: string;
+  created_at: string;
+}
+
+/** An application plus its slots — what both the captain and admin screens render. */
+export interface SrTeamApplicationView {
+  application: SrTeamApplication;
+  slots: SrTeamApplicationSlot[];
+}
 
 // ---------------------------------------------------------------------------
 // Public projections
@@ -220,6 +371,7 @@ export interface SrPublicTournament {
   best_of: 1 | 3 | 5;
   third_place_match: boolean;
   grand_final_reset: boolean;
+  grand_final_best_of: 1 | 3 | 5 | null;
   min_teams: number;
   max_teams: number;
   start_at: string | null;
@@ -227,6 +379,21 @@ export interface SrPublicTournament {
   champion_team_id: string | null;
   /** Public because it is the answer to "can I still enter?". */
   signups_open: boolean;
+  /**
+   * Presentation state. Public on purpose: /srlive/[slug] is an
+   * unauthenticated venue screen and this is the only thing that tells it
+   * what to draw. It says nothing about admin workflow — unlike
+   * `seed_locked`, which is dropped above for exactly that reason.
+   */
+  scene: SrMatchScene;
+  countdown_ends_at: string | null;
+  /** A match id, which SrPublicMatch already publishes. No new identifier class. */
+  active_match_id: string | null;
+  /** See SrTournament.ubr1_revealed_count — same meaning, public because the live screen drives its reveal off it. */
+  ubr1_revealed_count: number;
+  ubr1_reveal_generation: number;
+  ubr1_reveal_started_at: string | null;
+  ubr1_reveal_run_id: string | null;
 }
 
 /**
@@ -268,6 +435,17 @@ export interface SrPublicMatch {
   team_b_score: number;
   winner_id: string | null;
   status: SrMatchStatus;
+  /**
+   * Feeder-link ids/slots ARE published here, unlike every other admin
+   * field this type strips: the live screen draws real bracket connectors
+   * from them (see sr-live-screen.tsx). They reveal only bracket topology
+   * (which match feeds which), never any team/roster/admin data — a visitor
+   * with a bracket already sees this shape from the boxes themselves.
+   */
+  advances_to_match_id: string | null;
+  advances_to_slot: "a" | "b" | null;
+  drops_to_match_id: string | null;
+  drops_to_slot: "a" | "b" | null;
 }
 
 export interface SrPublicTournamentFull {

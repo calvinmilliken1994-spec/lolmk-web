@@ -1,35 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   AlertTriangle,
   BadgeCheck,
   Check,
+  Crown,
   Loader2,
+  Mail,
   Plus,
   Search,
   Trash2,
   UserPlus,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ErrorBanner, Field, inputClass, useRunner } from "@/components/sr/sr-shared";
 import { TeamLogoUpload } from "@/components/sr/team-logo-upload";
 import {
+  addDraftMember,
   addRosterPlayer,
   clearMyTeamLogo,
-  createTeam,
+  createPremadeApplication,
   disbandMyTeam,
   lookupRosterRank,
+  removeDraftSlot,
   removeRosterPlayer,
+  retryInviteDelivery,
+  sendApplicationInvites,
   updateMyTeam,
   updateRosterPlayer,
   uploadMyTeamLogo,
+  withdrawApplication,
 } from "@/app/captain/actions";
-import { SR_PLAYER_ROLES, SR_RANKS } from "@/types/sr-tournament";
+import { SR_PLAYER_ROLES, SR_PREMADE_ROSTER_SIZE, SR_RANKS } from "@/types/sr-tournament";
 import type { SrCaptainTeamView } from "@/lib/sr-db";
-import type { SrTournament } from "@/types/sr-tournament";
+import type {
+  SrTeamApplicationSlot,
+  SrTeamApplicationView,
+  SrTournament,
+} from "@/types/sr-tournament";
 
 /**
  * Captain-facing "My team" screen.
@@ -47,20 +59,27 @@ import type { SrTournament } from "@/types/sr-tournament";
 export function CaptainDashboard({
   username,
   teams,
+  applications,
   openTournaments,
   blobConfigured,
   riotConfigured,
 }: {
   username: string;
   teams: SrCaptainTeamView[];
+  applications: SrTeamApplicationView[];
   openTournaments: SrTournament[];
   blobConfigured: boolean;
   riotConfigured: boolean;
 }) {
   const router = useRouter();
-  // Tournaments the captain hasn't already entered.
-  const entered = new Set(teams.map((t) => t.team.tournament_id));
+  // Tournaments the captain hasn't already entered — either as a registered
+  // team, or as an application that hasn't finished collecting confirmations.
+  const entered = new Set([
+    ...teams.map((t) => t.team.tournament_id),
+    ...applications.map((a) => a.application.tournament_id),
+  ]);
   const available = openTournaments.filter((t) => !entered.has(t.id));
+  const tournamentsById = new Map(openTournaments.map((t) => [t.id, t]));
 
   return (
     <section className="container-wide py-16 md:py-20 space-y-12">
@@ -82,7 +101,7 @@ export function CaptainDashboard({
         </form>
       </header>
 
-      {teams.length === 0 && available.length === 0 && (
+      {teams.length === 0 && applications.length === 0 && available.length === 0 && (
         <div className="border border-dashed border-line-strong bg-surface p-10 text-center space-y-3">
           <p className="font-heading text-heading-lg text-ink">No signups open right now.</p>
           <p className="text-body-sm text-ink-secondary max-w-md mx-auto">
@@ -109,6 +128,15 @@ export function CaptainDashboard({
         />
       ))}
 
+      {applications.map((view) => (
+        <ApplicationPanel
+          key={view.application.id}
+          view={view}
+          tournamentName={tournamentsById.get(view.application.tournament_id)?.name ?? "Tournament"}
+          onDone={() => router.refresh()}
+        />
+      ))}
+
       {available.map((tournament) => (
         <SignupPanel
           key={tournament.id}
@@ -122,6 +150,16 @@ export function CaptainDashboard({
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Start an application for a tournament the captain hasn't entered yet.
+ *
+ * Deliberately asks for one thing: a team name. There is no roster form here
+ * any more — the old version took the captain's IGN/role/rank and created a
+ * real team on the spot, which meant a team could exist without a single
+ * player having agreed to be on it. Now creating the application only claims
+ * the name and fills the captain's own slot; the other four are picked from
+ * guild search in ApplicationPanel and each confirms for themselves.
+ */
 function SignupPanel({
   tournament,
   onDone,
@@ -132,10 +170,6 @@ function SignupPanel({
   const { pending, error, setError, run } = useRunner();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [ign, setIgn] = useState("");
-  const [role, setRole] = useState("FILL");
-  const [currentRank, setCurrentRank] = useState("");
-  const [peakRank, setPeakRank] = useState("");
 
   return (
     <div className="border border-line bg-surface p-6 space-y-4">
@@ -159,31 +193,23 @@ function SignupPanel({
 
       {open && (
         <form
-          className="grid gap-4 sm:grid-cols-2"
+          className="space-y-4 max-w-lg"
           onSubmit={(e) => {
             e.preventDefault();
             run(
-              () =>
-                createTeam({
-                  tournamentId: tournament.id,
-                  name,
-                  ign,
-                  role,
-                  currentRank: currentRank || null,
-                  peakRank: peakRank || null,
-                }),
+              async () => {
+                const result = await createPremadeApplication(tournament.id, name);
+                if (!result.ok) throw new Error(result.reason);
+              },
               () => {
                 setOpen(false);
                 setName("");
-                setIgn("");
                 onDone();
               },
             );
           }}
         >
-          <div className="sm:col-span-2">
-            <ErrorBanner error={error} onDismiss={() => setError(null)} />
-          </div>
+          <ErrorBanner error={error} onDismiss={() => setError(null)} />
           <Field label="Team name">
             <input
               className={inputClass}
@@ -193,35 +219,19 @@ function SignupPanel({
               required
             />
           </Field>
-          <Field label="Your IGN" hint="Riot ID, e.g. Name#KR1.">
-            <input
-              className={inputClass}
-              value={ign}
-              onChange={(e) => setIgn(e.target.value)}
-              maxLength={60}
-              required
-            />
-          </Field>
-          <Field label="Your role">
-            <select className={inputClass} value={role} onChange={(e) => setRole(e.target.value)}>
-              {SR_PLAYER_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Current rank" hint="Self-reported.">
-            <RankSelect value={currentRank} onChange={setCurrentRank} />
-          </Field>
-          <div className="sm:col-span-2 flex items-center gap-3">
+          <p className="text-caption text-ink-muted">
+            You&apos;ll take the first roster slot. Next you&apos;ll pick your other{" "}
+            {SR_PREMADE_ROSTER_SIZE - 1} players from the Discord server and send them each an
+            invite — the team isn&apos;t registered until all {SR_PREMADE_ROSTER_SIZE} confirm.
+          </p>
+          <div className="flex items-center gap-3">
             <button
               type="submit"
-              disabled={pending}
+              disabled={pending || !name.trim()}
               className="inline-flex items-center gap-2 border border-brand-red bg-brand-red/10 px-4 py-2 text-body-sm text-ink rounded-sm hover:bg-brand-red/20 disabled:opacity-50"
             >
               {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Submit team
+              Start roster
             </button>
             <button
               type="button"
@@ -230,14 +240,314 @@ function SignupPanel({
             >
               Cancel
             </button>
-            <span className="text-caption text-ink-muted">
-              Peak rank and the rest of your roster can be added after you
-              submit.
-            </span>
           </div>
-          <input type="hidden" value={peakRank} readOnly />
-          <button type="button" hidden onClick={() => setPeakRank("")} />
         </form>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * An application in progress: the five slots, their individual confirmation
+ * state, and the actions that move it forward. Nothing here exists in
+ * sr_teams yet — the panel disappears and a TeamPanel replaces it the moment
+ * the fifth player confirms.
+ */
+function ApplicationPanel({
+  view,
+  tournamentName,
+  onDone,
+}: {
+  view: SrTeamApplicationView;
+  tournamentName: string;
+  onDone: () => void;
+}) {
+  const { application, slots } = view;
+  const { pending, error, setError, run } = useRunner();
+  const [manualLinks, setManualLinks] = useState<Record<string, string>>({});
+
+  const confirmedCount = slots.filter((s) => s.status === "confirmed").length;
+  // The captain's own slot is 'confirmed' from creation and has no invite, so
+  // it must never count toward "an invite is already out" — otherwise a
+  // perfectly sendable roster (captain + four drafts) would never show the
+  // send button.
+  const others = slots.filter((s) => !s.is_captain);
+  const anyInviteOut = others.some((s) => s.status === "pending" || s.status === "confirmed");
+  const hasDrafts = others.some((s) => s.status === "draft");
+  const draftCount = others.filter((s) => s.status === "draft").length;
+  const readyToSend = slots.length === SR_PREMADE_ROSTER_SIZE && hasDrafts;
+
+  function handleSend() {
+    run(async () => {
+      const result = await sendApplicationInvites(application.id);
+      if (!result.ok) throw new Error(result.reason);
+      const links: Record<string, string> = {};
+      for (const r of result.results) if (r.manualLink) links[r.slotId] = r.manualLink;
+      setManualLinks(links);
+    }, onDone);
+  }
+
+  function handleRetry(slotId: string) {
+    run(async () => {
+      const result = await retryInviteDelivery(application.id, slotId);
+      if (!result.ok) throw new Error(result.reason);
+      setManualLinks((prev) => {
+        const next = { ...prev };
+        if (result.manualLink) next[slotId] = result.manualLink;
+        else delete next[slotId];
+        return next;
+      });
+    }, onDone);
+  }
+
+  return (
+    <div className="border border-line bg-surface">
+      <div className="border-b border-line p-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-caption font-mono uppercase tracking-wider text-ink-muted">
+            {tournamentName} — not registered yet
+          </p>
+          <p className="font-heading text-heading-lg text-ink">{application.team_name}</p>
+        </div>
+        <Badge variant={anyInviteOut ? "warning" : "outline"}>
+          {anyInviteOut
+            ? `${confirmedCount}/${SR_PREMADE_ROSTER_SIZE} confirmed`
+            : `${slots.length}/${SR_PREMADE_ROSTER_SIZE} added`}
+        </Badge>
+      </div>
+
+      <div className="p-6 space-y-4 max-w-2xl">
+        <ErrorBanner error={error} onDismiss={() => setError(null)} />
+
+        <p className="text-body-sm text-ink-secondary">
+          Every player confirms their own spot from a Discord DM. Your team only enters the field
+          once all {SR_PREMADE_ROSTER_SIZE} have confirmed — until then it isn&apos;t seeded, counted,
+          or visible publicly.
+        </p>
+
+        <ul className="space-y-1.5">
+          {slots.map((slot) => (
+            <li key={slot.id} className="border border-line-subtle bg-elevated px-3 py-2 space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-2 min-w-0 text-body-sm text-ink-secondary">
+                  {slot.is_captain && <Crown className="h-3.5 w-3.5 text-warning shrink-0" />}
+                  <span className="truncate">{slot.display_name ?? "Empty slot"}</span>
+                </span>
+                <span className="flex items-center gap-2 shrink-0">
+                  <SlotStatusBadge slot={slot} />
+                  {!slot.is_captain && slot.status !== "confirmed" && (
+                    <button
+                      aria-label={`Remove ${slot.display_name ?? "player"} from roster`}
+                      disabled={pending}
+                      onClick={() =>
+                        run(async () => {
+                          const result = await removeDraftSlot(application.id, slot.id);
+                          if (!result.ok) throw new Error(result.reason);
+                        }, onDone)
+                      }
+                      className="text-ink-muted hover:text-danger disabled:opacity-50"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {!slot.is_captain &&
+                    slot.status === "pending" &&
+                    slot.delivery_status === "failed" && (
+                      <button
+                        disabled={pending}
+                        onClick={() => handleRetry(slot.id)}
+                        className="text-caption font-semibold text-brand-blue-bright hover:text-ink disabled:opacity-50"
+                      >
+                        Retry
+                      </button>
+                    )}
+                </span>
+              </div>
+              {slot.delivery_status === "failed" && slot.delivery_error && (
+                <p className="text-caption text-danger">{slot.delivery_error}</p>
+              )}
+              {manualLinks[slot.id] && (
+                <div className="flex gap-1.5">
+                  <input
+                    readOnly
+                    value={manualLinks[slot.id]}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="flex-1 bg-base border border-line rounded-sm px-2 py-1 text-caption font-mono text-ink-secondary"
+                    aria-label={`Confirmation link for ${slot.display_name ?? "player"}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard?.writeText(manualLinks[slot.id])}
+                    className="border border-line px-2.5 py-1 text-caption text-ink-secondary rounded-sm hover:border-line-strong hover:text-ink"
+                  >
+                    Copy
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        {slots.length < SR_PREMADE_ROSTER_SIZE && (
+          <MemberSearchAdd
+            pending={pending}
+            onAdd={(discordUserId) =>
+              run(async () => {
+                const result = await addDraftMember(application.id, discordUserId);
+                if (!result.ok) throw new Error(result.reason);
+              }, onDone)
+            }
+          />
+        )}
+
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          {readyToSend && (
+            <button
+              onClick={handleSend}
+              disabled={pending}
+              className="inline-flex items-center gap-2 border border-brand-red bg-brand-red/10 px-4 py-2 text-body-sm text-ink rounded-sm hover:bg-brand-red/20 disabled:opacity-50"
+            >
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Send {draftCount === 1 ? "invite" : "invites"} to {draftCount} {draftCount === 1 ? "player" : "players"}
+            </button>
+          )}
+          <button
+            disabled={pending}
+            onClick={() =>
+              run(async () => {
+                const result = await withdrawApplication(application.id);
+                if (!result.ok) throw new Error(result.reason);
+              }, onDone)
+            }
+            className="text-body-sm text-ink-muted hover:text-danger disabled:opacity-50"
+          >
+            Withdraw application
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SlotStatusBadge({ slot }: { slot: SrTeamApplicationSlot }) {
+  if (slot.status === "confirmed") {
+    return (
+      <span className="inline-flex items-center gap-1 text-caption text-success">
+        <Check className="h-3.5 w-3.5" /> Confirmed
+      </span>
+    );
+  }
+  if (slot.status === "declined") return <span className="text-caption text-ink-muted">Declined</span>;
+  if (slot.status === "pending") {
+    if (slot.delivery_status === "sent")
+      return <span className="text-caption text-warning">Invited — waiting</span>;
+    if (slot.delivery_status === "sending")
+      return <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-muted" />;
+    if (slot.delivery_status === "failed")
+      return <span className="text-caption text-danger">Not delivered</span>;
+    return <span className="text-caption text-ink-muted">Pending</span>;
+  }
+  return <span className="text-caption text-ink-muted">Draft</span>;
+}
+
+interface MemberSearchResult {
+  discordUserId: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+/**
+ * Discord guild search — the only way to put someone on an initial roster.
+ * Queries /api/sr/member-search (captain-gated bot-token guild search),
+ * debounced, from two characters up.
+ *
+ * Picking a result only adds a draft slot; nothing is sent until the captain
+ * explicitly sends invites. The typed name is never trusted by the server —
+ * only the resolved discordUserId is submitted, and addDraftMember re-resolves
+ * identity from that id against the live guild anyway.
+ */
+function MemberSearchAdd({
+  pending,
+  onAdd,
+}: {
+  pending: boolean;
+  onAdd: (discordUserId: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<MemberSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults([]);
+      setSearchError(null);
+      return;
+    }
+    setSearching(true);
+    setSearchError(null);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/sr/member-search?q=${encodeURIComponent(q)}`);
+        const json = await res.json();
+        if (!res.ok) {
+          setSearchError(json.error ?? "Search unavailable right now.");
+          setResults([]);
+        } else {
+          setResults(json.results ?? []);
+        }
+      } catch {
+        setSearchError("Search unavailable right now.");
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-muted" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search Discord members to add"
+          aria-label="Search Discord members to add"
+          className="w-full bg-elevated border border-line rounded-sm pl-8 pr-3 py-2 text-body-sm"
+        />
+        {searching && (
+          <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-ink-muted" />
+        )}
+      </div>
+      {searchError && <p className="text-caption text-danger">{searchError}</p>}
+      {results.length > 0 && (
+        <ul className="border border-line-subtle divide-y divide-line-subtle max-h-48 overflow-y-auto">
+          {results.map((r) => (
+            <li key={r.discordUserId}>
+              <button
+                disabled={pending}
+                onClick={() => {
+                  onAdd(r.discordUserId);
+                  setQuery("");
+                  setResults([]);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-2 text-body-sm text-ink-secondary hover:bg-elevated text-left disabled:opacity-50"
+              >
+                {r.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- Discord CDN avatar, no remotePatterns entry.
+                  <img src={r.avatarUrl} alt="" className="h-5 w-5 rounded-full shrink-0" />
+                ) : (
+                  <span className="h-5 w-5 rounded-full bg-elevated shrink-0" />
+                )}
+                <span className="truncate">{r.displayName}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
