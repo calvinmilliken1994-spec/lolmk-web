@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useBoomDropCue } from "@/components/sr/use-boom-drop-cue";
+import { useLockInCue } from "@/components/sr/use-lock-in-cue";
 import type {
   SrPublicMatch,
   SrPublicTeam,
@@ -36,7 +36,7 @@ export function SrLiveScreen({
   const [data, setData] = useState(initial);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const playBoomDrop = useBoomDropCue();
+  const { play: playLockIn, unlock } = useLockInCue();
   // Audio must never fire in the admin's muted preview embed (see
   // sr-live-preview.tsx's `?muted=1`), regardless of soundEnabled — the
   // "Enable sound" gesture button is hidden entirely below when muted, so
@@ -111,14 +111,20 @@ export function SrLiveScreen({
       {!muted && !soundEnabled && (
         <button
           type="button"
-          onClick={() => setSoundEnabled(true)}
+          onClick={() => {
+            setSoundEnabled(true);
+            // The gesture that satisfies the autoplay policy — resume the
+            // AudioContext here, inside the click handler, or the synthesized
+            // cue stays suspended forever even with soundEnabled true.
+            unlock();
+          }}
           className="absolute right-4 top-4 z-20 border border-line-strong bg-surface/90 px-3 py-1.5 text-caption uppercase tracking-wider text-ink-secondary hover:text-ink"
         >
           Enable sound
         </button>
       )}
       <div className="relative z-10 flex h-full w-full items-center justify-center p-[3vw]">
-        <LiveScene data={data} reducedMotion={reducedMotion} audioEnabled={audioEnabled} playBoomDrop={playBoomDrop} />
+        <LiveScene data={data} reducedMotion={reducedMotion} audioEnabled={audioEnabled} playLockIn={playLockIn} />
       </div>
     </main>
   );
@@ -128,12 +134,12 @@ function LiveScene({
   data,
   reducedMotion,
   audioEnabled,
-  playBoomDrop,
+  playLockIn,
 }: {
   data: SrPublicTournamentFull;
   reducedMotion: boolean;
   audioEnabled: boolean;
-  playBoomDrop: () => void;
+  playLockIn: () => void;
 }) {
   const scene = data.tournament.scene;
   const [displayedScene, setDisplayedScene] = useState(scene);
@@ -186,10 +192,10 @@ function LiveScene({
       )}
       {displayedScene === "teams" && <TeamsScene data={data} />}
       {displayedScene === "bracket" && (
-        <BracketOrReveal data={data} reducedMotion={reducedMotion} audioEnabled={audioEnabled} playBoomDrop={playBoomDrop} />
+        <BracketOrReveal data={data} reducedMotion={reducedMotion} audioEnabled={audioEnabled} playLockIn={playLockIn} />
       )}
       {displayedScene === "match" && (
-        <MatchScene data={data} reducedMotion={reducedMotion} audioEnabled={audioEnabled} playBoomDrop={playBoomDrop} />
+        <MatchScene data={data} reducedMotion={reducedMotion} audioEnabled={audioEnabled} playLockIn={playLockIn} />
       )}
       {displayedScene === "champion" && <ChampionScene data={data} />}
     </div>
@@ -722,12 +728,12 @@ function BracketOrReveal({
   data,
   reducedMotion,
   audioEnabled,
-  playBoomDrop,
+  playLockIn,
 }: {
   data: SrPublicTournamentFull;
   reducedMotion: boolean;
   audioEnabled: boolean;
-  playBoomDrop: () => void;
+  playLockIn: () => void;
 }) {
   const { tournament } = data;
   const ubr1Matches = useMemo(
@@ -763,7 +769,7 @@ function BracketOrReveal({
   const visibleCount = total === 0 ? 0 : Math.min(total, Math.floor(elapsed / REVEAL_ROW_INTERVAL_MS) + 1);
   const revealActive = total > 0 && startedAt !== null && elapsed < revealDurationMs;
 
-  // Play boom-drop once per newly revealed row, keyed to this run. The
+  // Play the lock-in cue once per newly revealed row, keyed to this run. The
   // baseline is set on the FIRST observation of an active run WITHOUT
   // playing — a client that connects mid-sequence (or reconnects) renders
   // however many rows are already due silently, never firing a catch-up
@@ -776,10 +782,10 @@ function BracketOrReveal({
     }
     const last = lastRef.current;
     if (last && last.runId === runId && visibleCount > last.count && audioEnabled) {
-      playBoomDrop();
+      playLockIn();
     }
     lastRef.current = { runId, count: visibleCount };
-  }, [revealActive, runId, visibleCount, audioEnabled, playBoomDrop]);
+  }, [revealActive, runId, visibleCount, audioEnabled, playLockIn]);
 
   // Small local crossfade between the reveal list and the full bracket —
   // same 200ms pattern as LiveScene's top-level scene transition — so the
@@ -940,18 +946,18 @@ function MatchScene({
   data,
   reducedMotion,
   audioEnabled,
-  playBoomDrop,
+  playLockIn,
 }: {
   data: SrPublicTournamentFull;
   reducedMotion: boolean;
   audioEnabled: boolean;
-  playBoomDrop: () => void;
+  playLockIn: () => void;
 }) {
   const match = data.matches.find((candidate) => candidate.id === data.tournament.active_match_id);
   const teams = new Map(data.teams.map((team) => [team.id, team]));
   if (!match) {
     return (
-      <BracketOrReveal data={data} reducedMotion={reducedMotion} audioEnabled={audioEnabled} playBoomDrop={playBoomDrop} />
+      <BracketOrReveal data={data} reducedMotion={reducedMotion} audioEnabled={audioEnabled} playLockIn={playLockIn} />
     );
   }
   const teamA = teams.get(match.team_a_id ?? "");

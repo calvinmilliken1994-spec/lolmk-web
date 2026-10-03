@@ -261,7 +261,7 @@ function Ubr1RevealControls({
           : `Not started. ${ubr1Total} matchups will reveal automatically, alternating in from either side.`}
       </p>
       <div className="flex flex-wrap gap-2">
-        <Tooltip content="Starts the automatic reveal sequence on the live screen — one matchup every few seconds, boom-drop cue on each.">
+        <Tooltip content="Starts the automatic reveal sequence on the live screen — one matchup every few seconds, lock-in cue on each.">
           <Button size="sm" variant="secondary" disabled={pending} onClick={() => run(() => startUbr1Reveal(tournament.id), refresh)}>
             <Play className="h-3.5 w-3.5" /> {inProgress ? "Replay" : "Start"}
           </Button>
@@ -273,7 +273,7 @@ function Ubr1RevealControls({
         </Tooltip>
       </div>
       <p className="text-caption text-ink-muted">
-        Automatic and animated — each matchup slides in from alternating sides with its own boom-drop cue, centered on the live screen. The full bracket fades in once every matchup has shown.
+        Automatic and animated — each matchup slides in from alternating sides with its own lock-in cue, centered on the live screen. The full bracket fades in once every matchup has shown.
       </p>
     </div>
   );
