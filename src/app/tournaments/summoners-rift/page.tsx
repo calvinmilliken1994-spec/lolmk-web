@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Trophy, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, Swords, Trophy, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
-import { listPublicTournaments } from "@/lib/sr-db";
-import type { SrPublicTournament } from "@/types/sr-tournament";
+import {
+  getApplicationsForCaptain,
+  getTeamsForCaptain,
+  listPublicTournaments,
+  listSignupOpenTournaments,
+} from "@/lib/sr-db";
+import { getCaptainSession } from "@/lib/discord-auth";
+import type { SrPublicTournament, SrTournament } from "@/types/sr-tournament";
+import { SrPublicSignupGate, SrSignupSection } from "@/components/sr/sr-public-signup";
 
 export const metadata: Metadata = {
   title: "Summoner's Rift tournaments",
@@ -14,10 +21,10 @@ export const metadata: Metadata = {
     "LoLMK's 5v5 Summoner's Rift tournaments on the Korean server: live brackets, team lists and results.",
 };
 
-// Bracket state changes whenever an admin reports a result, and the admin
-// actions revalidate this path explicitly — but a cold render must never
-// serve a stale cached bracket during a live event.
-export const revalidate = 60;
+// Signup state and eligibility are per-captain (session/cookie driven), so
+// this route renders dynamically like the ARAM page — a cached render would
+// show one captain's panel to everyone.
+export const dynamic = "force-dynamic";
 
 const DATE_FMT = new Intl.DateTimeFormat("en-US", {
   timeZone: "Asia/Seoul",
@@ -39,52 +46,80 @@ const STATUS_COPY: Record<
 };
 
 export default async function SummonersRiftPublicPage() {
-  const tournaments = await listPublicTournaments();
+  // Same shape as the ARAM page: a session failure degrades to the
+  // signed-out state, never a failed request.
+  const captain = await getCaptainSession().catch(() => null);
+  const [tournaments, signupOpen] = await Promise.all([
+    listPublicTournaments(),
+    listSignupOpenTournaments(),
+  ]);
+
+  // Same eligibility rule as CaptainDashboard: open for signups, minus
+  // tournaments this captain already has a team or a pending application in.
+  let enterable: SrTournament[] = [];
+  if (captain) {
+    const [teams, applications] = await Promise.all([
+      getTeamsForCaptain(captain.discordUserId),
+      getApplicationsForCaptain(captain.discordUserId),
+    ]);
+    const entered = new Set([
+      ...teams.map((v) => v.team.tournament_id),
+      ...applications.map((v) => v.application.tournament_id),
+    ]);
+    enterable = signupOpen.filter((t) => !entered.has(t.id));
+  }
   const live = tournaments.filter((t) => t.status !== "completed");
   const finished = tournaments.filter((t) => t.status === "completed");
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-line-subtle">
-        <div aria-hidden className="absolute inset-0 grain pointer-events-none" />
-        <div
-          aria-hidden
-          className="absolute -top-40 left-1/2 h-[560px] w-[1100px] -translate-x-1/2 bg-gradient-to-br from-brand-red/15 via-transparent to-brand-blue/15 blur-3xl pointer-events-none"
-        />
-        <div className="container-wide relative py-20 md:py-28">
-          <div className="max-w-3xl space-y-6">
+      <section className="border-b border-line-subtle">
+        <div className="container-wide py-10 md:py-14">
+          <div className="max-w-3xl space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <Link
-                href="/tournaments"
-                className="text-body-sm text-ink-muted hover:text-ink"
-              >
+              <Link href="/tournaments" className="text-body-sm text-ink-muted hover:text-ink">
                 Tournaments
               </Link>
               <span className="text-ink-muted">/</span>
               <Badge variant="red">Summoner&apos;s Rift</Badge>
             </div>
-            <h1 className="font-display text-display-lg md:text-display-xl text-ink leading-[0.95]">
-              5v5, full draft, real stakes.
-            </h1>
-            <p className="text-body-lg text-ink-secondary max-w-[55ch]">
-              Team tournaments on the KR server, run over a week or a month.
-              Rosters are locked before kickoff, seeds are drawn at random, and
-              the bracket below updates as results come in.
+            <h1 className="font-heading text-heading-xl text-ink">5v5 team tournaments</h1>
+            <p className="text-body-md text-ink-secondary max-w-[62ch]">
+              Full-draft 5v5s on the KR server, run over a week or a month.
+              Captains register a team, every player confirms their own slot,
+              rosters lock before kickoff, and the bracket below updates as
+              results come in.
             </p>
-            <div className="pt-2">
+            <div className="flex flex-wrap items-center gap-3 pt-1">
               <a
                 href="https://discord.gg/lolmk"
                 target="_blank"
                 rel="noreferrer"
-                className={cn(buttonVariants({ variant: "discord", size: "lg" }))}
+                className={cn(buttonVariants({ variant: "discord", size: "md" }))}
               >
-                <DiscordIcon className="h-6 w-6" />
+                <DiscordIcon className="h-5 w-5" />
                 Enter via Discord
               </a>
+              <Link
+                href="/captain"
+                className={cn(buttonVariants({ variant: "secondary", size: "md" }))}
+              >
+                <Swords strokeWidth={1.5} className="h-4 w-4" />
+                Captain dashboard
+              </Link>
             </div>
           </div>
         </div>
       </section>
+
+      {signupOpen.length > 0 && (
+        <section className="container-wide py-12 border-b border-line-subtle space-y-4">
+          {enterable.map((tournament) => (
+            <SrSignupSection key={tournament.id} tournament={tournament} />
+          ))}
+          {enterable.length === 0 && <SrPublicSignupGate />}
+        </section>
+      )}
 
       <section className="container-wide py-20 space-y-14">
         <div className="space-y-6">
