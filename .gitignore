@@ -42,3 +42,8 @@ next-env.d.ts
 
 .vercel
 .env*
+# local agent/tooling noise
+.claude-task-*
+.worktrees/
+pnpm-lock.yaml
+pnpm-workspace.yaml
