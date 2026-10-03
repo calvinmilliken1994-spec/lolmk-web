@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Archive, ArrowLeft, ArrowRight, Loader2, Plus, Trophy } from "lucide-react";
+import { Archive, ArrowLeft, ArrowRight, Loader2, Plus, Trash2, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ErrorBanner,
@@ -16,7 +16,7 @@ import {
 } from "@/components/sr/sr-shared";
 import type { SrBracketFormat, SrTournament } from "@/types/sr-tournament";
 import { SR_MAX_TEAMS, SR_MIN_TEAMS } from "@/types/sr-tournament";
-import { archiveTournament, createTournament } from "@/app/tools/summoners-rift/actions";
+import { archiveTournament, createTournament, deleteTournament } from "@/app/tools/summoners-rift/actions";
 
 const DATE_FMT = new Intl.DateTimeFormat("en-US", {
   timeZone: "Asia/Seoul",
@@ -106,6 +106,23 @@ export function SrAdminList({ tournaments }: { tournaments: SrTournament[] }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => {
+                      if (
+                        !confirm(
+                          `DELETE "${t.name}" permanently?\n\nThis removes it from the admin list AND the Hall of Champions, along with every team, match, and audit entry. This cannot be undone. Archive instead if you want the champion kept.`,
+                        )
+                      )
+                        return;
+                      run(() => deleteTournament(t.id), () => router.refresh());
+                    }}
+                    className="inline-flex items-center gap-1.5 border border-line px-3 py-1.5 text-body-sm text-ink-muted rounded-sm hover:border-brand-red hover:text-brand-red disabled:opacity-40"
+                  >
+                    <Trash2 strokeWidth={1.75} className="h-4 w-4" />
+                    Delete
+                  </button>
                   <button
                     type="button"
                     disabled={pending}
