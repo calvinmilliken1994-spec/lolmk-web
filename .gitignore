@@ -47,3 +47,7 @@ next-env.d.ts
 .worktrees/
 pnpm-lock.yaml
 pnpm-workspace.yaml
+
+# Root-level markdown notes are kept local, not in the repo
+/*.md
+/.hermes.md
