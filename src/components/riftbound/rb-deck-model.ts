@@ -6,6 +6,7 @@
 //
 // Relative imports (not "@/") so scripts/test-rb-setup.ts can load it.
 
+import { isTimeCalled } from "../../lib/rb-clock";
 import { resolveRoundCount, resolveTopCutSize, type SwissStanding } from "../../lib/swiss-engine";
 import type {
   RbAuditLogEntry,
@@ -39,7 +40,7 @@ export const RB_SCENE_LABEL: Record<RbScene, string> = {
   pairings_clock: "Pairings + clock",
   clock: "Clock",
   standings: "Standings",
-  top_cut: "Top cut",
+  top_cut: "Top-cut bracket",
   champion: "Champion",
 };
 
@@ -84,6 +85,16 @@ const matchesOf = (state: Pick<RbDeskState, "matches">, round: RbRound): RbMatch
 export const outstandingTables = (state: Pick<RbDeskState, "matches">, round: RbRound): number =>
   matchesOf(state, round).filter((m) => m.status === "pending").length;
 
+/** Whether a scene can be loaded into preview / taken right now. */
+export function rbSceneAvailable(scene: RbScene, state: Pick<RbDeskState, "tournament" | "rounds">): boolean {
+  if (scene === "top_cut") return Boolean(state.tournament.config.topCutSeedIds);
+  if (scene === "champion") return state.tournament.status === "completed" || state.tournament.status === "archived";
+  if (scene === "standings" || scene === "pairings" || scene === "pairings_clock" || scene === "clock") {
+    return state.rounds.length > 0;
+  }
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Phases
 // ---------------------------------------------------------------------------
@@ -113,15 +124,17 @@ export function rbPhases(state: RbDeskState): RbPhaseRow[] {
   });
 }
 
-/** Mono chip next to the event name: SETUP, CHECK-IN, ROUND 3 / 5 · LIVE, TOP CUT · ROUND 6 · LIVE, COMPLETE. */
-export function rbStatusChip(state: RbDeskState): string {
+/** Mono chip next to the event name: SETUP, CHECK-IN, ROUND 3 / 5 · LIVE (· TIME once the clock is out), TOP CUT · ROUND 6 · LIVE, COMPLETE. */
+export function rbStatusChip(state: RbDeskState, now: number | null = null): string {
   const phase = rbCurrentPhase(state);
   if (phase === "setup") return "SETUP";
   if (phase === "checkin") return "CHECK-IN";
   if (phase === "complete") return state.tournament.status === "archived" ? "ARCHIVED" : "COMPLETE";
   const round = latestRound(state);
   if (!round) return "SWISS";
-  const status = round.status.toUpperCase();
+  // "In time" is derived, never stored: a live round whose clock has run out reads TIME.
+  const timeCalled = round.status === "live" && now !== null && isTimeCalled(round, null, now);
+  const status = timeCalled ? "TIME" : round.status.toUpperCase();
   return round.stage === "top_cut"
     ? `TOP CUT · ROUND ${round.number} · ${status}`
     : `ROUND ${round.number} / ${rbSwissTotal(state)} · ${status}`;

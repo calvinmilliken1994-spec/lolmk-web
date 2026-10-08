@@ -6,22 +6,14 @@ import {
   type DeckPrimaryAction,
   type DeckWorkspaceProps,
 } from "@/components/control-deck";
-import {
-  closeCheckInAndPairRound1,
-  closeRound,
-  completeEvent,
-  cutToTop,
-  openCheckIn,
-  pairNextRound,
-  publishRound,
-  startClock,
-} from "@/app/tools/riftbound/actions";
-import { RB_SCENES, type RbScene } from "@/types/riftbound";
+import { rbActions, type RbActions } from "./rb-actions";
+import { RB_SCENES } from "@/types/riftbound";
 import {
   outstandingTables,
   rbAutoFollow,
   rbPhases,
   rbPrimarySpec,
+  rbSceneAvailable,
   RB_SCENE_LABEL,
   type RbDeskState,
   type RbPhaseId,
@@ -29,36 +21,27 @@ import {
 } from "./rb-deck-model";
 
 /** Bind a primary-action spec to the server action it stands for. */
-function runSpec(spec: RbPrimarySpec, state: RbDeskState): Promise<unknown> {
+function runSpec(spec: RbPrimarySpec, state: RbDeskState, actions: RbActions): Promise<unknown> {
   if (spec.confirm && !window.confirm(spec.confirm)) return Promise.resolve(undefined);
   const tid = state.tournament.id;
   switch (spec.kind) {
     case "open_checkin":
-      return openCheckIn(tid);
+      return actions.openCheckIn(tid);
     case "close_checkin":
-      return closeCheckInAndPairRound1(tid);
+      return actions.closeCheckInAndPairRound1(tid);
     case "publish_round":
-      return publishRound(spec.roundId as string);
+      return actions.publishRound(spec.roundId as string);
     case "start_clock":
-      return startClock(spec.roundId as string);
+      return actions.startClock(spec.roundId as string);
     case "close_round":
-      return closeRound(spec.roundId as string);
+      return actions.closeRound(spec.roundId as string);
     case "pair_next":
-      return pairNextRound(tid);
+      return actions.pairNextRound(tid);
     case "cut":
-      return cutToTop(tid);
+      return actions.cutToTop(tid);
     case "complete":
-      return completeEvent(tid);
+      return actions.completeEvent(tid);
   }
-}
-
-function sceneAvailable(scene: RbScene, state: RbDeskState): boolean {
-  if (scene === "top_cut") return Boolean(state.tournament.config.topCutSeedIds);
-  if (scene === "champion") return state.tournament.status === "completed" || state.tournament.status === "archived";
-  if (scene === "standings" || scene === "pairings" || scene === "pairings_clock" || scene === "clock") {
-    return state.rounds.length > 0;
-  }
-  return true;
 }
 
 const PHASE_TITLE: Record<RbPhaseId, string> = {
@@ -70,8 +53,8 @@ const PHASE_TITLE: Record<RbPhaseId, string> = {
 };
 
 /**
- * Stand-in workspace for the phases whose real workspaces come with the
- * round desk (RbRoundWorkspace). It still shows where the event stands so the
+ * Stand-in workspace for the phases that don't have one yet (Top cut,
+ * Complete); Swiss rounds is RbRoundWorkspace. It still shows where the event stands so the
  * primary action in the top bar can be followed.
  */
 export function RbPhasePlaceholder({ state, phaseId }: DeckWorkspaceProps<RbDeskState>) {
@@ -112,8 +95,8 @@ export function RbPhasePlaceholder({ state, phaseId }: DeckWorkspaceProps<RbDesk
   );
 }
 
-/** The Riftbound DeckDefinition. Binds rb-deck-model.ts to the task-3 server actions. */
-export function makeRbDeckDefinition(): DeckDefinition<RbDeskState> {
+/** The Riftbound DeckDefinition. Binds rb-deck-model.ts to the server actions (or the set passed in). */
+export function makeRbDeckDefinition(actions: RbActions = rbActions): DeckDefinition<RbDeskState> {
   return {
     tool: "riftbound",
     phases: (state) => rbPhases(state),
@@ -125,13 +108,13 @@ export function makeRbDeckDefinition(): DeckDefinition<RbDeskState> {
         enabled: spec.enabled,
         reason: spec.reason,
         hint: spec.hint,
-        run: () => runSpec(spec, state),
+        run: () => runSpec(spec, state, actions),
       };
     },
     scenes: RB_SCENES.map((id) => ({
       id,
       label: RB_SCENE_LABEL[id],
-      available: (state: RbDeskState) => sceneAvailable(id, state),
+      available: (state: RbDeskState) => rbSceneAvailable(id, state),
     })),
     autoFollow: (prev, next) => rbAutoFollow(prev, next),
     workspace: () => RbPhasePlaceholder,
