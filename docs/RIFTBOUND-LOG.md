@@ -117,3 +117,31 @@ One entry per task: what was built, deviations from `docs/RIFTBOUND.md` and
 - Delete `/tools/deck-preview` (see above).
 - `npm run lint` still fails on 22 existing errors in other files (19
   unescaped `'`, 2 `require()` imports, 1 `prefer-const`).
+
+## Task 5 — Riftbound admin list and desk (Setup, Check-in)
+
+**Built**
+
+- `/tools/riftbound` (list + Create, `RbAdminList`, SrAdminList pattern, Archive but no Delete) and `/tools/riftbound/[slug]` (`RbDesk`: DeckShell + Riftbound DeckDefinition, polling `/api/rb/admin-state`). Riftbound added to the `/tools` index.
+- Phases: Setup, Check-in, Swiss rounds, Top cut, Complete. Primary action labels and blocked reasons follow behaviour.md and are covered by `scripts/test-rb-setup.ts` (79 checks).
+- Setup workspace: `RbSetupChecklist` (six steps) with the panel on the right: Event basics, `RbFormatStep` (Auto hints and Locks note as in the reference), Players (member search, guest, bulk paste, Legend), Check-in, Judges (optional table ranges, QR + link to `/tools/riftbound/[slug]/floor`), Venue screen (QR + link to `/rblive/[slug]`, "Mark tested").
+- Check-in workspace: searchable list, tap to check in/undo, running count, walk-in guest.
+- Locked settings are read-only with the reason shown (`rbLocks`).
+- Pure logic lives in `rb-setup-model.ts` / `rb-deck-model.ts` (testable under node).
+
+**Deviations and why**
+
+- Added `date`, `venue`, `judges`, `venueTestedAt` to `RbTournamentConfig`: Event basics and the Judges/Venue steps need somewhere to store them. `venueTestedAt` is set only by `markVenueTested`; `updateConfig` strips it.
+- Member search uses `/api/mayhem/member-search`: no `/api/members` route exists.
+- Judges are a free-text roster in config, not a role; judges still sign in as tools admins.
+- QR codes are rendered client-side (`qrcode-generator`, new dependency) from the page's own origin.
+- `getCurrentAdmin()` now also returns `discordUserId` (needed for audit actors).
+- Swiss rounds, Top cut and Complete phases show a placeholder workspace; the round desk is a later task. The primary action for those phases already works.
+- Setup step cards are 82px tall to match the reference. Measured at 1440×1000 with a common fallback font, the header, rail, both sections and all controls matched the reference positions. Fonts differ in dev because web fonts were not loaded in the headless check.
+
+**Known issues / TODO**
+
+- Not exercised against a real Postgres; the page was visually checked with mock state only (a temporary preview page, removed).
+- Same Chakra Petch 400 / arrow-glyph caveats as Task 4.
+- Round desk, floor view and venue screen contents are still pending.
+- `npm run lint` still has pre-existing issues elsewhere; the new files lint clean.

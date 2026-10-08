@@ -456,18 +456,30 @@ async function reverifySession(
   return true;
 }
 
-export async function getCurrentAdmin(): Promise<{ username: string; avatar: string | null } | null> {
+export async function getCurrentAdmin(): Promise<{
+  discordUserId: string;
+  username: string;
+  avatar: string | null;
+} | null> {
   const store = await cookies();
   const rawToken = store.get(SESSION_COOKIE_NAME)?.value;
   if (rawToken) {
     const session = await getSession(rawToken);
-    if (session) return { username: session.discordUsername, avatar: session.discordAvatar };
+    if (session) {
+      return {
+        discordUserId: session.discordUserId,
+        username: session.discordUsername,
+        avatar: session.discordAvatar,
+      };
+    }
   }
   // Fall back to a verified-member session that is currently admin. Mirrors
   // isToolsSession()'s dual path — see its doc comment for why this never
   // trusts a cached flag without getMemberSession()'s live re-verification.
   const member = await getMemberSession();
-  if (member?.isAdmin) return { username: member.displayName, avatar: member.avatarUrl };
+  if (member?.isAdmin) {
+    return { discordUserId: member.discordUserId, username: member.displayName, avatar: member.avatarUrl };
+  }
   return null;
 }
 

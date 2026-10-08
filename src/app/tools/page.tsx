@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Swords, Timer, Trophy } from "lucide-react";
+import { Layers, Swords, Timer, Trophy } from "lucide-react";
 import { isToolsSession } from "@/lib/tools-auth";
 
 export const metadata: Metadata = {
@@ -38,6 +38,13 @@ const TOOLS: ToolEntry[] = [
     description:
       "Persistent 5v5 tournaments: teams and logos, random seeding, single/double-elim brackets, live result reporting and a full audit log.",
     icon: Trophy,
+  },
+  {
+    name: "Riftbound",
+    slug: "riftbound",
+    description:
+      "Swiss events with a top cut: setup checklist, check-in, round pairings and clock, judges' floor view and the venue screen.",
+    icon: Layers,
   },
 ];
 
