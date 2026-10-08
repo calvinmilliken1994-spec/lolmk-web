@@ -22,6 +22,8 @@ import { rbBasicsMissing } from "./rb-setup-model";
 export interface RbDeskState extends RbTournamentFull {
   standings: SwissStanding[];
   audit: RbAuditLogEntry[];
+  /** The server's clock (ms since epoch) when this state was read. The judges' floor corrects its clock with it. */
+  serverNow?: number;
 }
 
 export type RbPhaseId = "setup" | "checkin" | "swiss" | "top_cut" | "complete";

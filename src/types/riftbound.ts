@@ -237,9 +237,16 @@ export interface RbRound {
 }
 
 /** Kinds a judge can raise to the desk from the floor ("Flag to desk"). */
-export type RbDeskFlagKind = "judge_call" | "dispute" | "other";
+export type RbDeskFlagKind = "no_show" | "judge_call" | "deck_check" | "head_judge" | "dispute" | "other";
 
-export const RB_DESK_FLAG_KINDS: RbDeskFlagKind[] = ["judge_call", "dispute", "other"];
+export const RB_DESK_FLAG_KINDS: RbDeskFlagKind[] = [
+  "no_show",
+  "judge_call",
+  "deck_check",
+  "head_judge",
+  "dispute",
+  "other",
+];
 
 /** A table flagged to the desk. Open until a desk admin acknowledges it. */
 export interface RbDeskFlag {

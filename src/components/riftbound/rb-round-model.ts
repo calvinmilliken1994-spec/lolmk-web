@@ -74,15 +74,15 @@ export const kstTime = (iso: string | number): string =>
  * reused for its retries, so a double tap or a retry after a lost response
  * is a duplicate the server ignores. `crypto.randomUUID` only exists in
  * secure contexts and the desk is often opened over plain http on the LAN,
- * hence the fallback.
+ * hence the fallback. The floor passes its own prefix.
  */
-export function newDeskKey(): string {
+export function newDeskKey(prefix = "desk"): string {
   const c = (globalThis as { crypto?: Crypto }).crypto;
-  if (c && typeof c.randomUUID === "function") return `desk-${c.randomUUID()}`;
+  if (c && typeof c.randomUUID === "function") return `${prefix}-${c.randomUUID()}`;
   const bytes = new Uint8Array(16);
   if (c && typeof c.getRandomValues === "function") c.getRandomValues(bytes);
   else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
-  return `desk-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+  return `${prefix}-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,10 @@ export const isDeskFlag = (f: RbMatchFlag): f is RbDeskFlag =>
 export const openFlags = (m: RbMatch): RbDeskFlag[] => m.flags.filter(isDeskFlag).filter((f) => !f.acknowledged_at);
 
 export const FLAG_LABEL: Record<RbDeskFlagKind, string> = {
+  no_show: "No-show",
   judge_call: "Judge call",
+  deck_check: "Deck check",
+  head_judge: "Need head judge",
   dispute: "Dispute",
   other: "Flagged",
 };

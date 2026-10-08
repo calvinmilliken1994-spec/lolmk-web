@@ -31,7 +31,7 @@ export async function GET(req: Request) {
 
   const audit = await listAudit(full.tournament.id, AUDIT_LIMIT);
   return NextResponse.json(
-    { ...full, standings: computeRbStandings(full), audit },
+    { ...full, standings: computeRbStandings(full), audit, serverNow: Date.now() },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

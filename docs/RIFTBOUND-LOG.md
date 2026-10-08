@@ -206,3 +206,62 @@ The task number isn't in the brief; 6 follows Task 5 and sits before the venue s
 - `/tools/deck-preview` is still there (Task 4 TODO; the Riftbound desk now runs on `DeckShell`, SR and Mayhem don't).
 - `npm run lint` still fails on 22 existing errors in unrelated files (`react/no-unescaped-entities`, `require()`, `prefer-const`), which also stops `next build` at its lint step. `.eslintrc.json` was untracked before this task and is left out of the commit.
 - No browser test of two desks reporting the same table at once; that relies on the server's row locks and the `Reported by …` message, covered in `test-rb-scenario.ts`.
+
+## Task 7 — Riftbound judges' floor view (`/tools/riftbound/[slug]/floor`)
+
+The brief gave no task number; 7 follows Task 6 and the venue screen is task 8 (Task 6 refers to it). Rename if it's wrong.
+
+**Built**
+
+- `/tools/riftbound/[slug]/floor` (`page.tsx`): redirects to `/tools/login?next=…` without `isToolsSession()`, and also needs `getCurrentAdmin()` for the "Sends as <name>" line. Unknown slug is a 404. It renders `RbFloor`, a phone-first column (max 480px, full-screen over the site header like the desk).
+- **Table list** (`judge-tables`): header with tournament, judge and signed-in name, Online/Offline, "Round N", "x of y outstanding · your tables 1–6" and the round clock; search (table-number prefix or player name); Mine / All / Flagged; OUTSTANDING (open flags first, then by table) and REPORTED below. Reported rows show the reporter only when it isn't you (reference: "Iris 2–0 Jun · Jin"). Byes aren't listed.
+- **Score pad** (`judge-score-pad`): Table N, both players with their record going in (from the standings), the Riftbound Bo3/Bo1 `ScorePad` (pairs layout), "Decided on time" (on by default once the table is past its end time), drop toggles (only for active players), "+ Extension" (+1/+3/+5 min, `addExtension`) and "Flag to desk" (No-show, Judge call, Deck check, Need head judge; `flagTable`). "Other…" opens a games stepper.
+- **Review card** (`judge-review`): the result at 96px for both players to read, the show-both-players line, Submit, "Sends as <name> · retries if offline" and `id xxxx`, the first four characters of the idempotency key.
+- **Submissions** (`use-rb-submissions.ts`, `rb-floor-model.ts`): a submission shows Sending / Sent ✓ / Failed · will retry (or Rejected) in a strip above the bottom edge of the list, the table's row is locked while it is active, and "Sent" fades after 4s.
+  - One key per pad opening (`floor-<uuid>`), kept when you go Back from the review. A second submission for the same table is refused by the queue (`rbEnqueue`), and `inFlight` blocks overlapping sends of one key, so a double tap sends one request.
+  - A thrown error (offline, server down) leaves it Failed and it is sent again every 5s, on the browser's `online` event, and once after a refresh, always with the same key. The server already ignores a key it has recorded (`findMatchByIdempotencyKey`, checked before the "Reported by" test), so a retry after a lost response is a no-op.
+  - `{ ok: false }` answers aren't retried: "Reported by …" becomes a conflict banner ("Table 7 · Reported by Jin at 14:02:11 KST.") on the list; anything else (round closed, bad score) is Rejected with Retry/Discard.
+  - Unfinished submissions are written to `sessionStorage` (`rb-floor-pending:<slug>`) on every change and read back after a refresh; whatever was mid-flight comes back as Failed and is sent again.
+- If the poll shows someone else reported the table while the pad or review is open, it says "Reported by X at T." and returns to the list.
+- Polling is `useDeckState` at 2s on `/api/rb/admin-state`. The route now also returns `serverNow`; the floor uses the difference from the phone's clock, so the countdown follows the server's clock.
+- Each step pushes a history entry, so the phone's Back button goes pad → list instead of leaving the page.
+- `scripts/test-rb-floor.ts`: 103 checks on `rb-floor-model.ts` (round choice, judge ranges, list order, search and filters, going-in records, review text, queue classification, double-tap guard, sessionStorage round trip).
+
+**Verified**
+
+- `tsc --noEmit` clean. The new and changed files lint clean (`npm run lint` still fails on 22 pre-existing errors elsewhere). `test-rb-floor` (103), `test-rb-round` (96), `test-rb-setup` (79), `test-rb-clock` (74) pass.
+- 390×844 against the three reference HTMLs, rendered in Chrome and compared element by element. List header 390×102, search input 358×46, pad header 390×73, back link, "Table N" title, "+ Extension" and "Flag to desk" (175×48 at the same positions), review header and result card (358×293 at 16,93) all match to the pixel. Differences: see Deviations.
+- **Walkthrough, 69 checks** (Playwright with a touch, 390×844 mobile context against a throwaway page that ran the real `rb-service` operations on an in-memory store, deleted before the commit, so not repeatable from the repo):
+  1. Header, range "your tables 1–6", judge call listed first, Mine only 1–6, All shows other judges' tables marked "not your table", Flagged, search by number (finds a table outside the range) and by name.
+  2. Table → pad → phone Back → pad → score → review → Change → review → Submit **double-tapped**: one request, one `match.report` in the audit log, key `floor-…` on the match, "id" on the card equal to the key's first four characters, reporter "Ray".
+  3. **Offline**: set the context offline, Submit: "Failed · will retry", Offline in the header, entry in sessionStorage, the table locked, nothing on the server. Back online and **refreshed**: delivered once, with the original key, storage emptied.
+  4. **Refresh while sending keeps failing** (POSTs aborted): after the reload the submission is still there as Failed, tried again with the same key, nothing on the server; once POSTs work again it is delivered once with the original key.
+  5. **Lost response**: the server recorded the result, the response was dropped; the phone showed Failed, retried with the same key, got the duplicate: still one report, ends as Sent.
+  6. **Conflict**: Jin reported the table while the phone couldn't poll; Submit shows "Reported by Jin at hh:mm:ss KST", returns to the list, doesn't retry, Jin's result isn't overwritten; Dismiss clears it. A second case where the poll sees it while the pad is open returns to the list with the same message.
+  7. Extension +3:00 stored; the four flag kinds; a Deck check flag stored with the raiser; flagged tables rise to the top.
+  8. Past the end time (clock moved back 66 min): rows read "Time called", Decided on time is on by default, a 1–0 is stored with `decided_on_time`.
+  - Every button, link and select on the list, pad, review, extension sheet and flag sheet measured at least 44×44px (checkboxes through their 44px labels).
+
+**Deviations and why**
+
+- **Flag kinds**: the brief names no-show, judge call, deck check, need head judge, but `RbDeskFlagKind` only had `judge_call | dispute | other`. Added `no_show`, `deck_check`, `head_judge` (flags are stored in jsonb, so no migration); `dispute` and `other` stay for old data. `FLAG_LABEL` has all six. The desk's table sheet still offers only Judge call and Dispute.
+- **Filter chips are 44px tall** (reference 40, brief says ≥44), so the rows start 4px lower than the reference. The search input is 46px with its border, as in the reference. Outstanding rows are 66px and reported rows 50px, matching the reference's content-box sizes. ScorePad buttons are 60px (kit border-box) against 62px in the reference.
+- **"Playing · game 3"**: nothing records game numbers, so the second line shows "Playing · 04:10 left" (that table's own time, including its extension).
+- **Mine and search**: the reference shows table 7 "not your table" under Mine, which only makes sense if search ignores the filter. A non-empty search therefore looks at every table. A judge with no range, or not on the roster, sees all tables under Mine.
+- **Who is judging**: matched by name (case-insensitive) against the roster. If the signed-in name isn't on it, a "Judging as" select appears and the pick is remembered in `localStorage`. This path is covered by unit tests of `rbJudgeFor` but wasn't clicked in the browser run (the test judge matched by name).
+- **Header** shows the tournament name as written, uppercased ("PORO CUP"), where the reference has "POROCUP".
+- **Decided on time** can't be turned off for a time-out lead (e.g. 1–0): the server rejects that score without it, so the review card shows it as on.
+- **Rejected** (not in the spec): a third failure state for answers the server gave and won't change, with Retry and Discard, so they don't loop and don't disappear.
+- **"Other…"** has no reference; I made a games stepper sheet (44px buttons).
+- The pad shows the table's open flag or extension under the title (not in the reference).
+- **Server clock**: `admin-state` and the floor page return `serverNow`. The desk (Task 6) still uses the browser clock for its countdown; that TODO from Task 6 stands.
+- The reference only draws Mine/All/Flagged and OUTSTANDING/REPORTED; the empty states, banners and the submissions strip are mine.
+
+**Known issues / TODO**
+
+- Not run against Postgres, a real Discord session, a real phone, or Next's real server-action client. The harness called the same `rb-service` operations through `fetch`; that `reportResult`/`flagTable`/`addExtension` server actions reject (rather than hang) when the phone is offline is an assumption about Next's client, and `{ ok: false }` handling relies on `actions.ts` as read, not as run. Do this check on the first real device test.
+- A request that hangs forever (connection open, no answer) keeps its key in flight and nothing retries it until a refresh. Server actions can't be aborted from the client; a timeout that marks it Failed would need `Promise.race` and care that the original may still land (the duplicate check makes that safe).
+- Next serialises server-action calls from one page, so a stuck send queues the next result behind it.
+- The Next dev overlay badge sits over the bottom-left of the phone screen in dev (it covers part of "+ Extension"); production has none.
+- No table-sheet-style "undo" on the floor: a wrong submitted result is undone from the desk.
+- Only the latest running Swiss round is shown; top-cut matches aren't on the floor (`reportTopCutResult` exists).
