@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { isToolsSession } from "@/lib/tools-auth";
-import { getMayhemFull } from "@/lib/mayhem-db";
-import { MayhemAdmin } from "@/components/mayhem/mayhem-admin";
+import { getMayhemFull, listMayhemAudit } from "@/lib/mayhem-db";
+import { MayhemDesk } from "@/components/mayhem/mayhem-desk";
 
 export const metadata: Metadata = {
   title: "ARAM Mayhem",
@@ -16,6 +16,6 @@ export default async function MayhemToolPage() {
   const signedIn = await isToolsSession();
   if (!signedIn) redirect("/tools/login?next=/tools/mayhem");
 
-  const data = await getMayhemFull();
-  return <MayhemAdmin initial={data} />;
+  const [full, audit] = await Promise.all([getMayhemFull(), listMayhemAudit()]);
+  return <MayhemDesk initial={{ ...full, audit }} />;
 }
