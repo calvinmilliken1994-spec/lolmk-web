@@ -40,6 +40,26 @@ export function computeAutoRevealIndex(input: AutoRevealInput): number {
   return Math.max(0, Math.min(input.teamCount, revealed));
 }
 
+/**
+ * Has the team reveal started? Once it has, re-rolling teams or refreshing
+ * their names would change teams the room may already have seen, so both are
+ * locked (server-side in actions.ts, and on the desk) until the reveal is
+ * restarted. Started means any of: a team shown (reveal index above 0),
+ * auto-reveal armed (including waiting for the countdown), or an auto-reveal
+ * start time on record. Never while still collecting entrants.
+ */
+export function isRevealStarted(e: {
+  stage: string;
+  revealIndex: number;
+  autoReveal: boolean;
+  revealStartedAt: string | null;
+}): boolean {
+  if (e.stage === "collecting") return false;
+  return e.revealIndex > 0 || e.autoReveal || e.revealStartedAt !== null;
+}
+
+export const REVEAL_LOCKED_MESSAGE = "Teams are locked because the reveal has started. Restart the reveal to change them.";
+
 export const DEFAULT_REVEAL_INTERVAL_MS = 10_000;
 export const MIN_REVEAL_INTERVAL_MS = 2_000;
 export const MAX_REVEAL_INTERVAL_MS = 60_000;

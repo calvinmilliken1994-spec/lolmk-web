@@ -237,6 +237,30 @@ export interface MayhemEvent {
   reveal_start_on_countdown: boolean;
 }
 
+/** Who did something on the admin desk (getCurrentAdmin() at the time). */
+export interface MayhemActor {
+  discordId: string;
+  name: string;
+}
+
+/**
+ * One row of mayhem_audit_log: every admin action, with the acting admin.
+ * Admin-only (it carries Discord ids); never part of the venue or public reads.
+ */
+export interface MayhemAuditEntry {
+  id: string;
+  event_id: string;
+  at: string;
+  /** e.g. "player.add", "teams.randomize", "reveal.advance", "match.report". */
+  action: string;
+  detail: Record<string, unknown>;
+  actor_discord_id: string;
+  actor_name: string;
+}
+
+/** /api/mayhem/admin-state and the desk's initial props: full state plus the audit log. */
+export type MayhemAdminState = MayhemFull & { audit: MayhemAuditEntry[] };
+
 export interface MayhemFull {
   event: MayhemEvent;
   players: MayhemPlayer[];
