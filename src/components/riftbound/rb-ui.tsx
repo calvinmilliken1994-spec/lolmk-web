@@ -90,7 +90,7 @@ export function RbSegmented<T extends string | number>({
   columns,
 }: {
   label: string;
-  columns: 2 | 4;
+  columns: 2 | 3 | 4;
   options: RbSegmentOption<T>[];
   value: T;
   onChange: (value: T) => void;
@@ -104,7 +104,7 @@ export function RbSegmented<T extends string | number>({
       <div
         role="group"
         aria-labelledby={`seg-${label.replace(/\s+/g, "-").toLowerCase()}`}
-        className={cn("grid gap-1", columns === 2 ? "grid-cols-2" : "grid-cols-4")}
+        className={cn("grid gap-1", columns === 2 ? "grid-cols-2" : columns === 3 ? "grid-cols-3" : "grid-cols-4")}
       >
         {options.map((o) => {
           const selected = o.value === value;

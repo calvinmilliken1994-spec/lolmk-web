@@ -137,8 +137,12 @@ export function BroadcastColumn({
   toolSlot,
   className,
 }: {
-  autoFollow: boolean;
-  onAutoFollowChange: (next: boolean) => void;
+  autoFollow?: boolean;
+  /**
+   * Omit when the tool defines no auto-follow rules (Mayhem, for now): the
+   * Auto-follow checkbox is then hidden rather than shown doing nothing.
+   */
+  onAutoFollowChange?: (next: boolean) => void;
   preview: ReactNode;
   program: ReactNode;
   scenes: BroadcastScene[];
@@ -154,17 +158,19 @@ export function BroadcastColumn({
     <aside aria-label="Broadcast" className={cn("flex min-w-0 flex-auto flex-col gap-3.5 bg-deck-rail p-4", className)}>
       <div className="flex items-center justify-between">
         <DeckKicker>BROADCAST</DeckKicker>
-        <label className="flex items-center gap-2 text-[12px] text-ink-secondary">
-          <input
-            type="checkbox"
-            checked={autoFollow}
-            disabled={pending}
-            onChange={(e) => onAutoFollowChange(e.target.checked)}
-            // UA checkbox margins (3px, 4px left), which preflight strips.
-            className="m-[3px] ml-1 h-4 w-4 accent-brand-blue-bright"
-          />
-          Auto-follow
-        </label>
+        {onAutoFollowChange && (
+          <label className="flex items-center gap-2 text-[12px] text-ink-secondary">
+            <input
+              type="checkbox"
+              checked={autoFollow ?? false}
+              disabled={pending}
+              onChange={(e) => onAutoFollowChange(e.target.checked)}
+              // UA checkbox margins (3px, 4px left), which preflight strips.
+              className="m-[3px] ml-1 h-4 w-4 accent-brand-blue-bright"
+            />
+            Auto-follow
+          </label>
+        )}
       </div>
       {preview}
       <TakeButton disabled={pending || !previewId || previewId === programId} onTake={onTake} />
