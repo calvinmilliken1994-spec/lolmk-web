@@ -265,6 +265,7 @@ export async function clearAllPlayers() {
     await client.query(
       `UPDATE mayhem_events
        SET stage = 'collecting', scene = 'idle', reveal_index = 0,
+           auto_reveal = false, reveal_started_at = NULL, reveal_start_on_countdown = false,
            active_match_id = NULL, champion_team_id = NULL, countdown_ends_at = NULL,
            registration_open = false, registration_generation = registration_generation + 1
        WHERE id = $1`,
@@ -1296,7 +1297,11 @@ export async function randomizeTeams() {
 
     await client.query(
       `UPDATE mayhem_events
-       SET stage = 'randomized', scene = 'reveal', reveal_index = 0, registration_open = false
+       SET stage = 'randomized', scene = 'reveal', reveal_index = 0, registration_open = false,
+           -- A fresh team set starts unrevealed. Without clearing these, a
+           -- reveal_started_at left over from an earlier auto-reveal makes
+           -- getMayhemFull() derive every new team as already revealed.
+           auto_reveal = false, reveal_started_at = NULL, reveal_start_on_countdown = false
        WHERE id = $1`,
       [SINGLETON_EVENT_ID],
     );
@@ -1378,7 +1383,11 @@ export async function finalizePremadeTeams() {
 
     await client.query(
       `UPDATE mayhem_events
-       SET stage = 'randomized', scene = 'reveal', reveal_index = 0, registration_open = false
+       SET stage = 'randomized', scene = 'reveal', reveal_index = 0, registration_open = false,
+           -- A fresh team set starts unrevealed. Without clearing these, a
+           -- reveal_started_at left over from an earlier auto-reveal makes
+           -- getMayhemFull() derive every new team as already revealed.
+           auto_reveal = false, reveal_started_at = NULL, reveal_start_on_countdown = false
        WHERE id = $1`,
       [SINGLETON_EVENT_ID],
     );
