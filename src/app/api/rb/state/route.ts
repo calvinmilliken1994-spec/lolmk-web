@@ -35,5 +35,5 @@ export async function GET(req: Request) {
   }
   const full = await getTournamentFull(slug);
   const standings = full ? computeRbStandings(full) : [];
-  return NextResponse.json({ ...data, standings }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ...data, standings, serverNow: Date.now() }, { headers: { "Cache-Control": "no-store" } });
 }

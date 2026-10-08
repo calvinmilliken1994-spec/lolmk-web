@@ -18,7 +18,7 @@ import { rbAutoFollowNext } from "./rb-round-model";
  * Flip to true when the venue screen (/rblive/[slug]) exists. Until then both
  * monitors show a placeholder instead of an iframe that would 404.
  */
-export const RB_VENUE_SCREEN_READY = false;
+export const RB_VENUE_SCREEN_READY = true;
 
 /** The "Announcement" scene in the design has no stored scene id yet (see RbScene), so it can't be taken. */
 const ANNOUNCEMENT = "announcement";

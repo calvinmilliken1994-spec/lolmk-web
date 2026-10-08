@@ -265,3 +265,55 @@ The brief gave no task number; 7 follows Task 6 and the venue screen is task 8 (
 - The Next dev overlay badge sits over the bottom-left of the phone screen in dev (it covers part of "+ Extension"); production has none.
 - No table-sheet-style "undo" on the floor: a wrong submitted result is undone from the desk.
 - Only the latest running Swiss round is shown; top-cut matches aren't on the floor (`reportTopCutResult` exists).
+
+## Task 8 — Riftbound venue screen (`/rblive/[slug]`)
+
+Numbered 8 as Tasks 6 and 7 anticipated; the brief gave no number.
+
+**Built**
+
+- `/rblive/[slug]` (`page.tsx`, noindex, no auth: public data only). `RbVenueScreen` polls `/api/rb/state` every 2s, like `SrLiveScreen`: a 404 shows "Not live yet", any other failure keeps the last good scene. A scene change fades out and in over 200ms (instant under reduced motion).
+- `VenueFrame`: a fixed 1920×1080 stage scaled to fit the window with `min(w/1920, h/1080)`, centred and letterboxed. In the desk's 1920×1080 iframes the scale is 1; `LiveFrame` then shrinks the iframe, as with SR.
+- Clock: `/api/rb/state` now also returns `serverNow`. The screen keeps its offset from the server's clock and computes everything from `clockRemainingMs`, so a skewed venue PC still shows the right time. No countdown is stored.
+- Scenes (`rb-venue-scenes.tsx`, logic in `rb-venue-model.ts`):
+  - `pairings`: one row per player, alphabetical (case-insensitive), "vs <opponent>" and the table number in the blue box; byes show "Bye". 3 columns × 11 rows = 33 per page, columns fill top to bottom, auto-page every 12s with "PAGE n / m" when there are more.
+  - `pairings_clock`: the same with "TIME REMAINING" and the clock in the header.
+  - `clock`: the round pill ("ROUND 3 OF 5", "TOP CUT ROUND n"), the 460px clock, PAUSED when paused, "SWISS · BEST OF n", and the round rail (every Swiss round plus "TOP n" when a cut is planned; done rounds full blue, the running round red and filled by clock progress). Background: `riftboundcardback-tile.png` tiled and rotated like the timer's `TimerBackground`, at 5% opacity.
+  - **Time called** (`time-called`): drawn when the stored scene is `pairings_clock` or `clock` and the running Swiss round's clock has hit zero. Nothing is written. Pausing, an adjusted clock, an unstarted clock and a closed round all keep the normal scene. It lists pending tables that are out of time and, underneath, "Table N has +M:SS extension" for pending tables still running on an extension.
+  - `standings`: top 16 as 8 + 8. Mid-event: "STANDINGS", "After round n of m", left header "1 – 8" with no cut header. Once every Swiss round is closed: "FINAL SWISS STANDINGS" and the left header becomes "TOP X · ADVANCING" in red with red ranks for the cut (X from `resolveTopCutSize`; none for tiny fields).
+  - `idle`, `starting_soon`, `announcement`: left copy over the slabs and the logo at right, taken from `venue-champion.html`'s layout.
+  - `champion` and `top_cut` (see Deviations).
+- `?scene=<id>&preview=1` overrides the scene on the client only. Nothing on the page can write: the only network calls are GETs of `/api/rb/state`. Unknown scene ids are ignored. `?text=` feeds the announcement and `?at=<ISO time>` the starting-soon countdown (both only used with `?scene=`).
+- `RB_VENUE_SCREEN_READY` is now true in `rb-broadcast.tsx`, so the Task 6 desk's Preview and Program monitors load `/rblive/<slug>?scene=<id>&preview=1` and `/rblive/<slug>`.
+- `scripts/test-rb-venue.ts`: 74 checks (scene choice and derived time-called, rounds, alphabetical paging, the rail, time-called tables and extensions, the standings split and cut header).
+
+**Verified**
+
+- `tsc --noEmit` clean. No lint messages in any new or changed file (`npm run lint` still fails on 22 old errors elsewhere, so `next build` still stops at lint). `test-rb-venue` (74), `test-rb-floor` (103), `test-rb-round` (96), `test-rb-setup` (79), `test-rb-clock` (74) pass.
+- At 1920×1080 in Chrome, the real route with `/api/rb/state` answered by a script (no database here), each scene was compared with its reference:
+  - Pairings (clock) and Time called: every text element within the first 60 matches the reference's position and height (0 differences over 3px).
+  - Clock: checked by eye against the PNG, plus the rail's positions (the automatic comparison was shifted by the reference's "Background:" footnote, which I dropped, so its header numbers aren't usable). Standings: checked by eye against the PNG. Header, both column headers, row positions and rank colours match; the deck line under each name is missing (see Deviations).
+  - Idle, starting soon, announcement, champion and a 50-player pairings page (page indicator showing) were looked at; no clipping.
+- Scaling: 1280×720 fills the window (scale 0.667); 1000×1000 letterboxes top and bottom.
+- Polling: a 500 keeps the clock scene; a 404 shows "Not live yet"; the next good answer brings the scene back.
+- The Task 6 iframes were **not** exercised against the desk. I only confirmed that the URLs `rb-broadcast.tsx` builds (`/rblive/<slug>?scene=<id>&preview=1`, `/rblive/<slug>`) are what the page serves. The desk harness from Task 6 was deleted, so the desk Preview/Program were not opened in a browser.
+
+**Deviations and why**
+
+- **No deck line** under standings names: the reference shows a legend ("Jinx", "Annie"), which is private by the public projection rule, so it isn't in `/api/rb/state`. Names are vertically centred instead.
+- **Standings dummy data**: tiebreaker percentages come from the real standings; the sample values in the reference are fake.
+- **Clock background** is a rotated, 5%-opacity tile like the timer (the asset is the League card back), not the diagonal stand-in lines.
+- **`top_cut` shows the standings** and **`champion`** is a simple version (name, "CHAMPION", logo, "N PLAYERS · M ROUNDS · TOP X"). The brief didn't list them but the stored scene can be set to them, and a blank screen on TAKE would be worse. The bracket (`venue-top8.html`) and the champion's final score, Swiss and playoff records are not built; they need top-cut match data this screen doesn't read yet.
+- **`starting_soon` and `announcement`** aren't in `RbScene` (Task 6 already marks the announcement scene unavailable), so the program can't select them and the stored scene never shows them; they're reachable only through `?scene=`. Starting soon needs `&at=<ISO>`; without it only the title shows. They use the champion reference's layout, because they have no reference of their own. I first tried SR-style centred text, which collided with the slabs.
+- **Time-called**: tables on an extension are in the footnote only, as in the reference (table 6 isn't in the list). With more than 8 pending tables the squares shrink (4 columns, then 6 above 16) so the list stays on the screen. The three rules are fixed text.
+- **Muted**: the SR screen's `?muted=1` exists to silence lock-in cues. The Riftbound screen has no audio, so there is no sound button and nothing to mute; `muted` is ignored.
+- Logo is `/logo.svg` (the SR screens' logo) rather than the references' `logo.png`.
+- `serverNow` was added to a public route (the number is harmless; the floor's equivalent was added in Task 7).
+
+**Known issues / TODO**
+
+- The pairings page shows the **stored** current round only: the latest running Swiss round, else the latest Swiss round. The top-cut bracket scene is still to be built.
+- `Time called` is round-level. A table that was extended is only listed once its own time runs out; there is no separate tone for "extension running".
+- The paging timer restarts when the number of pages changes, and pages are not synchronised across screens (each display pages on its own).
+- Not tested on a real venue display, with real data from Postgres, or with the desk open; fonts load through next/font as on the other live screens (the references use the same families).
+- The dev overlay's hydration warning on `<html>` also appears on `/srlive/*`; it is in the root layout, not this page.
