@@ -17,6 +17,8 @@
 // Enumerations
 // ---------------------------------------------------------------------------
 
+import type { AuditActorKind } from "./audit-actor";
+
 export type RbTournamentStatus =
   | "draft" // admin workspace, never public
   | "registration" // players being added / checked in, publicly viewable
@@ -334,6 +336,8 @@ export type RbAuditAction =
 export interface RbActor {
   discordId: string;
   name: string;
+  /** Who is acting; "admin" when omitted (every Riftbound write today is a desk or judge admin). */
+  kind?: AuditActorKind;
 }
 
 export interface RbAuditLogEntry {
@@ -343,6 +347,8 @@ export interface RbAuditLogEntry {
   detail: Record<string, unknown> | null;
   actor_discord_id: string;
   actor_name: string;
+  /** Null on rows written before actor_kind existed. */
+  actor_kind: AuditActorKind | null;
   created_at: string;
 }
 

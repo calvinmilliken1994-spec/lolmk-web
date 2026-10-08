@@ -161,7 +161,10 @@ export function ActivityLog({
         {sorted.map((entry) => (
           <div key={entry.id} className="flex min-h-7 items-center gap-3 text-[13px]">
             <span className="w-11 shrink-0 font-mono text-[12px] text-ink-muted">{TIME_FORMAT.format(toMs(entry.at))}</span>
-            <span className="w-[52px] shrink-0 truncate text-ink-secondary">{entry.actor}</span>
+            {/* Wide enough for "Name (admin)" / "Name (captain)"; the reference's 52px only fit a bare name. */}
+            <span title={entry.actor} className="w-[132px] shrink-0 truncate text-ink-secondary">
+              {entry.actor}
+            </span>
             <span className="flex-auto">{entry.text}</span>
             {entry.id === undoId && (
               <button

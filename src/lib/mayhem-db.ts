@@ -1,5 +1,6 @@
 import { sql, type VercelPoolClient } from "@vercel/postgres";
 import { randomUUID } from "node:crypto";
+import { isAuditActorKind } from "@/types/audit-actor";
 import type {
   MayhemActor,
   MayhemAuditEntry,
@@ -203,6 +204,11 @@ export function ensureSchema(): Promise<void> {
         );
       `;
       await sql`CREATE INDEX IF NOT EXISTS mayhem_audit_log_event_at_idx ON mayhem_audit_log (event_id, at DESC);`;
+      // 'admin' or 'member', matching rb_audit_log and sr_audit_log.
+      await sql`
+        ALTER TABLE mayhem_audit_log ADD COLUMN IF NOT EXISTS actor_kind text
+          CONSTRAINT mayhem_audit_actor_kind_check CHECK (actor_kind IN ('admin', 'member'));
+      `;
       // Ensure the singleton event row exists.
       await sql`
         INSERT INTO mayhem_events (id, title, format)
@@ -342,9 +348,17 @@ export async function writeMayhemAudit(
   detail: Record<string, unknown> = {},
   client?: VercelPoolClient,
 ): Promise<void> {
-  const params = [newId("audit"), SINGLETON_EVENT_ID, action, JSON.stringify(detail), actor.discordId, actor.name];
-  const text = `INSERT INTO mayhem_audit_log (id, event_id, action, detail, actor_discord_id, actor_name)
-     VALUES ($1, $2, $3, $4::jsonb, $5, $6)`;
+  const params = [
+    newId("audit"),
+    SINGLETON_EVENT_ID,
+    action,
+    JSON.stringify(detail),
+    actor.discordId,
+    actor.name,
+    actor.kind ?? "admin",
+  ];
+  const text = `INSERT INTO mayhem_audit_log (id, event_id, action, detail, actor_discord_id, actor_name, actor_kind)
+     VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)`;
   if (client) await client.query(text, params);
   else await sql.query(text, params);
 }
@@ -364,6 +378,7 @@ export async function listMayhemAudit(limit = 50): Promise<MayhemAuditEntry[]> {
     detail: (r.detail ?? {}) as Record<string, unknown>,
     actor_discord_id: r.actor_discord_id,
     actor_name: r.actor_name,
+    actor_kind: isAuditActorKind(r.actor_kind) ? r.actor_kind : null,
   }));
 }
 

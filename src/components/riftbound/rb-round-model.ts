@@ -9,6 +9,7 @@
 // Postgres driver and can't be bundled for the client.
 
 import { isTimeCalled, clockRemainingMs } from "../../lib/rb-clock";
+import { formatAuditActor } from "../../types/audit-actor";
 import { validateManualPairings, type Pairing, type SwissWarningCode } from "../../lib/swiss-engine";
 import {
   RB_DESK_FLAG_KINDS,
@@ -531,7 +532,14 @@ export function rbActivity(state: RbDeskState, visible = 4): RbActivityRow[] {
         break;
     }
     if (text === null) continue;
-    rows.push({ id: String(e.id), at: e.created_at, actor: e.actor_name, text, reversible: undo !== null, undo });
+    rows.push({
+      id: String(e.id),
+      at: e.created_at,
+      actor: formatAuditActor(e.actor_name, e.actor_kind),
+      text,
+      reversible: undo !== null,
+      undo,
+    });
   }
   // The reference shows four lines. Show more only when the newest undoable entry is further
   // down, so Undo never disappears behind a burst of newer, non-reversible entries.

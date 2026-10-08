@@ -238,17 +238,17 @@ const statuses = (s: MayhemAdminState) => m.mayhemPhases(s).map((p) => `${p.id}:
   eq(m.mayhemKnockoutSettingsLock(s) !== null, true, "knockout settings locked once seeded");
 
   const audit = [
-    { id: "a1", event_id: "main", at: "2026-10-09T10:00:00Z", action: "match.report", detail: { matchNumber: 2, teamAScore: 1, teamBScore: 2, winnerId: "t3" }, actor_discord_id: "1", actor_name: "calvin" },
-    { id: "a2", event_id: "main", at: "2026-10-09T10:01:00Z", action: "reveal.hide_last", detail: { shown: 2, of: 6 }, actor_discord_id: "1", actor_name: "calvin" },
-    { id: "a3", event_id: "main", at: "2026-10-09T10:02:00Z", action: "teams.randomize", detail: { teams: 6, reroll: true }, actor_discord_id: "2", actor_name: "mj" },
-    { id: "a4", event_id: "main", at: "2026-10-09T10:03:00Z", action: "match.set_active", detail: { matchId: "m4" }, actor_discord_id: "2", actor_name: "mj" },
+    { id: "a1", event_id: "main", at: "2026-10-09T10:00:00Z", action: "match.report", detail: { matchNumber: 2, teamAScore: 1, teamBScore: 2, winnerId: "t3" }, actor_discord_id: "1", actor_name: "calvin", actor_kind: "admin" as const },
+    { id: "a2", event_id: "main", at: "2026-10-09T10:01:00Z", action: "reveal.hide_last", detail: { shown: 2, of: 6 }, actor_discord_id: "1", actor_name: "calvin", actor_kind: "admin" as const },
+    { id: "a3", event_id: "main", at: "2026-10-09T10:02:00Z", action: "teams.randomize", detail: { teams: 6, reroll: true }, actor_discord_id: "2", actor_name: "mj", actor_kind: null },
+    { id: "a4", event_id: "main", at: "2026-10-09T10:03:00Z", action: "match.set_active", detail: { matchId: "m4" }, actor_discord_id: "2", actor_name: "mj", actor_kind: null },
   ];
   const withAudit = { ...s, audit };
   eq(
     m.mayhemActivity(withAudit).map((r) => `${r.actor}: ${r.text}`),
     [
-      "calvin: M2: Team 3 won 2–1",
-      "calvin: Hid the last team (2 of 6 on screen)",
+      "calvin (admin): M2: Team 3 won 2–1",
+      "calvin (admin): Hid the last team (2 of 6 on screen)",
       "mj: Re-rolled teams (6)",
       "mj: Put M4 on screen",
     ],

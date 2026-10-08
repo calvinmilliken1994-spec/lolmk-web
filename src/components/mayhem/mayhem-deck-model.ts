@@ -5,6 +5,7 @@
  * scripts/test-mayhem-deck-model.ts.
  */
 import { isRevealStarted } from "../../lib/mayhem-reveal";
+import { formatAuditActor } from "../../types/audit-actor";
 import type {
   MayhemAdminState,
   MayhemAuditEntry,
@@ -507,5 +508,10 @@ export function mayhemActivityText(s: Pick<MayhemFull, "teams" | "matches">, e: 
 }
 
 export function mayhemActivity(s: MayhemAdminState): MayhemActivityRow[] {
-  return s.audit.map((e) => ({ id: e.id, at: e.at, actor: e.actor_name, text: mayhemActivityText(s, e) }));
+  return s.audit.map((e) => ({
+    id: e.id,
+    at: e.at,
+    actor: formatAuditActor(e.actor_name, e.actor_kind),
+    text: mayhemActivityText(s, e),
+  }));
 }

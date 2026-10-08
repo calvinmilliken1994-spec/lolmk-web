@@ -4,6 +4,8 @@
 // tournaments run same-day at meetups), not the seasonal League tournament
 // system described in assets/TOURNAMENT.md.
 
+import type { AuditActorKind } from "./audit-actor";
+
 export type MayhemScene =
   | "idle"
   | "starting_soon"
@@ -241,6 +243,8 @@ export interface MayhemEvent {
 export interface MayhemActor {
   discordId: string;
   name: string;
+  /** "admin" when omitted: every Mayhem audit write today is a desk action. */
+  kind?: AuditActorKind;
 }
 
 /**
@@ -256,6 +260,8 @@ export interface MayhemAuditEntry {
   detail: Record<string, unknown>;
   actor_discord_id: string;
   actor_name: string;
+  /** Null on rows written before actor_kind existed. */
+  actor_kind: AuditActorKind | null;
 }
 
 /** /api/mayhem/admin-state and the desk's initial props: full state plus the audit log. */

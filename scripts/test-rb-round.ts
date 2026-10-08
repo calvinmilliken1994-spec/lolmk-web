@@ -112,6 +112,7 @@ const audit = (action: RbAuditAction, detail: Record<string, unknown>, actor = "
   detail,
   actor_discord_id: "9",
   actor_name: actor,
+  actor_kind: null,
   created_at: iso(at),
 });
 

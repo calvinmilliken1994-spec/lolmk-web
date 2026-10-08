@@ -1,5 +1,6 @@
 import { sql, type VercelPoolClient } from "@vercel/postgres";
 import { randomUUID } from "node:crypto";
+import { isAuditActorKind } from "../types/audit-actor";
 import type {
   RbActor,
   RbAuditAction,
@@ -219,6 +220,12 @@ export function ensureSchema(): Promise<void> {
         `);
         await client.query(
           `CREATE INDEX IF NOT EXISTS rb_audit_log_tournament_idx ON rb_audit_log (tournament_id, created_at DESC)`,
+        );
+        // Who acted: 'admin' (desk/judge) or 'member'. Same column on
+        // mayhem_audit_log and sr_audit_log; null on older rows.
+        await client.query(
+          `ALTER TABLE rb_audit_log ADD COLUMN IF NOT EXISTS actor_kind text
+             CONSTRAINT rb_audit_actor_kind_check CHECK (actor_kind IN ('admin', 'member'))`,
         );
 
         // Champion must be a player of THIS tournament. Added after both
@@ -522,9 +529,9 @@ export async function writeAudit(
   }
   const db: Queryable = client ?? sql;
   await db.query(
-    `INSERT INTO rb_audit_log (tournament_id, action, detail, actor_discord_id, actor_name)
-     VALUES ($1, $2, $3::jsonb, $4, $5)`,
-    [tournamentId, action, detail ? JSON.stringify(detail) : null, actor.discordId, actor.name],
+    `INSERT INTO rb_audit_log (tournament_id, action, detail, actor_discord_id, actor_name, actor_kind)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6)`,
+    [tournamentId, action, detail ? JSON.stringify(detail) : null, actor.discordId, actor.name, actor.kind ?? "admin"],
   );
 }
 
@@ -543,6 +550,7 @@ export async function listAudit(tournamentId: string, limit?: number): Promise<R
     detail: (r.detail as Record<string, unknown>) ?? null,
     actor_discord_id: r.actor_discord_id as string,
     actor_name: r.actor_name as string,
+    actor_kind: isAuditActorKind(r.actor_kind) ? r.actor_kind : null,
     created_at: iso(r.created_at),
   }));
 }
