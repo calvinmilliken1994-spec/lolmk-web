@@ -10,6 +10,7 @@ import {
   VenueStandings,
   VenueStartingSoon,
   VenueTimeCalled,
+  VenueTopCut,
 } from "./rb-venue-scenes";
 import { rbRenderScene, rbVenueOffset, type RbVenueData, type RbVenueScene } from "./rb-venue-model";
 
@@ -171,7 +172,8 @@ function Scene({ data, now, options }: { data: RbVenueData; now: number; options
       {shown === "pairings_clock" && <VenuePairings data={data} now={now} withClock />}
       {shown === "clock" && <VenueClock data={data} now={now} />}
       {shown === "time-called" && <VenueTimeCalled data={data} now={now} />}
-      {(shown === "standings" || shown === "top_cut") && <VenueStandings data={data} />}
+      {shown === "standings" && <VenueStandings data={data} />}
+      {shown === "top_cut" && <VenueTopCut data={data} />}
       {shown === "champion" && <VenueChampion data={data} />}
       {shown === "idle" && <VenueIdle data={data} />}
       {shown === "starting_soon" && <VenueStartingSoon data={data} at={options.at} now={now} />}

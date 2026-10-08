@@ -189,6 +189,8 @@ export function ensureSchema(): Promise<void> {
               FOREIGN KEY (tournament_id, player_b) REFERENCES rb_players (tournament_id, id) ON DELETE RESTRICT
           );
         `);
+        // Added after the first release: idempotent, and runs for fresh tables too.
+        await client.query(`ALTER TABLE rb_matches ADD COLUMN IF NOT EXISTS started_at timestamptz`);
         await client.query(
           `CREATE INDEX IF NOT EXISTS rb_matches_tournament_idx ON rb_matches (tournament_id)`,
         );
@@ -339,6 +341,7 @@ export function rowToMatch(row: Record<string, unknown>): RbMatch {
     games_drawn: Number(row.games_drawn),
     decided_on_time: Boolean(row.decided_on_time),
     extension_ms: Number(row.extension_ms ?? 0),
+    started_at: isoOrNull(row.started_at),
     status: row.status as RbMatch["status"],
     reported_by_id: (row.reported_by_id as string) ?? null,
     reported_by_name: (row.reported_by_name as string) ?? null,
@@ -588,6 +591,21 @@ export async function getTournamentFull(slug: string): Promise<RbTournamentFull 
   return loadFull(rows[0]);
 }
 
+/**
+ * Completed (or archived) events that have a champion, newest first, loaded in
+ * full. Feeds the Hall of Champions the way SR's completed tournaments do:
+ * completeEvent writes status + champion_player_id, and nothing else is stored.
+ */
+export async function listChampionEvents(): Promise<RbTournamentFull[]> {
+  await ensureSchema();
+  const { rows } = await sql.query(
+    `SELECT * FROM rb_tournaments
+     WHERE status IN ('completed', 'archived') AND champion_player_id IS NOT NULL
+     ORDER BY updated_at DESC`,
+  );
+  return Promise.all(rows.map((r) => loadFull(r)));
+}
+
 // ---------------------------------------------------------------------------
 // Public projection
 // ---------------------------------------------------------------------------
@@ -647,6 +665,7 @@ export function toPublicMatch(m: RbMatch): RbPublicMatch {
     games_drawn: m.games_drawn,
     decided_on_time: m.decided_on_time,
     extension_ms: m.extension_ms,
+    started_at: m.started_at,
     status: m.status,
   };
 }

@@ -7,6 +7,7 @@ import { rbActions, type RbActions } from "./rb-actions";
 import { RbBroadcast } from "./rb-broadcast";
 import { RbCheckinWorkspace } from "./rb-checkin-workspace";
 import { RbClockSheet } from "./rb-clock-sheet";
+import { RbCutWorkspace } from "./rb-cut-workspace";
 import { makeRbDeckDefinition, RbPhasePlaceholder } from "./rb-deck-definition";
 import {
   RB_SCENE_LABEL,
@@ -22,8 +23,8 @@ import { RbSetupWorkspace } from "./rb-setup-workspace";
 /**
  * The Riftbound desk page body: DeckShell with the Riftbound DeckDefinition,
  * polling /api/rb/admin-state. Setup and Check-in have their own workspaces,
- * Swiss rounds is the round desk, and the remaining phases show
- * RbPhasePlaceholder.
+ * Swiss rounds is the round desk, Top cut is the match queue, and
+ * Complete shows RbPhasePlaceholder.
  *
  * `actions` and `stateUrl` default to the real server actions and the
  * admin-state route; a test page can pass its own.
@@ -80,6 +81,8 @@ export function RbDesk({
       <RbCheckinWorkspace state={state} run={run} pending={pending} />
     ) : selected === "swiss" ? (
       <RbRoundWorkspace state={state} run={run} pending={pending} error={error} now={now} actions={actions} />
+    ) : selected === "top_cut" ? (
+      <RbCutWorkspace state={state} run={run} pending={pending} error={error} actions={actions} />
     ) : (
       <RbPhasePlaceholder state={state} phaseId={selected} />
     );

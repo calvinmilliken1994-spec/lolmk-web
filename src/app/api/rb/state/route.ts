@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPublicTournament, getTournamentFull } from "@/lib/rb-db";
+import { rbChampionSummary } from "@/lib/rb-cut";
 import { computeRbStandings } from "@/lib/rb-service";
 
 export const dynamic = "force-dynamic";
@@ -35,5 +36,7 @@ export async function GET(req: Request) {
   }
   const full = await getTournamentFull(slug);
   const standings = full ? computeRbStandings(full) : [];
-  return NextResponse.json({ ...data, standings, serverNow: Date.now() }, { headers: { "Cache-Control": "no-store" } });
+  // The champion's Legend, seed and records are only published once the event is over.
+  const champion = full ? rbChampionSummary(full, standings) : null;
+  return NextResponse.json({ ...data, standings, champion, serverNow: Date.now() }, { headers: { "Cache-Control": "no-store" } });
 }

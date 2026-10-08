@@ -247,6 +247,7 @@ const mkMatch = (over: Partial<RbMatch>): RbMatch => ({
   games_drawn: 0,
   decided_on_time: false,
   extension_ms: 5 * MIN,
+  started_at: null,
   status: "completed",
   reported_by_id: "999",
   reported_by_name: "Judge Judy",

@@ -83,6 +83,7 @@ function match(r: number, table: number, a: number, b: number | null, over: Part
     games_drawn: 0,
     decided_on_time: false,
     extension_ms: 0,
+    started_at: null,
     status,
     reported_by_id: null,
     reported_by_name: null,
@@ -311,7 +312,7 @@ eq(model.rbResultForKey(1, "s"), null, "Bo1 has no 2–1");
   eq(table2.text, "Table 2 · Calder wins 2–1 · Dami drops after round", "report line carries the drop (reference style)");
   eq(rows.filter((r) => r.text.includes("drops after round 3")).length, 0, "the via-report drop isn't a second line");
   eq(table2.reversible, true, "newest report is reversible");
-  eq(JSON.stringify(table2.undo), JSON.stringify({ kind: "report", matchId: "m3-2", dropPlayerIds: ["p3"] }), "undoing a report also undoes its drops");
+  eq(JSON.stringify(table2.undo), JSON.stringify({ kind: "report", matchId: "m3-2", stage: "swiss", dropPlayerIds: ["p3"] }), "undoing a report also undoes its drops");
   eq(rows.find((r) => r.text.startsWith("Table 1"))!.reversible, true, "an older report is reversible on its own");
   eq(rows.find((r) => r.text === "Round 3 published")!.reversible, false, "publish isn't reversible once results exist");
   eq(rows.find((r) => r.text === "Round 3 clock started")!.reversible, false, "clock start has no undo");
@@ -379,7 +380,7 @@ eq(model.rbResultForKey(1, "s"), null, "Bo1 has no 2–1");
   eq(names(noCut), "Event completed → Champion", "no cut: only the champion is left");
   eq(names(state({ status: "completed", rounds: [round(1, "closed")] })), "", "nothing after completion");
   const final = round(7, "live", { stage: "top_cut", duration_ms: null });
-  eq(names(state({ rounds: [round(1, "closed"), final], matches: [match(7, 1, 0, 1)] })), "Round closed → Standings | Event completed → Champion", "final: no timer, then the champion");
+  eq(names(state({ rounds: [round(1, "closed"), final], matches: [match(7, 1, 0, 1)] })), "Round closed → Top-cut bracket | Event completed → Champion", "final: no timer, the bracket stays up, then the champion");
   eq(model.rbAutoFollowNext(state({ rounds: [] }), null).length, 2, "no round yet still lists two steps");
 }
 

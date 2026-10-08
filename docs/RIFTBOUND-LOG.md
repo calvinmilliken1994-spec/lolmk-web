@@ -317,3 +317,46 @@ Numbered 8 as Tasks 6 and 7 anticipated; the brief gave no number.
 - The paging timer restarts when the number of pages changes, and pages are not synchronised across screens (each display pages on its own).
 - Not tested on a real venue display, with real data from Postgres, or with the desk open; fonts load through next/font as on the other live screens (the references use the same families).
 - The dev overlay's hydration warning on `<html>` also appears on `/srlive/*`; it is in the root layout, not this page.
+
+## Task 9 — Top cut: desk workspace, venue bracket and champion scenes, Hall of Champions
+
+**Built**
+
+- `src/lib/rb-cut.ts` (pure): `replayTopCut` (moved here from `rb-service.ts`, which re-exports it), `rbCutView` (the bracket as absolutely positioned cards and connector lines, in the pixels of `venue-top8.html`: cards 460 wide, 70px rows, level-0 cards 200 apart, columns 600 apart for a top 8 and 800 for a top 4), `rbChampionSummary` (name, Legend, seed, final score, Swiss record, playoff record) and `rbChampionRecord` (the Hall of Champions row).
+- Desk, Top cut phase: `rb-cut-model.ts` + `rb-cut-workspace.tsx`. Match queue of the current cut round, each table with Start match / Report result (the existing `ScorePad`, Bo3 or Bo1, no draws), no clock; reported list; scaled bracket; earlier rounds; activity log. "Undo latest result" (top of the workspace) clears the newest result of an open round. The primary action was already there from Task 6 (Publish → Close → Pair → "Complete event" once the final has a result).
+- Venue: `VenueTopCut` (`rb-bracket.tsx` draws the cards: higher seed first, seed cell, name, Swiss record, score; losers and empty seats dimmed; red border plus a LIVE tag on a started, unreported table; supports 4 and 8; a top 2 or an unreadable cut falls back to standings) and a full `VenueChampion` (name, Legend · Seed, FINAL score and opponent, SWISS, PLAYOFFS, "N PLAYERS · M ROUNDS · TOP X").
+- "Started" state: `rb_matches.started_at` (nullable), set by the new `setMatchStarted` operation (audit `match.start` / `match.unstart`). Display only: it never blocks a result. Added to `RbMatch`, the public match, the pg store, and an idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `ensureSchema`. Only top-cut tables in a running round that have no result can be marked.
+- `/api/rb/state` now also returns `champion` (summary), which is null until the event is completed.
+- `completeEvent` already stored `status = completed` and `champion_player_id` (and followed the scene to champion). That is what SR does as well (its Hall reads completed tournaments back), so nothing extra is written: `getRiftboundChampions` in `champions.ts` reads completed Riftbound events (`listChampionEvents` in `rb-db.ts`) and `getChampions` merges them with the SR and legacy rows. A failing lookup returns no rows, the same as the SR lookup.
+- Auto-follow: publishing or closing a top-cut round keeps the program on `top_cut` (it was Pairings / Standings, which are wrong for a bracket); the desk's "Auto-follow next" panel and `rbAutoFollow` say the same.
+- Tests: `scripts/test-rb-cut.ts` (148 checks: a 4-player and an 8-player cut played to a champion through the real operations, LIVE tag, undo, seeds, bracket positions, winners/losers, summary, Hall row). The in-memory store was moved out of `test-rb-scenario.ts` to `scripts/rb-memory-store.ts` so both can use it.
+
+**Verified**
+
+- `tsc --noEmit` clean; no lint messages in any new or changed file (`npm run lint` still fails on the 22 old errors elsewhere). All seven `scripts/test-rb-*.ts` suites pass (cut 148, round 96, setup 79, clock 74, floor 103, venue 74, scenario 1003).
+- In Chrome at 1920×1080 against a temporary harness (real `rb-service` over the in-memory store, desk and venue in a browser, since deleted): a 4-player and an 8-player cut were each played on the desk from "Cut to Top N" to "Complete event" by clicking only (publish, mark live, report through the ScorePad, undo and re-report the newest result, close, pair, complete): 25 and 34 checks, no page errors. The venue showed the LIVE tag on exactly the started table, and a champion with Legend, seed, final score, Swiss and playoff records.
+- `top_cut` and `champion` were compared with `venue-top8.png` and `venue-champion.png` by eye (header, labels, card positions, connector lines, dimming, slabs, text positions). Not a pixel diff: the data differs from the reference's.
+
+**Deviations and why**
+
+- LIVE tag says "LIVE", not "LIVE · GAME 2": games in progress aren't recorded, only the result.
+- Logo is `/logo.svg` (as Task 8), not the reference's `logo.png`, so the artwork differs slightly.
+- A top 4 uses a 800px column pitch (the reference only shows a top 8) so the bracket fills the stage.
+- Bye cards (only if a player dropped after the cut) show "Bye"; the player who advances is shown on the next card.
+- The Hall row's date is the tournament's `updated_at`; the runner-up is the other finalist.
+
+**Decisions**
+
+- Task number 9 follows Task 8 (the brief gave none).
+- "Started" is stored on the match (`started_at`), not derived, because nothing else says a table is in play; it is display-only so it can never block a result.
+- The Hall of Champions reads completed events back (SR's pattern) instead of a separate champions write, so there is one source of truth and nothing to keep in sync.
+- The Hall mapping lives in `rb-cut.ts` (not `champions.ts`) because `champions.ts` uses `@/` imports the Node test scripts can't load.
+- The Legend is public only through the champion summary, and only once the event is completed.
+- `replayTopCut` moved to `rb-cut.ts` so the desk, venue and service share one bracket; `rb-service.ts` re-exports it.
+- The in-memory store moved to `scripts/rb-memory-store.ts` so two test scripts share it.
+
+**Known issues / TODO**
+
+- Not verified: the SQL (the new column, `listChampionEvents`, the insert) against a real Postgres; the Hall of Champions rendered with a Riftbound row (the mapping is tested, the page wasn't opened); the desk's Preview/Program iframes (still the Task 6/8 gap; the harness has no `/rblive` database behind it).
+- Undo works on any result while the round is open (service rule); "Undo latest result" is just the shortcut for the newest.
+- The Legend appears on the venue champion scene only after completion.

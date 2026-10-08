@@ -12,9 +12,15 @@ import type {
   RbScene,
 } from "../../types/riftbound";
 import { clockRemainingMs, isTimeCalled } from "../../lib/rb-clock";
+import { rbCutView, type CutView, type RbChampionSummary } from "../../lib/rb-cut";
 import { resolveRoundCount, resolveTopCutSize, type SwissStanding } from "../../lib/swiss-engine";
 
-export type RbVenueData = RbPublicTournamentFull & { standings: SwissStanding[]; serverNow?: number };
+export type RbVenueData = RbPublicTournamentFull & {
+  standings: SwissStanding[];
+  /** Set once the event is completed: the winner with Legend, seed and records. */
+  champion?: RbChampionSummary | null;
+  serverNow?: number;
+};
 
 /** Everything the screen can draw. The last two exist only as `?scene=` overrides. */
 export type RbVenueScene = RbScene | "time-called" | "starting_soon" | "announcement";
@@ -234,6 +240,24 @@ export function rbTimeCalled(
 export function rbExtensionLine(e: { table: number; ms: number }): string {
   const total = Math.round(e.ms / 1000);
   return `Table ${e.table} has +${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")} extension`;
+}
+
+// ---------------------------------------------------------------------------
+// Top cut
+// ---------------------------------------------------------------------------
+
+/** The bracket for the venue, or null when no cut has been made (the scene then shows standings). */
+export function rbVenueCut(data: RbVenueData): CutView | null {
+  const seeds = data.tournament.config.topCutSeedIds;
+  if (!seeds || seeds.length < 2) return null;
+  const names = new Map(data.players.map((p) => [p.id, p.display_name]));
+  const records = new Map(data.standings.map((s) => [s.playerId, s.record]));
+  try {
+    return rbCutView(seeds, data.tournament.config.bestOf, data.rounds, data.matches, names, records);
+  } catch {
+    // A round that doesn't fit the bracket (should not happen): show standings rather than nothing.
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------

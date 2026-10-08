@@ -9,7 +9,6 @@ import { clockRemainingMs } from "../../lib/rb-clock";
 import {
   PAGE_MS,
   rbAdvances,
-  rbCutSize,
   rbExtensionLine,
   rbPageCount,
   rbPairingColumns,
@@ -17,11 +16,13 @@ import {
   rbRail,
   rbSwissTotal,
   rbTimeCalled,
+  rbVenueCut,
   rbVenueRound,
   rbVenueStandings,
   type RbStandingRow,
   type RbVenueData,
 } from "./rb-venue-model";
+import { RbBracket } from "./rb-bracket";
 import { formatClock } from "./rb-round-model";
 
 const BG = "#0A0E1A";
@@ -447,11 +448,67 @@ export function VenueAnnouncement({ data, text }: { data: RbVenueData; text: str
   );
 }
 
+// ---------------------------------------------------------------------------
+// Top cut bracket
+// ---------------------------------------------------------------------------
+
+export function VenueTopCut({ data }: { data: RbVenueData }) {
+  const view = rbVenueCut(data);
+  if (!view) return <VenueStandings data={data} />;
+  return (
+    <div className="relative flex h-full w-full flex-col overflow-hidden" style={{ background: BG, padding: "48px 72px", gap: 24 }}>
+      <Slab style={{ right: -260, top: -100, width: 620, height: 1300, background: "#10162A" }} />
+      <header className="relative flex items-center" style={{ gap: 24 }}>
+        <span className="flex justify-center" style={{ width: 119 }}>
+          <Logo size={105} />
+        </span>
+        <div className="flex flex-col">
+          <span className="font-heading font-semibold" style={{ fontSize: 22, letterSpacing: "0.12em", color: MUTED }}>
+            {eventLabel(data.tournament.name)}
+          </span>
+          <span className="font-display" style={{ fontSize: 88, lineHeight: 0.85 }}>
+            TOP {view.size}
+          </span>
+        </div>
+      </header>
+      <div className="relative flex font-display" style={{ fontSize: 34, letterSpacing: "0.08em", color: DIM, marginBottom: 8 }}>
+        {view.labels.map((l) => (
+          <span key={l.text} style={{ width: l.width }}>
+            {l.text}
+          </span>
+        ))}
+      </div>
+      <div className="relative">
+        <RbBracket view={view} />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Champion
+// ---------------------------------------------------------------------------
+
+const STAT_LABEL: React.CSSProperties = { fontSize: 18, color: DIM };
+
 export function VenueChampion({ data }: { data: RbVenueData }) {
-  const champ = data.players.find((p) => p.id === data.tournament.champion_player_id);
-  const cut = rbCutSize(data);
-  const players = data.players.filter((p) => p.status === "active" || p.status === "dropped").length;
-  const swiss = data.rounds.filter((r) => r.stage === "swiss").length;
+  const summary = data.champion ?? null;
+  const fallback = data.players.find((p) => p.id === data.tournament.champion_player_id);
+  const name = (summary?.name ?? fallback?.display_name ?? "TBD").toUpperCase();
+  const size = Math.min(300, Math.floor(2000 / Math.max(1, name.length)));
+  const sub = [summary?.legend, summary?.seed ? `Seed ${summary.seed}` : null].filter(Boolean).join(" · ");
+  const stats: { label: string; value: string }[] = [];
+  if (summary?.finalFor !== null && summary?.finalFor !== undefined && summary.finalAgainst !== null) {
+    stats.push({
+      label: "FINAL",
+      value: `${summary.finalFor} – ${summary.finalAgainst}${summary.finalOpponent ? ` ${summary.finalOpponent.toUpperCase()}` : ""}`,
+    });
+  }
+  if (summary?.swissRecord) stats.push({ label: "SWISS", value: summary.swissRecord });
+  if (summary?.playoffRecord) stats.push({ label: "PLAYOFFS", value: summary.playoffRecord });
+  const foot = summary
+    ? `${summary.players} PLAYERS · ${summary.swissRounds} ROUNDS${summary.cutSize > 0 ? ` · TOP ${summary.cutSize}` : ""}`
+    : "";
   return (
     <div className="relative flex h-full w-full items-center overflow-hidden" style={{ background: BG }}>
       <Slab style={{ left: 980, top: -100, width: 1300, height: 1300, background: "#10162A" }} />
@@ -464,15 +521,34 @@ export function VenueChampion({ data }: { data: RbVenueData }) {
         <span className="font-display" style={{ fontSize: 72, letterSpacing: "0.1em", lineHeight: 0.9, color: "#E94560" }}>
           CHAMPION
         </span>
-        <span className="font-display truncate" style={{ fontSize: 300, lineHeight: 0.8, letterSpacing: "0.01em" }}>
-          {(champ?.display_name ?? "TBD").toUpperCase()}
+        <span className="font-display whitespace-nowrap" style={{ fontSize: size, lineHeight: 0.8, letterSpacing: "0.01em" }}>
+          {name}
         </span>
+        {sub && (
+          <span style={{ fontSize: 34, color: MUTED }}>{sub}</span>
+        )}
+        {stats.length > 0 && (
+          <div className="flex" style={{ gap: 48, marginTop: 24 }}>
+            {stats.map((st) => (
+              <span key={st.label} className="flex flex-col">
+                <span className="font-mono" style={STAT_LABEL}>
+                  {st.label}
+                </span>
+                <span className="font-display" style={{ fontSize: 64 }}>
+                  {st.value}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div className="relative ml-auto flex flex-col items-center" style={{ marginRight: 160, gap: 28 }}>
         <Logo size={420} />
-        <span className="font-mono" style={{ fontSize: 20, letterSpacing: "0.12em", color: MUTED }}>
-          {players} PLAYERS · {swiss} ROUNDS{cut > 0 ? ` · TOP ${cut}` : ""}
-        </span>
+        {foot && (
+          <span className="font-mono" style={{ fontSize: 20, letterSpacing: "0.12em", color: MUTED }}>
+            {foot}
+          </span>
+        )}
       </div>
     </div>
   );

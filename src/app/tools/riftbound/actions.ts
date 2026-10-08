@@ -234,6 +234,11 @@ export async function undoTopCutResult(matchId: string) {
   return run((ctx) => svc.undoTopCutResult(ctx, { matchId }));
 }
 
+/** Mark a top-cut table as in progress (or not): the venue's LIVE tag. */
+export async function setMatchStarted(matchId: string, started: boolean) {
+  return run((ctx) => svc.setMatchStarted(ctx, { matchId, started }));
+}
+
 // ---------------------------------------------------------------------------
 // Finish
 // ---------------------------------------------------------------------------

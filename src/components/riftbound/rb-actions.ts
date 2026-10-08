@@ -19,13 +19,16 @@ import {
   pauseClock,
   publishRound,
   reportResult,
+  reportTopCutResult,
   resumeClock,
   setAutoFollow,
+  setMatchStarted,
   setScene,
   startClock,
   swapDraftPairing,
   undoDrop,
   undoResult,
+  undoTopCutResult,
   unpublishRound,
 } from "@/app/tools/riftbound/actions";
 
@@ -43,13 +46,16 @@ export const rbActions = {
   pauseClock,
   publishRound,
   reportResult,
+  reportTopCutResult,
   resumeClock,
   setAutoFollow,
+  setMatchStarted,
   setScene,
   startClock,
   swapDraftPairing,
   undoDrop,
   undoResult,
+  undoTopCutResult,
   unpublishRound,
 };
 

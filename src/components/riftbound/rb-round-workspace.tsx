@@ -75,7 +75,7 @@ function RbActivity({ state, run, pending, actions }: Pick<RbRoundWorkspaceProps
       if (undo.kind === "unpublish") return actions.unpublishRound(undo.roundId);
       if (undo.kind === "drop") return actions.undoDrop(undo.playerId);
       // A report and the drops recorded with it are undone together.
-      const result = await actions.undoResult(undo.matchId);
+      const result = await (undo.stage === "top_cut" ? actions.undoTopCutResult(undo.matchId) : actions.undoResult(undo.matchId));
       if (!result.ok) return result;
       for (const playerId of undo.dropPlayerIds) {
         const dropped = await actions.undoDrop(playerId);

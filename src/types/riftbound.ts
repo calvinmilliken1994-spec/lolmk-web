@@ -281,6 +281,11 @@ export interface RbMatch {
   decided_on_time: boolean;
   /** Per-table extension added to the round's duration. */
   extension_ms: number;
+  /**
+   * Top cut only: when the desk marked the table as in progress (the venue's
+   * LIVE tag). Null until then; kept after the result, cleared by nothing.
+   */
+  started_at: string | null;
   status: RbMatchStatus;
   reported_by_id: string | null;
   reported_by_name: string | null;
@@ -314,6 +319,8 @@ export type RbAuditAction =
   | "clock.adjust"
   | "match.report"
   | "match.undo"
+  | "match.start"
+  | "match.unstart"
   | "match.correct"
   | "match.extension"
   | "match.flag"
@@ -405,6 +412,8 @@ export interface RbPublicMatch {
   decided_on_time: boolean;
   /** Public because clients need it to compute the table's remaining time. */
   extension_ms: number;
+  /** Top cut: set while the table is in progress (LIVE tag); null otherwise. */
+  started_at: string | null;
   status: RbMatchStatus;
 }
 

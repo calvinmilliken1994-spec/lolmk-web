@@ -65,6 +65,7 @@ function match(r: number, table: number, a: string, b: string | null, extra: Par
     games_drawn: 0,
     decided_on_time: false,
     extension_ms: 0,
+    started_at: null,
     status: "pending",
     ...extra,
   };

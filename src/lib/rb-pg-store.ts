@@ -54,6 +54,7 @@ const MATCH_COLUMNS: ColumnMap = {
   games_drawn: { column: "games_drawn" },
   decided_on_time: { column: "decided_on_time" },
   extension_ms: { column: "extension_ms" },
+  started_at: { column: "started_at" },
   status: { column: "status" },
   reported_by_id: { column: "reported_by_id" },
   reported_by_name: { column: "reported_by_name" },
@@ -190,9 +191,9 @@ export function createPgStore(client: VercelPoolClient): RbStore {
       await client.query(
         `INSERT INTO rb_matches
            (id, tournament_id, round_id, table_number, player_a, player_b, games_a, games_b, games_drawn,
-            decided_on_time, extension_ms, status, reported_by_id, reported_by_name, reported_at,
+            decided_on_time, extension_ms, started_at, status, reported_by_id, reported_by_name, reported_at,
             idempotency_key, flags)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb)`,
         [
           m.id,
           m.tournament_id,
@@ -205,6 +206,7 @@ export function createPgStore(client: VercelPoolClient): RbStore {
           m.games_drawn,
           m.decided_on_time,
           m.extension_ms,
+          m.started_at,
           m.status,
           m.reported_by_id,
           m.reported_by_name,

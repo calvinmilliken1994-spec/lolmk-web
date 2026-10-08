@@ -79,6 +79,7 @@ function match(roundNumber: number, table: number, status: RbMatch["status"]): R
     games_drawn: 0,
     decided_on_time: false,
     extension_ms: 0,
+    started_at: null,
     status,
     reported_by_id: status === "completed" ? "9" : null,
     reported_by_name: status === "completed" ? "Ray" : null,

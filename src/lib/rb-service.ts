@@ -22,11 +22,7 @@
 //
 // Relative imports (not "@/") so the Node test scripts can load this file.
 
-import {
-  applyBracketResult,
-  buildKnockoutBracket,
-  type BracketMatch,
-} from "./bracket-engine";
+import { replayTopCut } from "./rb-cut";
 import {
   clockAdjustPatch,
   clockPausePatch,
@@ -672,6 +668,7 @@ function makeMatch(
     games_drawn: 0,
     decided_on_time: false,
     extension_ms: 0,
+    started_at: null,
     status: b === null ? "bye" : "pending",
     reported_by_id: null,
     reported_by_name: null,
@@ -752,7 +749,8 @@ export async function publishRound(ctx: RbContext, input: { roundId: string }): 
   if (round.status !== "draft") fail("Only a draft round can be published.");
   await ctx.store.updateRound(t.id, round.id, { status: "published" });
   await audit(ctx, t, "round.publish", { round: round.number, stage: round.stage });
-  await followPhase(ctx, t, "pairings");
+  // The bracket is the venue's view of the whole cut: publishing a cut round keeps it up.
+  await followPhase(ctx, t, round.stage === "top_cut" ? "top_cut" : "pairings");
 }
 
 /** Back to draft, clock reset. Only while no table in the round has a reported result. */
@@ -864,7 +862,7 @@ export async function closeRound(ctx: RbContext, input: { roundId: string }): Pr
   }
   await ctx.store.updateRound(t.id, round.id, { status: "closed" });
   await audit(ctx, t, "round.close", { round: round.number, stage: round.stage });
-  await followPhase(ctx, t, "standings");
+  await followPhase(ctx, t, round.stage === "top_cut" ? "top_cut" : "standings");
 }
 
 /** Pair the next Swiss round, or the next top-cut round once the cut is made. */
@@ -1067,6 +1065,25 @@ async function undo(ctx: RbContext, matchId: string, stage: RbRoundStage): Promi
 export const undoResult = (ctx: RbContext, input: { matchId: string }) => undo(ctx, input.matchId, "swiss");
 export const undoTopCutResult = (ctx: RbContext, input: { matchId: string }) => undo(ctx, input.matchId, "top_cut");
 
+/**
+ * Mark a top-cut table as in progress (the venue's LIVE tag), or take the mark
+ * off. Display only: it never blocks or changes a result.
+ */
+export async function setMatchStarted(ctx: RbContext, input: { matchId: string; started: boolean }): Promise<void> {
+  const { t, round, match } = await lockMatchScope(ctx, input.matchId);
+  requireInProgress(t);
+  if (round.stage !== "top_cut") fail("Only top-cut matches are marked as started.");
+  if (round.status !== "published" && round.status !== "live") fail("The round isn't running.");
+  if (match.status !== "pending") fail("This match already has a result.");
+  if (input.started === (match.started_at !== null)) return;
+  await ctx.store.updateMatch(t.id, match.id, { started_at: input.started ? isoAt(ctx) : null });
+  await audit(ctx, t, input.started ? "match.start" : "match.unstart", {
+    matchId: match.id,
+    round: round.number,
+    table: match.table_number,
+  });
+}
+
 /** Throw away a draft round and pair it again (after a drop or an undone drop changed the field). */
 async function repairDraft(ctx: RbContext, s: LockedState, draft: RbRound): Promise<void> {
   await ctx.store.deleteRoundMatches(s.t.id, draft.id);
@@ -1211,73 +1228,7 @@ export async function acknowledgeFlag(ctx: RbContext, input: { matchId: string; 
 // Top cut
 // ---------------------------------------------------------------------------
 
-interface CutReplay {
-  /** Bracket matches per cut round (index 0 = first cut round), in table order. */
-  levels: BracketMatch[][];
-  championId: string | null;
-}
-
-/**
- * Rebuild the single-elimination bracket from the stored seeds and replay
- * every reported top-cut result in order. Top-cut round k (k-th top_cut
- * rb_round by number) corresponds to bracket level k, and its tables to that
- * level's matches in match-number order.
- */
-export function replayTopCut(
-  seeds: string[],
-  bestOf: 1 | 3,
-  rounds: RbRound[],
-  matches: RbMatch[],
-): CutReplay {
-  let k = 0;
-  const bracket = buildKnockoutBracket(seeds, {
-    tournamentId: "top-cut",
-    knockoutBestOf: bestOf,
-    doubleElimination: false,
-    thirdPlaceMatch: false,
-    grandFinalReset: false,
-    idFactory: () => `cut${++k}`,
-  });
-  let size = 1;
-  while (size < Math.max(seeds.length, 2)) size *= 2;
-  const depth = Math.log2(size);
-  const levels: BracketMatch[][] = Array.from({ length: depth }, () => []);
-  for (const m of bracket) {
-    const level = m.bracket === "grand_final" ? depth : m.round_number;
-    levels[level - 1].push(m);
-  }
-  levels.forEach((l) => l.sort((a, b) => a.match_number - b.match_number));
-
-  const needed = bestOf === 3 ? 2 : 1;
-  let championId: string | null = null;
-  const cutRounds = rounds.filter((r) => r.stage === "top_cut").sort(byNumber);
-  cutRounds.forEach((round, i) => {
-    const level = levels[i];
-    const ms = matches.filter((m) => m.round_id === round.id).sort(byTable);
-    if (!level || ms.length !== level.length) throw new Error(`Top-cut round ${round.number} doesn't match the bracket.`);
-    ms.forEach((m, j) => {
-      // Re-read by id: applyBracketResult/resolveByes may replace array entries.
-      const bm = bracket.find((x) => x.id === level[j].id) as BracketMatch;
-      if (bm.status === "bye" || bm.status === "completed") return; // structural bye, already resolved
-      let winner: string | null = null;
-      let w = 0;
-      let l = 0;
-      if (m.status === "completed") {
-        winner = m.games_a > m.games_b ? m.player_a_id : m.player_b_id;
-        w = Math.max(m.games_a, m.games_b);
-        l = Math.min(m.games_a, m.games_b);
-      } else if (m.status === "bye") {
-        // The opponent dropped after the cut: player_a advances.
-        winner = m.player_a_id;
-        w = needed;
-      }
-      if (!winner) return;
-      const res = applyBracketResult(bracket, bm.id, winner === bm.team_a_id ? w : l, winner === bm.team_a_id ? l : w);
-      if (res.championId) championId = res.championId;
-    });
-  });
-  return { levels, championId };
-}
+export { replayTopCut };
 
 async function createTopCutRound(ctx: RbContext, s: LockedState): Promise<RbRound> {
   const { t } = s;

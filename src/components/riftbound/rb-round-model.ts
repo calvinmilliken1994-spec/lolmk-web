@@ -19,6 +19,7 @@ import {
   type RbMatchFlag,
   type RbPlayer,
   type RbRound,
+  type RbRoundStage,
   type RbScene,
 } from "../../types/riftbound";
 import { rbCutSize, rbSwissTotal, RB_SCENE_LABEL, type RbDeskState } from "./rb-deck-model";
@@ -362,7 +363,14 @@ export function rbDraftRows(state: RbDeskState, round: RbRound): RbDraftRow[] {
 
 /** What Undo does for an entry. */
 export type RbUndo =
-  | { kind: "report"; matchId: string; /** Drops recorded with the report, undone with it. */ dropPlayerIds: string[] }
+  | {
+      kind: "report";
+      matchId: string;
+      /** Which undo applies: a top-cut table is undone by its own action. */
+      stage: RbRoundStage;
+      /** Drops recorded with the report, undone with it. */
+      dropPlayerIds: string[];
+    }
   | { kind: "unpublish"; roundId: string }
   | { kind: "drop"; playerId: string };
 
@@ -430,6 +438,7 @@ export function rbActivity(state: RbDeskState, visible = 4): RbActivityRow[] {
           undo = {
             kind: "report",
             matchId,
+            stage: round.stage,
             dropPlayerIds: drops.filter((id) => playerById(id)?.status === "dropped"),
           };
         }
@@ -437,6 +446,12 @@ export function rbActivity(state: RbDeskState, visible = 4): RbActivityRow[] {
       }
       case "match.undo":
         text = `Table ${table ?? "?"} · result undone`;
+        break;
+      case "match.start":
+        text = `Table ${table ?? "?"} · marked live`;
+        break;
+      case "match.unstart":
+        text = `Table ${table ?? "?"} · live mark removed`;
         break;
       case "match.extension":
         text = `Table ${table ?? "?"} · ${formatDelta(asNum(d.ms) ?? 0)} extension${asStr(d.reason) ? ` (${asStr(d.reason)})` : ""}`;
@@ -538,6 +553,9 @@ const STEP = {
   started: { event: "Clock started", scene: "Pairings + clock" } as RbFollowStep,
   zero: { event: "Clock reaches 0", scene: "Time called" } as RbFollowStep,
   closed: { event: "Round closed", scene: "Standings" } as RbFollowStep,
+  /** Top-cut rounds keep the bracket up (the venue shows the whole cut on one scene). */
+  cutPublished: (n: number): RbFollowStep => ({ event: `Round ${n} published`, scene: "Top-cut bracket" }),
+  cutClosed: { event: "Round closed", scene: "Top-cut bracket" } as RbFollowStep,
   cut: (size: number): RbFollowStep => ({ event: "Cut made", scene: `Top ${size} bracket` }),
   done: { event: "Event completed", scene: "Champion" } as RbFollowStep,
 };
@@ -556,22 +574,24 @@ export function rbAutoFollowNext(state: RbDeskState, now: number | null): RbFoll
   if (!latest) return [STEP.published(1), STEP.started];
 
   const timed = latest.duration_ms !== null;
-  if (latest.status === "draft") steps.push(STEP.published(latest.number), STEP.started);
-  if (latest.status === "published") steps.push(STEP.started);
+  const cut = latest.stage === "top_cut";
+  if (latest.status === "draft") steps.push(cut ? STEP.cutPublished(latest.number) : STEP.published(latest.number), ...(timed ? [STEP.started] : []));
+  if (latest.status === "published" && timed) steps.push(STEP.started);
   if (latest.status === "draft" || latest.status === "published") {
     if (timed) steps.push(STEP.zero);
-    steps.push(STEP.closed);
+    steps.push(cut ? STEP.cutClosed : STEP.closed);
   } else if (latest.status === "live") {
     const called = now !== null && isTimeCalled(latest, null, now);
     if (timed && !called) steps.push(STEP.zero);
-    steps.push(STEP.closed);
+    steps.push(cut ? STEP.cutClosed : STEP.closed);
   }
 
   // After the round closes.
   const isFinalCutRound = latest.stage === "top_cut" && roundMatches(state, latest).length === 1;
   const swissLeft = latest.stage === "swiss" && state.rounds.filter((r) => r.stage === "swiss").length < rbSwissTotal(state);
   if (isFinalCutRound) steps.push(STEP.done);
-  else if (swissLeft || latest.stage === "top_cut") steps.push(STEP.published(latest.number + 1), STEP.started);
+  else if (latest.stage === "top_cut") steps.push(STEP.cutPublished(latest.number + 1));
+  else if (swissLeft) steps.push(STEP.published(latest.number + 1), STEP.started);
   else {
     const size = state.tournament.config.topCutSeedIds ? 0 : rbCutSize(state);
     if (size > 0) steps.push(STEP.cut(size));

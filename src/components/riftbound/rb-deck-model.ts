@@ -285,9 +285,10 @@ export function rbAutoFollow(prev: RbDeskState, next: RbDeskState): RbScene | nu
   if (next.tournament.config.topCutSeedIds && !prev.tournament.config.topCutSeedIds) return "top_cut";
   for (const r of next.rounds) {
     const before = prev.rounds.find((x) => x.id === r.id);
-    if (r.status === "closed" && before && before.status !== "closed") return "standings";
+    // A top-cut round keeps the bracket up when it is published or closed.
+    if (r.status === "closed" && before && before.status !== "closed") return r.stage === "top_cut" ? "top_cut" : "standings";
     if (r.started_at && before && !before.started_at) return "pairings_clock";
-    if (r.status === "published" && before && before.status !== "published") return "pairings";
+    if (r.status === "published" && before && before.status !== "published") return r.stage === "top_cut" ? "top_cut" : "pairings";
   }
   return null;
 }
