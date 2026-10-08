@@ -9,6 +9,8 @@
 // built yet. This one reuses ARAM Mayhem's admin-driven, single-shared-login
 // pattern, scaled up to persistent multi-tournament + team logos.
 
+import type { AuditActorKind } from "./audit-actor";
+
 export type SrTournamentStatus =
   | "draft" // admin is setting up teams, format, dates — not visible publicly
   | "seeding" // teams locked, random seed generated, publicly viewable pre-kickoff
@@ -242,13 +244,30 @@ export type SrAuditAction =
   | "roster.slot_confirm"
   | "roster.slot_decline"
   // Presentation desk (src/app/tools/summoners-rift/actions.ts)
-  | "scene.set";
+  | "scene.set"
+  | "reveal.start"
+  | "reveal.reset";
+
+/**
+ * Who an audit row is attributed to. Desk actions: the admin from
+ * getCurrentAdmin(), kind "admin". Captain/invite flow
+ * (src/app/captain/actions.ts): the signed-in captain or member, kind "member".
+ */
+export interface SrActor {
+  discordId: string;
+  name: string;
+  kind: AuditActorKind;
+}
 
 export interface SrAuditLogEntry {
   id: number;
   tournament_id: string;
   action: SrAuditAction;
   detail: Record<string, unknown> | null;
+  /** Null on rows written before the actor columns existed. */
+  actor_discord_id: string | null;
+  actor_name: string | null;
+  actor_kind: AuditActorKind | null;
   created_at: string;
 }
 
