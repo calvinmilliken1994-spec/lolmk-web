@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Mayhem desk — teams phase</title>
+<!-- Control Deck v2 static reference. Frame: 1440x1000. Sample data is fake. See ../README.md -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Chakra+Petch:wght@400;500;600&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>body{margin:0;background:#0A0E1A} a{color:#7F97D6} button,input,select{font-family:inherit}</style>
+</head>
+<body>
+<div style="min-height: 1000px; background: #0A0E1A; color: #F5F5F7; font-family: Inter, Pretendard, system-ui, sans-serif; font-size: 14px; display: flex; flex-direction: column;">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #2D3A52; background: #10162A;">
+    <div style="display: flex; align-items: center; gap: 12px; flex: 1 1 320px; min-width: 0px;">
+      <a href="#" style="font-size: 13px; text-decoration: none;">← ARAM Mayhem</a>
+      <span style="width: 1px; height: 18px; background: #2D3A52;"></span>
+      <h1 style="margin: 0px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 20px; font-weight: 600;">Mayhem Night · Random teams</h1>
+      <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; color: #B8BCC8; border: 1px solid #2D3A52; padding: 3px 8px;">TEAMS · 30 PLAYERS</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #BA263C; background: #2A0D16;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #E94560;"></span>
+      <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.06em;">ON AIR</span>
+      <span style="font-size: 13px;">Reveal · 3 of 6</span>
+    </div>
+    <span style="font-size: 12px; color: #8B8D98;">● Synced 1s ago</span>
+    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+      <button type="button" style="height: 44px; padding: 0px 20px; background: #BA263C; color: #F5F5F7; border: 0px; border-radius: 2px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 15px; font-weight: 600; cursor: pointer;">Reveal team 4</button>
+      <span style="font-size: 12px; color: #B8BCC8;">Then: seed knockout bracket</span>
+    </div>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; flex: 1 1 auto;">
+    <nav aria-label="Event phases" style="flex: 0 0 200px; border-right: 1px solid #1F2937; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; background: #0D1222;">
+      <p style="margin: 0px 0px 8px 8px; font-size: 11px; letter-spacing: 0.08em; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">PHASES</p>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #B8BCC8;"><span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #22C55E;"></span><span style="flex: 1 1 auto;">Entrants</span><span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">30</span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; background: #1A2240; color: #F5F5F7; border: 1px solid #4A65A8;"><span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #E94560;"></span><span style="flex: 1 1 auto;">Teams</span><span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">NOW</span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; border-radius: 2px; border: 1px solid transparent; color: #4A4D5A; text-decoration: line-through;"><span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; border: 1px solid #4A4D5A;"></span><span style="flex: 1 1 auto;">Groups</span><span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">OFF</span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #8B8D98;"><span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; border: 1px solid #4A4D5A;"></span><span style="flex: 1 1 auto;">Knockout</span><span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #8B8D98;"><span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; border: 1px solid #4A4D5A;"></span><span style="flex: 1 1 auto;">Complete</span><span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span></a>
+      
+    </nav>
+
+    <main style="flex: 999 1 560px; min-width: 0px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <p style="margin: 0px; font-size: 11px; letter-spacing: 0.08em; color: #E94560; font-family: &quot;Chakra Petch&quot;, monospace;">TEAMS · RANDOMIZED</p>
+          <h2 style="margin: 4px 0px 0px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 24px; font-weight: 600;">6 teams of 5</h2>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <button type="button" disabled="" style="height: 34px; padding: 0px 12px; background: transparent; color: #4A4D5A; border: 1px solid #1F2937; border-radius: 2px; font-size: 13px; cursor: not-allowed;">Re-roll teams</button>
+          <span style="font-size: 12px; color: #8B8D98;">Locked: reveal started</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0px, 1fr)); gap: 10px;">
+        
+          <div style="padding: 12px; display: flex; flex-direction: column; gap: 6px; border-radius: 2px; background: #10162A; border: 1px solid #2D3A52;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 17px; font-weight: 600;">Team 1</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">ON SCREEN</span>
+            </div>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Aria</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Bok</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Calder</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Dami</span><span style="font-size: 12px; color: #8B8D98;">guest</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Eun</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+          </div>
+        
+          <div style="padding: 12px; display: flex; flex-direction: column; gap: 6px; border-radius: 2px; background: #10162A; border: 1px solid #2D3A52;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 17px; font-weight: 600;">Team 2</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">ON SCREEN</span>
+            </div>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Finn</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Gyu</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Hana</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Iris</span><span style="font-size: 12px; color: #8B8D98;">guest</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Jun</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+          </div>
+        
+          <div style="padding: 12px; display: flex; flex-direction: column; gap: 6px; border-radius: 2px; background: #10162A; border: 1px solid #2D3A52;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 17px; font-weight: 600;">Team 3</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">ON SCREEN</span>
+            </div>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Kai</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Lumi</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Mina</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Jae</span><span style="font-size: 12px; color: #8B8D98;">guest</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Nox</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+          </div>
+        
+          <div style="padding: 12px; display: flex; flex-direction: column; gap: 6px; border-radius: 2px; background: #0D1222; border: 1px dashed #2D3A52;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 17px; font-weight: 600;">Team 4</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; padding: 3px 6px; color: #8B8D98; background: #141B2E;">HIDDEN</span>
+            </div>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Oli</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Pip</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Quinn</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Rho</span><span style="font-size: 12px; color: #8B8D98;">guest</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Sol</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+          </div>
+        
+          <div style="padding: 12px; display: flex; flex-direction: column; gap: 6px; border-radius: 2px; background: #0D1222; border: 1px dashed #2D3A52;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 17px; font-weight: 600;">Team 5</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; padding: 3px 6px; color: #8B8D98; background: #141B2E;">HIDDEN</span>
+            </div>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Tae</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Uma</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Vex</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Won</span><span style="font-size: 12px; color: #8B8D98;">guest</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Xia</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+          </div>
+        
+          <div style="padding: 12px; display: flex; flex-direction: column; gap: 6px; border-radius: 2px; background: #0D1222; border: 1px dashed #2D3A52;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 17px; font-weight: 600;">Team 6</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; padding: 3px 6px; color: #8B8D98; background: #141B2E;">HIDDEN</span>
+            </div>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Yuri</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Zed</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Ahn</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Bea</span><span style="font-size: 12px; color: #8B8D98;">guest</span></span>
+            
+              <span style="display: flex; justify-content: space-between; font-size: 13px; color: #B8BCC8; min-height: 22px;"><span style="color: #F5F5F7;">Cho</span><span style="font-size: 12px; color: #8B8D98;">member</span></span>
+            
+          </div>
+        
+      </div>
+
+      <div style="padding: 10px 12px; border: 1px solid #1F2937; background: #0D1222; font-size: 13px; color: #B8BCC8;">Groups are switched off for this event, so the rail skips that phase. Format settings stay in Entrants, locked since players exist.</div>
+    </main>
+
+    <aside aria-label="Broadcast" style="flex: 1 1 340px; max-width: 420px; border-left: 1px solid #1F2937; padding: 16px; display: flex; flex-direction: column; gap: 14px; background: #0D1222;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <p style="margin: 0px; font-size: 11px; letter-spacing: 0.08em; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">BROADCAST</p>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #B8BCC8;"><input type="checkbox" checked="" style="width: 16px; height: 16px; accent-color: #4A65A8;"> Auto-follow</label>
+      </div>
+      <div>
+        <p style="margin: 0px 0px 6px; font-size: 12px; color: #B8BCC8;"><span style="font-family: &quot;Chakra Petch&quot;, monospace; color: #E94560;">● PROGRAM</span> · Team reveal</p>
+        <div style="aspect-ratio: 16 / 9; border: 2px solid #BA263C; background: #0A0E1A; display: flex; align-items: center; justify-content: center; color: #8B8D98; font-size: 12px;">Existing MayhemLivePreview iframe</div>
+      </div>
+
+      <div style="border: 1px solid #2D3A52; background: #10162A; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+        <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 11px; color: #8B8D98;">TEAM REVEAL</span>
+        <div style="display: flex; gap: 4px;">
+          <span style="flex: 1 1 0px; height: 8px; background: #E94560;"></span><span style="flex: 1 1 0px; height: 8px; background: #E94560;"></span><span style="flex: 1 1 0px; height: 8px; background: #E94560;"></span>
+          <span style="flex: 1 1 0px; height: 8px; background: #1A2240;"></span><span style="flex: 1 1 0px; height: 8px; background: #1A2240;"></span><span style="flex: 1 1 0px; height: 8px; background: #1A2240;"></span>
+        </div>
+        <span style="font-size: 13px; color: #B8BCC8;">3 of 6 teams shown on screen</span>
+        <label style="display: flex; justify-content: space-between; align-items: center; min-height: 36px; font-size: 13px;">Auto-reveal every 8s
+          <input type="checkbox" style="width: 16px; height: 16px; accent-color: #4A65A8;">
+        </label>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0px, 1fr)); gap: 6px;">
+          <button type="button" style="height: 36px; background: transparent; color: #B8BCC8; border: 1px solid #2D3A52; border-radius: 2px; font-size: 13px;">Hide last</button>
+          <button type="button" style="height: 36px; background: transparent; color: #B8BCC8; border: 1px solid #2D3A52; border-radius: 2px; font-size: 13px;">Restart reveal</button>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0px, 1fr)); gap: 6px;">
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Idle</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Starting soon</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #2A0D16; color: #F5F5F7; border: 1px solid #BA263C;">Reveal</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Teams</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: transparent; color: #4A4D5A; border: 1px dashed #1F2937;">Groups</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Bracket</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Match</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Champion</button>
+        
+      </div>
+    </aside>
+  </div></div>
+</body>
+</html>

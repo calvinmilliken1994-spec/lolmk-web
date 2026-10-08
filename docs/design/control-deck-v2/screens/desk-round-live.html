@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Riftbound desk — round live</title>
+<!-- Control Deck v2 static reference. Frame: 1440x1000. Sample data is fake. See ../README.md -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Chakra+Petch:wght@400;500;600&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>body{margin:0;background:#0A0E1A} a{color:#7F97D6} button,input,select{font-family:inherit}</style>
+</head>
+<body>
+<div style="min-height: 1000px; background: #0A0E1A; color: #F5F5F7; font-family: Inter, Pretendard, system-ui, sans-serif; font-size: 14px; display: flex; flex-direction: column;">
+
+  
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #2D3A52; background: #10162A;">
+    <div style="display: flex; align-items: center; gap: 12px; flex: 1 1 320px; min-width: 0px;">
+      <a href="#" style="font-size: 13px; text-decoration: none;">← Riftbound</a>
+      <span style="width: 1px; height: 18px; background: #2D3A52;"></span>
+      <h1 style="margin: 0px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 20px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Poro Cup · Riftbound</h1>
+      <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; color: #B8BCC8; border: 1px solid #2D3A52; padding: 3px 8px;">ROUND 3 / 5 · LIVE</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-family: &quot;Bebas Neue&quot;, sans-serif; font-size: 40px; line-height: 1; letter-spacing: 0.02em; font-variant-numeric: tabular-nums;">04:12</span>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <button type="button" style="height: 22px; padding: 0px 8px; background: #1A2240; color: #F5F5F7; border: 1px solid #2D3A52; border-radius: 2px; font-size: 11px; cursor: pointer;">Pause</button>
+        <button type="button" style="height: 22px; padding: 0px 8px; background: #1A2240; color: #F5F5F7; border: 1px solid #2D3A52; border-radius: 2px; font-size: 11px; cursor: pointer;">± Adjust</button>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #BA263C; background: #2A0D16;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #E94560;"></span>
+      <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.06em;">ON AIR</span>
+      <span style="font-size: 13px; color: #F5F5F7;">Pairings + clock</span>
+    </div>
+
+    <span style="font-size: 12px; color: #8B8D98; white-space: nowrap;">● Synced 1s ago</span>
+
+    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+      <button type="button" disabled="" style="height: 44px; padding: 0px 20px; background: #3A1520; color: #D9A0AA; border: 1px solid #5A1422; border-radius: 2px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 15px; font-weight: 600; cursor: not-allowed;">Close round 3</button>
+      <span style="font-size: 12px; color: #F5B54A;">5 tables outstanding</span>
+    </div>
+  </header>
+
+  
+  <div style="display: flex; flex-wrap: wrap; flex: 1 1 auto; min-height: 0px;">
+
+    
+    <nav aria-label="Event phases" style="flex: 0 0 200px; border-right: 1px solid #1F2937; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; background: #0D1222;">
+      <p style="margin: 0px 0px 8px 8px; font-size: 11px; letter-spacing: 0.08em; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">PHASES</p>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #B8BCC8;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #22C55E;"></span>
+          <span style="flex: 1 1 auto;">Setup</span>
+          <span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span>
+        </a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #B8BCC8;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #22C55E;"></span>
+          <span style="flex: 1 1 auto;">Check-in</span>
+          <span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">32</span>
+        </a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #B8BCC8;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #22C55E;"></span>
+          <span style="flex: 1 1 auto;">Round 1</span>
+          <span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span>
+        </a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #B8BCC8;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #22C55E;"></span>
+          <span style="flex: 1 1 auto;">Round 2</span>
+          <span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span>
+        </a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; background: #1A2240; color: #F5F5F7; border: 1px solid #4A65A8;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #E94560;"></span>
+          <span style="flex: 1 1 auto;">Round 3</span>
+          <span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">LIVE</span>
+        </a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #8B8D98;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; border: 1px solid #4A4D5A;"></span>
+          <span style="flex: 1 1 auto;">Round 4</span>
+          <span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span>
+        </a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #8B8D98;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; border: 1px solid #4A4D5A;"></span>
+          <span style="flex: 1 1 auto;">Round 5</span>
+          <span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span>
+        </a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #8B8D98;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; border: 1px solid #4A4D5A;"></span>
+          <span style="flex: 1 1 auto;">Top 8</span>
+          <span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span>
+        </a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #8B8D98;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; border: 1px solid #4A4D5A;"></span>
+          <span style="flex: 1 1 auto;">Complete</span>
+          <span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span>
+        </a>
+      
+    </nav>
+
+    
+    <main style="flex: 999 1 560px; min-width: 0px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px;">
+        <div>
+          <p style="margin: 0px; font-size: 11px; letter-spacing: 0.08em; color: #E94560; font-family: &quot;Chakra Petch&quot;, monospace;">ROUND 3 · SWISS · BO3 · 60 MIN</p>
+          <h2 style="margin: 4px 0px 0px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 24px; font-weight: 600;">Tables</h2>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button type="button" style="height: 32px; padding: 0px 12px; background: #1A2240; color: #F5F5F7; border: 1px solid #4A65A8; border-radius: 2px; font-size: 13px;">All 16</button>
+          <button type="button" style="height: 32px; padding: 0px 12px; background: transparent; color: #B8BCC8; border: 1px solid #2D3A52; border-radius: 2px; font-size: 13px;">Outstanding 5</button>
+          <button type="button" style="height: 32px; padding: 0px 12px; background: transparent; color: #B8BCC8; border: 1px solid #2D3A52; border-radius: 2px; font-size: 13px;">Flagged 1</button>
+          <label for="tablejump" style="position: absolute; left: -9999px;">Jump to table</label>
+          <input id="tablejump" placeholder="Table # then key" style="height: 32px; width: 150px; padding: 0px 10px; background: #10162A; color: #F5F5F7; border: 1px solid #2D3A52; border-radius: 2px; font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px;">
+        </div>
+      </div>
+
+      <div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #B8BCC8; margin-bottom: 6px;">
+          <span>11 of 16 reported</span><span>Judges: Ray · Joe · Jin</span>
+        </div>
+        <div style="height: 6px; background: #1A2240;"><div style="width: 69%; height: 6px; background: #22C55E;"></div></div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid #6B4A12; background: #241A08;">
+        <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 11px; font-weight: 600; color: #F5B54A;">ALERT</span>
+        <span style="flex: 1 1 240px; font-size: 13px;">Table 6 · judge call (Joe) · +3:00 extension applied</span>
+        <button type="button" style="height: 28px; padding: 0px 10px; background: transparent; color: #F5F5F7; border: 1px solid #6B4A12; border-radius: 2px; font-size: 12px;">Acknowledge</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0px, 1fr)); gap: 10px;">
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #10162A; border: 1px solid #1F2937; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">1</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">REPORTED</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Aria <span style="color: #8B8D98;">vs</span> Bok</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Aria 2–0 · Ray</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #10162A; border: 1px solid #1F2937; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">2</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">REPORTED</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Calder <span style="color: #8B8D98;">vs</span> Dami</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Dami 2–1 · Joe</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #141B32; border: 1px solid #2D3A52; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">3</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #B8BCC8; background: #1A2240;">PLAYING</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Eun <span style="color: #8B8D98;">vs</span> Finn</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Game 3 · started 41m</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #10162A; border: 1px solid #1F2937; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">4</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">REPORTED</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Gyu <span style="color: #8B8D98;">vs</span> Hana</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Draw 1–1 · Ray</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #10162A; border: 1px solid #1F2937; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">5</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">REPORTED</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Iris <span style="color: #8B8D98;">vs</span> Jun</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Iris 2–0 · Jin</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #1C1710; border: 1px solid #8A6418; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">6</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #F5B54A; background: #2E210A;">JUDGE CALL</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Kai <span style="color: #8B8D98;">vs</span> Lumi</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Judge call · +3:00</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #141B32; border: 1px solid #2D3A52; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">7</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #B8BCC8; background: #1A2240;">PLAYING</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Mina <span style="color: #8B8D98;">vs</span> Jae</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Game 2</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #10162A; border: 1px solid #1F2937; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">8</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">REPORTED</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nox <span style="color: #8B8D98;">vs</span> Oli</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nox 2–1 · Desk</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #10162A; border: 1px solid #1F2937; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">9</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">REPORTED</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Pip <span style="color: #8B8D98;">vs</span> Quinn</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Quinn 2–0 · Joe</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #141B32; border: 1px solid #2D3A52; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">10</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #B8BCC8; background: #1A2240;">PLAYING</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Rho <span style="color: #8B8D98;">vs</span> Sol</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Game 3</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #10162A; border: 1px solid #1F2937; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">11</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">REPORTED</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tae <span style="color: #8B8D98;">vs</span> Uma</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tae 2–1 · Jin</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #10162A; border: 1px solid #1F2937; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">12</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">REPORTED</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Vex <span style="color: #8B8D98;">vs</span> Won</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Vex 2–0 · Ray</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #10162A; border: 1px solid #1F2937; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">13</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">REPORTED</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Xia <span style="color: #8B8D98;">vs</span> Yuri</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Yuri 2–1 · Joe</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #141B32; border: 1px solid #2D3A52; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">14</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #B8BCC8; background: #1A2240;">PLAYING</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Zed <span style="color: #8B8D98;">vs</span> Ahn</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Game 2</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #10162A; border: 1px solid #1F2937; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">15</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #4ADE80; background: #0F2A1A;">REPORTED</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Bea <span style="color: #8B8D98;">vs</span> Cho</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Bea 2–0 · Jin</span>
+          </button>
+        
+          <button type="button" style="display: block; text-align: left; padding: 12px; min-height: 92px; background: #0D1222; border: 1px solid #1F2937; border-radius: 2px; color: #F5F5F7; cursor: pointer; font-family: inherit;">
+            <span style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 18px; font-weight: 600;">16</span>
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 6px; color: #8B8D98; background: #141B2E;">BYE</span>
+            </span>
+            <span style="display: block; font-size: 13px; margin-top: 8px; color: #F5F5F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Dov <span style="color: #8B8D98;">vs</span> —</span>
+            <span style="display: block; font-size: 12px; margin-top: 4px; color: #B8BCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Bye · auto 2–0</span>
+          </button>
+        
+      </div>
+
+      
+      <section style="border-top: 1px solid #1F2937; padding-top: 12px;">
+        <p style="margin: 0px 0px 8px; font-size: 11px; letter-spacing: 0.08em; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">ACTIVITY</p>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          
+            <div style="display: flex; gap: 12px; align-items: center; font-size: 13px; min-height: 28px;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; color: #8B8D98; width: 44px;">14:52</span>
+              <span style="color: #B8BCC8; width: 52px;">Jin</span>
+              <span style="flex: 1 1 auto;">Table 15 · Bea wins 2–0</span>
+              
+                <button type="button" style="height: 26px; padding: 0px 10px; background: transparent; color: #7F97D6; border: 1px solid #2D3A52; border-radius: 2px; font-size: 12px;">Undo</button>
+              
+            </div>
+          
+            <div style="display: flex; gap: 12px; align-items: center; font-size: 13px; min-height: 28px;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; color: #8B8D98; width: 44px;">14:50</span>
+              <span style="color: #B8BCC8; width: 52px;">Joe</span>
+              <span style="flex: 1 1 auto;">Table 6 · judge call, +3:00 extension</span>
+              
+            </div>
+          
+            <div style="display: flex; gap: 12px; align-items: center; font-size: 13px; min-height: 28px;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; color: #8B8D98; width: 44px;">14:47</span>
+              <span style="color: #B8BCC8; width: 52px;">Ray</span>
+              <span style="flex: 1 1 auto;">Table 12 · Vex wins 2–0 · Won drops after round</span>
+              
+            </div>
+          
+            <div style="display: flex; gap: 12px; align-items: center; font-size: 13px; min-height: 28px;">
+              <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; color: #8B8D98; width: 44px;">14:41</span>
+              <span style="color: #B8BCC8; width: 52px;">Joe</span>
+              <span style="flex: 1 1 auto;">Table 13 · Yuri wins 2–1</span>
+              
+            </div>
+          
+        </div>
+      </section>
+    </main>
+
+    
+    <aside aria-label="Broadcast" style="flex: 1 1 340px; max-width: 420px; min-width: 0px; border-left: 1px solid #1F2937; padding: 16px; display: flex; flex-direction: column; gap: 14px; background: #0D1222;">
+
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <p style="margin: 0px; font-size: 11px; letter-spacing: 0.08em; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">BROADCAST</p>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #B8BCC8;">
+          <input type="checkbox" checked="" style="width: 16px; height: 16px; accent-color: #4A65A8;">
+          Auto-follow
+        </label>
+      </div>
+
+      
+      <div>
+        <p style="margin: 0px 0px 6px; font-size: 12px; color: #B8BCC8;"><span style="font-family: &quot;Chakra Petch&quot;, monospace; color: #7F97D6;">PREVIEW</span> · Standings</p>
+        <div style="aspect-ratio: 16 / 9; border: 2px solid #4A65A8; background: #0A0E1A; padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-family: &quot;Bebas Neue&quot;, sans-serif; font-size: 16px; letter-spacing: 0.04em;">STANDINGS AFTER ROUND 2</span>
+          
+            <span style="display: flex; gap: 8px; font-size: 9px; color: #B8BCC8; font-family: &quot;Chakra Petch&quot;, monospace;"><span style="width: 12px;">1</span><span style="flex: 1 1 auto; color: #F5F5F7;">Iris</span><span>2-0</span><span>75%</span></span>
+          
+            <span style="display: flex; gap: 8px; font-size: 9px; color: #B8BCC8; font-family: &quot;Chakra Petch&quot;, monospace;"><span style="width: 12px;">2</span><span style="flex: 1 1 auto; color: #F5F5F7;">Tae</span><span>2-0</span><span>62%</span></span>
+          
+            <span style="display: flex; gap: 8px; font-size: 9px; color: #B8BCC8; font-family: &quot;Chakra Petch&quot;, monospace;"><span style="width: 12px;">3</span><span style="flex: 1 1 auto; color: #F5F5F7;">Aria</span><span>2-0</span><span>58%</span></span>
+          
+            <span style="display: flex; gap: 8px; font-size: 9px; color: #B8BCC8; font-family: &quot;Chakra Petch&quot;, monospace;"><span style="width: 12px;">4</span><span style="flex: 1 1 auto; color: #F5F5F7;">Mina</span><span>2-0</span><span>50%</span></span>
+          
+            <span style="display: flex; gap: 8px; font-size: 9px; color: #B8BCC8; font-family: &quot;Chakra Petch&quot;, monospace;"><span style="width: 12px;">5</span><span style="flex: 1 1 auto; color: #F5F5F7;">Nox</span><span>1-0-1</span><span>67%</span></span>
+          
+        </div>
+      </div>
+
+      <button type="button" style="height: 48px; background: #BA263C; color: #F5F5F7; border: 0px; border-radius: 2px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.08em; cursor: pointer;">TAKE ▸ ON AIR</button>
+
+      
+      <div>
+        <p style="margin: 0px 0px 6px; font-size: 12px; color: #B8BCC8;"><span style="font-family: &quot;Chakra Petch&quot;, monospace; color: #E94560;">● PROGRAM</span> · Pairings + clock</p>
+        <div style="aspect-ratio: 16 / 9; border: 2px solid #BA263C; background: #0A0E1A; box-sizing: border-box; display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #10162A;">
+            <span style="font-family: &quot;Bebas Neue&quot;, sans-serif; font-size: 14px; letter-spacing: 0.04em;">ROUND 3 PAIRINGS</span>
+            <span style="font-family: &quot;Bebas Neue&quot;, sans-serif; font-size: 18px;">04:12</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0px, 1fr)); gap: 2px 10px; padding: 6px 10px;">
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Ahn</span><span>T14</span></span>
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Aria</span><span>T1</span></span>
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Bea</span><span>T15</span></span>
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Bok</span><span>T1</span></span>
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Calder</span><span>T2</span></span>
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Cho</span><span>T15</span></span>
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Dami</span><span>T2</span></span>
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Dov</span><span>TBYE</span></span>
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Eun</span><span>T3</span></span>
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Finn</span><span>T3</span></span>
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Gyu</span><span>T4</span></span>
+            
+              <span style="display: flex; gap: 6px; font-size: 8px; font-family: &quot;Chakra Petch&quot;, monospace; color: #B8BCC8;"><span style="color: #F5F5F7; flex: 1 1 auto;">Hana</span><span>T4</span></span>
+            
+          </div>
+          <span style="margin-top: auto; padding: 4px 10px; font-size: 8px; color: #8B8D98;">A–H · page 1 of 4 · auto-paging</span>
+        </div>
+      </div>
+
+      
+      <div>
+        <p style="margin: 0px 0px 6px; font-size: 12px; color: #B8BCC8;">Load a scene into preview</p>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0px, 1fr)); gap: 6px;">
+          
+            <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; cursor: pointer; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Pairings</button>
+          
+            <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; cursor: pointer; background: #2A0D16; color: #F5F5F7; border: 1px solid #BA263C;">Pairings + clock</button>
+          
+            <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; cursor: pointer; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Clock</button>
+          
+            <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; cursor: pointer; background: #1A2547; color: #F5F5F7; border: 1px solid #4A65A8;">Standings</button>
+          
+            <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; cursor: pointer; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Top-cut bracket</button>
+          
+            <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; cursor: pointer; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Announcement</button>
+          
+            <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; cursor: pointer; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Idle / brand</button>
+          
+        </div>
+      </div>
+
+      <div style="border: 1px solid #1F2937; padding: 10px; font-size: 12px; color: #B8BCC8; display: flex; flex-direction: column; gap: 4px;">
+        <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 11px; color: #8B8D98;">AUTO-FOLLOW NEXT</span>
+        <span>Time called → Clock with TIME banner</span>
+        <span>Round closed → Standings</span>
+      </div>
+    </aside>
+  </div></div>
+</body>
+</html>

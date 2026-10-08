@@ -40,9 +40,42 @@ const config: Config = {
           },
         },
 
-        success: "#22C55E",
-        warning: "#F59E0B",
+        success: {
+          DEFAULT: "#22C55E",
+          // Control Deck v2: base `success` is too dark for 10–12px text.
+          surface: "#0F2A1A",
+          ink: "#4ADE80",
+        },
+        warning: {
+          DEFAULT: "#F59E0B",
+          // Control Deck v2: judge calls, alert strip, flagged tables.
+          surface: "#2E210A",
+          "surface-strong": "#241A08",
+          tile: "#1C1710",
+          line: "#8A6418",
+          "line-quiet": "#6B4A12",
+          ink: "#F5B54A",
+        },
         danger: "#EF4444",
+
+        // Control Deck v2 (docs/design/control-deck-v2/tokens.md).
+        deck: {
+          rail: "#0D1222", // phase rail + broadcast column background
+          tile: "#141B32", // table tile, "playing" state
+        },
+        link: "#7F97D6", // links + PREVIEW label on dark surfaces
+        "onair-surface": "#2A0D16", // ON AIR chip, program-scene button
+        "primary-disabled": {
+          DEFAULT: "#3A1520",
+          ink: "#D9A0AA",
+        },
+        venue: {
+          row: "#121931",
+          "row-alt": "#0E1428",
+          card: "#151C36",
+          time: "#8E1C2E",
+          "time-ink": "#FFC2CC",
+        },
       },
       fontFamily: {
         display: ["var(--font-bebas-neue)", "Impact", "sans-serif"],
