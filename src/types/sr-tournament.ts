@@ -283,6 +283,12 @@ export interface SrTournamentFull {
   players: SrTeamPlayer[];
 }
 
+/** What /api/sr/admin-state returns and the SR desk renders (admin-only). */
+export interface SrAdminState extends SrTournamentFull {
+  audit: SrAuditLogEntry[];
+  applications: SrTeamApplicationView[];
+}
+
 export const SR_MIN_TEAMS = 8;
 export const SR_MAX_TEAMS = 16;
 
