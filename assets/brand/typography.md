@@ -34,11 +34,11 @@ Used for everything else: nav, body copy, buttons, forms, tables. Workhorse font
 - Weights to load: 400, 500, 600
 - Tracking: normal
 
-### Monospace — JetBrains Mono
+### Monospace — Chakra Petch
 
-Used sparingly for: code in how-to guides, tournament timestamps, score displays where alignment matters, and small "KR server stats" callouts where a technical feel is wanted.
+Loaded as `--font-chakra` (see `src/app/layout.tsx`). JetBrains Mono is no longer used. Used sparingly for: code in how-to guides, tournament timestamps, score displays where alignment matters, and small "KR server stats" callouts where a technical feel is wanted.
 
-- Weights to load: 400, 500
+- Weights to load: 500, 600, 700
 - Tracking: normal
 
 ### Korean fallback — Pretendard
@@ -113,7 +113,7 @@ fontFamily: {
   display: ["var(--font-bebas-neue)", "Impact", "sans-serif"],
   heading: ["var(--font-space-grotesk)", "system-ui", "sans-serif"],
   sans: ["var(--font-inter)", "Pretendard", "system-ui", "sans-serif"],
-  mono: ["var(--font-jetbrains-mono)", "monospace"],
+  mono: ["var(--font-chakra)", "monospace"],
 },
 fontSize: {
   "display-xl": ["6rem", { lineHeight: "0.95", letterSpacing: "0.02em", fontWeight: "400" }],
@@ -143,12 +143,12 @@ When using Bebas Neue (`font-display`) in Tailwind, also apply `uppercase` since
 Use `next/font/google` in `app/layout.tsx`:
 
 ```ts
-import { Inter, Space_Grotesk, Bebas_Neue, JetBrains_Mono } from "next/font/google";
+import { Inter, Space_Grotesk, Bebas_Neue, Chakra_Petch } from "next/font/google";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-space-grotesk", display: "swap" });
 const bebasNeue = Bebas_Neue({ subsets: ["latin"], weight: ["400"], variable: "--font-bebas-neue", display: "swap" });
-const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-jetbrains-mono", display: "swap" });
+const chakraPetch = Chakra_Petch({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-chakra", display: "swap" });
 ```
 
 For Pretendard (Korean), self-host the subset or use the CDN:
