@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import type { MayhemVenueState } from "@/lib/mayhem-db";
-import type { MayhemMatch, MayhemScene, MayhemTeam } from "@/types/mayhem";
+import type { MayhemMatch, MayhemScene } from "@/types/mayhem";
 import { cn } from "@/lib/utils";
 
 /**
