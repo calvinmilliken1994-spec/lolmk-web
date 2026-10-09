@@ -3,7 +3,9 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLockInCue } from "@/components/sr/use-lock-in-cue";
+import { ubr1RevealDurationMs, ubr1VisibleCount } from "@/lib/sr-reveal";
 import type {
+  SrMatchScene,
   SrPublicMatch,
   SrPublicTeam,
   SrPublicTournamentFull,
@@ -20,25 +22,27 @@ const BRACKET_LABEL: Record<SrPublicMatch["bracket"], string> = {
 // (see startUbr1Reveal in actions.ts); every connected client (including
 // one that reconnects mid-sequence) derives the exact same animation frame
 // from elapsed wall-clock time against that timestamp, never from a
-// manually-clicked step count and never from polling cadence.
-const REVEAL_ROW_INTERVAL_MS = 3000;
-const REVEAL_HOLD_MS = 1800;
+// manually-clicked step count and never from polling cadence. Timing lives in
+// src/lib/sr-reveal.ts so the desk shows the same progress.
 
 export function SrLiveScreen({
   initial,
   slug,
   muted = false,
+  sceneOverride = null,
 }: {
   initial: SrPublicTournamentFull | null;
   slug: string;
   muted?: boolean;
+  /** The desk's Preview monitor (`?scene=<id>&preview=1`): render this scene instead of the one on air. */
+  sceneOverride?: SrMatchScene | null;
 }) {
   const [data, setData] = useState(initial);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const { play: playLockIn, unlock } = useLockInCue();
   // Audio must never fire in the admin's muted preview embed (see
-  // sr-live-preview.tsx's `?muted=1`), regardless of soundEnabled — the
+  // the desk's Program and Preview monitors, `?muted=1` or `preview=1`), regardless of soundEnabled — the
   // "Enable sound" gesture button is hidden entirely below when muted, so
   // this is belt-and-braces against soundEnabled somehow flipping true.
   const audioEnabled = soundEnabled && !muted;
@@ -124,7 +128,13 @@ export function SrLiveScreen({
         </button>
       )}
       <div className="relative z-10 flex h-full w-full items-center justify-center p-[3vw]">
-        <LiveScene data={data} reducedMotion={reducedMotion} audioEnabled={audioEnabled} playLockIn={playLockIn} />
+        <LiveScene
+          data={data}
+          scene={sceneOverride ?? tournament.scene}
+          reducedMotion={reducedMotion}
+          audioEnabled={audioEnabled}
+          playLockIn={playLockIn}
+        />
       </div>
     </main>
   );
@@ -132,16 +142,17 @@ export function SrLiveScreen({
 
 function LiveScene({
   data,
+  scene,
   reducedMotion,
   audioEnabled,
   playLockIn,
 }: {
   data: SrPublicTournamentFull;
+  scene: SrMatchScene;
   reducedMotion: boolean;
   audioEnabled: boolean;
   playLockIn: () => void;
 }) {
-  const scene = data.tournament.scene;
   const [displayedScene, setDisplayedScene] = useState(scene);
   const [visible, setVisible] = useState(true);
   const timerRef = useRef<number | null>(null);
@@ -746,7 +757,7 @@ function BracketOrReveal({
   const total = ubr1Matches.length;
   const startedAt = tournament.ubr1_reveal_started_at;
   const runId = tournament.ubr1_reveal_run_id;
-  const revealDurationMs = total > 1 ? (total - 1) * REVEAL_ROW_INTERVAL_MS + REVEAL_HOLD_MS : REVEAL_HOLD_MS;
+  const revealDurationMs = ubr1RevealDurationMs(total);
 
   // Self-terminating ticker: only runs while a reveal is actually in
   // progress, and stops itself once elapsed time passes the sequence's
@@ -766,7 +777,7 @@ function BracketOrReveal({
   }, [startedAt, runId, revealDurationMs]);
 
   const elapsed = startedAt ? Math.max(0, now - Date.parse(startedAt)) : 0;
-  const visibleCount = total === 0 ? 0 : Math.min(total, Math.floor(elapsed / REVEAL_ROW_INTERVAL_MS) + 1);
+  const visibleCount = ubr1VisibleCount(total, elapsed);
   const revealActive = total > 0 && startedAt !== null && elapsed < revealDurationMs;
 
   // Play the lock-in cue once per newly revealed row, keyed to this run. The
