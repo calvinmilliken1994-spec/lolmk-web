@@ -109,7 +109,19 @@ export function RbBroadcast({
       onPreview={setPreviewId}
       onTake={() => void run(() => actions.setScene(t.id, previewId as RbScene))}
       pending={pending}
-      toolSlot={<BroadcastNote title="AUTO-FOLLOW NEXT" lines={lines} />}
+      toolSlot={
+        <div className="flex flex-col gap-3.5">
+          <BroadcastNote title="AUTO-FOLLOW NEXT" lines={lines} />
+          <a
+            href={`/rblive/${encodeURIComponent(t.slug)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[12px] text-link hover:text-ink"
+          >
+            Open /rblive full screen ↗
+          </a>
+        </div>
+      }
     />
   );
 }
