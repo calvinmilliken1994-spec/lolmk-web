@@ -66,6 +66,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang="en"
+      // The inline script below adds .lolmk-cursor before hydration (no cursor
+      // flash), so the server and client class lists differ on purpose. Only
+      // this element's own attributes are exempt; children still warn.
+      suppressHydrationWarning
       className={`${inter.variable} ${spaceGrotesk.variable} ${bebasNeue.variable} ${chakraPetch.variable}`}
     >
       <head>
