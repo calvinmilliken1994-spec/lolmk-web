@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 const BASE_URL = "https://lolmk.gg";
 
 // Static, substantive, publicly indexable routes only. Excluded on purpose:
-// auth/session pages (/tools, /captain, /members/profile, /api/*), the
+// auth/session pages (/tools, /captain, /locker, /members/profile, /api/*), the
 // dev-only bracket previews (/tournaments/preview*), and /design-preview/*
 // (throwaway reskin mockups, never meant to be crawled).
 const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"]; priority: number }[] = [

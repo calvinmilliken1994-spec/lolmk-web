@@ -67,7 +67,7 @@ The handover's token names (`surface`, `line`, `text`, …) collide with existin
 
 ### 8. Locker nav item waits for Phase 5 (Phase 2)
 
-The handover's nav is Tournaments, Members, How-tos, Locker, About, with the signed-in avatar linking to `/locker`. `/locker` doesn't exist until Phase 5, so in Phase 2 the nav has no Locker item and the avatar links to `/members/profile`. Both switch in Phase 5.
+The handover's nav is Tournaments, Members, How-tos, Locker, About, with the signed-in avatar linking to `/locker`. `/locker` didn't exist until Phase 5, so in Phase 2 the nav had no Locker item and the avatar linked to `/members/profile`. **Resolved in Phase 5:** the nav has Locker and the avatar links to `/locker`.
 
 ## Tournaments
 
@@ -100,4 +100,18 @@ Cards use the member's favourite champion's splash from Riot Data Dragon (`ddrag
 ### 15. About: partner details and history (Phase 4)
 
 The partners section names Gen.G GGX and the Naver Riftbound TCG cafe with one plain line each and no links, because the repo has no URL for either. The history timeline is left out until Calvin supplies milestones, as the handover says. **Needs:** partner URLs and any copy you want for them.
+
+## Locker
+
+### 16. RSVPs come from Discord "Interested", not a bot table (Phase 5)
+
+The handover asks whether the bot tracks RSVPs per member. Nothing in the database does, but Discord does: members who click "Interested" on a scheduled event are listed by `GET /guilds/{guild}/scheduled-events/{event}/users`, which the site's existing bot token can read. The Locker's "Next RSVP" stat and "Coming up" list use that, read-only, cached for 5 minutes. No bot endpoint was added. **Needs:** confirm "Interested" is the RSVP you mean.
+
+### 17. Locker history covers Summoner's Rift and Riftbound only (Phase 5)
+
+History reads `sr_team_players.discord_id` and `rb_players.member_discord_id`. ARAM Mayhem keeps a single live event row that is overwritten each meetup (see #2), so there is no past Mayhem to list. Placements are derived from recorded results (champion, runner-up, third, or the round a team went out in; Swiss rank for Riftbound). **Needs:** a Mayhem results history if past meetups should show up.
+
+### 18. Locker was verified with a read-only render, not a real sign-in (Phase 5)
+
+The local `.env.local` has no member-auth config (`DISCORD_CLIENT_ID` is empty), so sign-in redirects to `/members?authError=config` locally. The signed-out redirect (`/locker` to `/api/auth/member/login?next=/locker`), `/shop` and `/members/profile` permanent redirects to `/locker` were checked on a production build; the signed-in page was checked by rendering its content for Calvin's member ID through a temporary route that was deleted before the commit. **Needs:** a real sign-in on a preview deploy.
 

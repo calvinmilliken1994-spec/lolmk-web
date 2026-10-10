@@ -13,6 +13,7 @@ export default function robots(): MetadataRoute.Robots {
           "/captain",
           "/captain/",
           "/members/profile",
+          "/locker",
           "/mayhemlive",
         ],
       },

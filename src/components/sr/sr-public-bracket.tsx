@@ -1,6 +1,6 @@
 import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { computeBracketGraph, type BracketHeader } from "@/lib/bracket-layout";
+import { computeBracketGraph, decidingFinalId, type BracketHeader } from "@/lib/bracket-layout";
 import type { SrPublicMatch, SrPublicTeam } from "@/types/sr-tournament";
 
 /**
@@ -72,7 +72,7 @@ export function SrPublicBracket({
 
   // The trophy marks the champion once: on their row in the deciding final
   // (the grand-final reset when one was played), not in every round won.
-  const decidingFinalId = decidingFinal(visible);
+  const decidingFinal = decidingFinalId(visible);
 
   const posById = new Map(graph.positioned.map((p) => [p.match.id, p]));
   const headerFor = (m: SrPublicMatch) => {
@@ -232,7 +232,7 @@ export function SrPublicBracket({
                 match={match}
                 teamById={teamById}
                 championTeamId={
-                  match.id === decidingFinalId ? championTeamId : null
+                  match.id === decidingFinal ? championTeamId : null
                 }
                 sourceA={match.team_a_id ? null : sourceLabel(match, "a")}
                 sourceB={match.team_b_id ? null : sourceLabel(match, "b")}
@@ -243,23 +243,6 @@ export function SrPublicBracket({
       </div>
     </div>
   );
-}
-
-function decidingFinal(matches: SrPublicMatch[]): string | null {
-  const gf = matches
-    .filter((m) => m.bracket === "grand_final" && m.status === "completed")
-    .sort((a, b) => b.round_number - a.round_number)[0];
-  if (gf) return gf.id;
-  if (matches.some((m) => m.bracket === "grand_final" || m.bracket === "lower"))
-    return null;
-  // Single elimination: the upper-bracket match nothing advances out of.
-  const final = matches.find(
-    (m) =>
-      m.bracket === "upper" &&
-      !m.advances_to_match_id &&
-      m.status === "completed",
-  );
-  return final?.id ?? null;
 }
 
 /**

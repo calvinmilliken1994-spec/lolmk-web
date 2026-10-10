@@ -15,6 +15,8 @@ const nextConfig = (phase) => ({
   redirects: async () => [
     // The tournament timer moved behind the admin tools wall.
     { source: "/timer", destination: "/tools/timer", permanent: false },
+    // The Locker replaced the shop as the signed-in member hub (2026 redesign).
+    { source: "/shop", destination: "/locker", permanent: true },
   ],
   images: {
     formats: ["image/avif", "image/webp"],

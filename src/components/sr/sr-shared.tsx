@@ -88,14 +88,17 @@ export function Field({
   label,
   hint,
   children,
+  labelClassName = "text-label uppercase tracking-wider text-ink-muted",
 }: {
   label: string;
   hint?: string;
   children: React.ReactNode;
+  /** Public pages pass the redesign's sentence-case label style. */
+  labelClassName?: string;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-label uppercase tracking-wider text-ink-muted">{label}</span>
+      <span className={labelClassName}>{label}</span>
       {children}
       {hint && <span className="text-caption text-ink-muted">{hint}</span>}
     </label>

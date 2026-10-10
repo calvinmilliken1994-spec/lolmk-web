@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { href: "/tournaments", label: "Tournaments" },
   { href: "/members", label: "Members" },
   { href: "/how-tos", label: "How-tos" },
+  { href: "/locker", label: "Locker" },
   { href: "/about", label: "About" },
 ];
 
@@ -23,7 +24,7 @@ function isActive(pathname: string | null, href: string): boolean {
 }
 
 /** Where the signed-in avatar goes. */
-const MEMBER_HOME = "/members/profile";
+const MEMBER_HOME = "/locker";
 
 interface HeaderMemberState {
   displayName: string;

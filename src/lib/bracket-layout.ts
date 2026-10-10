@@ -274,3 +274,20 @@ export function computeBracketGraph<M extends LayoutMatch>(
     grandFinalCol: finalMatches.length > 0 ? gfCol : -1,
   };
 }
+
+/**
+ * The match that decided the tournament: the latest completed grand final
+ * (the reset when one was played); in single elimination, the completed
+ * final. Null while undecided.
+ */
+export function decidingFinalId<M extends LayoutMatch>(matches: M[]): string | null {
+  const gf = matches
+    .filter((m) => m.bracket === "grand_final" && m.status === "completed")
+    .sort((a, b) => b.round_number - a.round_number)[0];
+  if (gf) return gf.id;
+  if (matches.some((m) => m.bracket === "grand_final" || m.bracket === "lower")) return null;
+  const final = matches.find(
+    (m) => m.bracket === "upper" && !m.advances_to_match_id && m.status === "completed",
+  );
+  return final?.id ?? null;
+}
