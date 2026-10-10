@@ -2,9 +2,10 @@
 
 import { sql, type VercelPoolClient } from "@vercel/postgres";
 import { revalidatePath } from "next/cache";
-import { isToolsSession } from "@/lib/tools-auth";
+import { getCurrentAdmin, isToolsSession } from "@/lib/tools-auth";
 import {
   ensureSchema,
+  insertSrAudit,
   newId,
 } from "@/lib/sr-db";
 import {
@@ -17,6 +18,7 @@ import {
 import { assertOwnBlobUrl, deleteTeamLogo, uploadTeamLogo } from "@/lib/team-logo";
 import { shuffle } from "@/lib/mayhem-icons";
 import type {
+  SrActor,
   SrBracketFormat,
   SrMatch,
   SrMatchScene,
@@ -41,9 +43,13 @@ import { SR_MAX_TEAMS, SR_MIN_TEAMS, SR_SCENES } from "@/types/sr-tournament";
  *   5. revalidates the admin page + public tournament page after commit.
  */
 
-async function requireAdmin() {
+/** Gate every admin action; returns the admin as the audit actor. */
+async function requireAdmin(): Promise<SrActor> {
   const ok = await isToolsSession();
   if (!ok) throw new Error("Not authorized.");
+  const admin = await getCurrentAdmin();
+  if (!admin) throw new Error("Not authorized.");
+  return { discordId: admin.discordUserId, name: admin.username, kind: "admin" };
 }
 
 /** Run `fn` inside a transaction on a dedicated client, always releasing it. */
@@ -158,7 +164,7 @@ export async function createTournament(input: {
   startAt: string | null;
   endAt: string | null;
 }): Promise<string> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   await ensureSchema();
 
   const name = input.name.trim();
@@ -215,10 +221,7 @@ export async function createTournament(input: {
           ],
         );
 
-        await client.query(
-          `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'tournament.create', $2::jsonb)`,
-          [id, JSON.stringify({ name, format: input.format })],
-        );
+        await insertSrAudit(client, id, "tournament.create", { name, format: input.format }, actor);
 
         return { id, slug };
       });
@@ -252,7 +255,7 @@ export async function updateTournament(
     endAt: string | null;
   }>,
 ): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
 
   let refreshSlug: string | undefined;
   await withTransaction(async (client) => {
@@ -320,17 +323,14 @@ export async function updateTournament(
         input.grandFinalBestOf ?? null,
       ],
     );
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'tournament.update', $2::jsonb)`,
-      [tournamentId, JSON.stringify(input)],
-    );
+    await insertSrAudit(client, tournamentId, "tournament.update", input, actor);
     refreshSlug = current.slug as string;
   });
   refresh(refreshSlug);
 }
 
 export async function archiveTournament(tournamentId: string): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const slug = await withTransaction(async (client) => {
     const { rows } = await client.sql`
       UPDATE sr_tournaments SET status = 'archived', updated_at = now()
@@ -338,10 +338,7 @@ export async function archiveTournament(tournamentId: string): Promise<void> {
       RETURNING slug
     `;
     if (rows.length === 0) throw new Error("Tournament not found.");
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action) VALUES ($1, 'tournament.archive')`,
-      [tournamentId],
-    );
+    await insertSrAudit(client, tournamentId, "tournament.archive", null, actor);
     return rows[0].slug as string;
   });
   refresh(slug);
@@ -391,7 +388,7 @@ export async function addTeam(
   tournamentId: string,
   input: { name: string; logoUrl?: string | null },
 ): Promise<string> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const name = input.name.trim();
   if (!name) throw new Error("Team name is required.");
   if (input.logoUrl) assertOwnBlobUrl(input.logoUrl);
@@ -436,10 +433,7 @@ export async function addTeam(
       }
       throw e;
     }
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'team.add', $2::jsonb)`,
-      [tournamentId, JSON.stringify({ teamId: id, name })],
-    );
+    await insertSrAudit(client, tournamentId, "team.add", { teamId: id, name }, actor);
     return { id, slug: tournament.slug as string };
   });
   refresh(slug);
@@ -450,7 +444,7 @@ export async function updateTeam(
   teamId: string,
   input: { name?: string; logoUrl?: string | null },
 ): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   // A logo URL may only ever be one of ours. Anything else — a Discord CDN
   // attachment link, an imgur hotlink — is rejected here rather than
   // stored, so this is true no matter which caller supplies it.
@@ -488,17 +482,14 @@ export async function updateTeam(
       }
       throw e;
     }
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'team.update', $2::jsonb)`,
-      [team.tournament_id, JSON.stringify({ teamId, ...input })],
-    );
+    await insertSrAudit(client, team.tournament_id, "team.update", { teamId, ...input }, actor);
     return team.tournament_slug as string;
   });
   refresh(slug);
 }
 
 export async function removeTeam(teamId: string): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const slug = await withTransaction(async (client) => {
     const { rows } = await client.sql`
       SELECT t.*, tr.slug as tournament_slug, tr.status as tournament_status FROM sr_teams t
@@ -524,10 +515,7 @@ export async function removeTeam(teamId: string): Promise<void> {
       }
       throw e;
     }
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'team.remove', $2::jsonb)`,
-      [team.tournament_id, JSON.stringify({ teamId, name: team.name })],
-    );
+    await insertSrAudit(client, team.tournament_id, "team.remove", { teamId, name: team.name }, actor);
     return team.tournament_slug as string;
   });
   if (slug) refresh(slug);
@@ -544,7 +532,7 @@ export async function removeTeam(teamId: string): Promise<void> {
  * `seed_locked = false`.
  */
 export async function rollSeeds(tournamentId: string): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const slug = await withTransaction(async (client) => {
     const { rows: tRows } = await client.sql`
       SELECT * FROM sr_tournaments WHERE id = ${tournamentId} FOR UPDATE
@@ -587,10 +575,7 @@ export async function rollSeeds(tournamentId: string): Promise<void> {
          signups_open = false, updated_at = now() WHERE id = $1`,
       [tournamentId],
     );
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'seed.roll', $2::jsonb)`,
-      [tournamentId, JSON.stringify({ teamCount: count })],
-    );
+    await insertSrAudit(client, tournamentId, "seed.roll", { teamCount: count }, actor);
     return tournament.slug as string;
   });
   refresh(slug);
@@ -622,7 +607,7 @@ export async function unlockSeeds(tournamentId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function generateBracket(tournamentId: string): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const slug = await withTransaction(async (client) => {
     const { rows: tRows } = await client.sql`
       SELECT * FROM sr_tournaments WHERE id = ${tournamentId} FOR UPDATE
@@ -725,10 +710,7 @@ export async function generateBracket(tournamentId: string): Promise<void> {
       `UPDATE sr_tournaments SET status = $2, champion_team_id = $3, updated_at = now() WHERE id = $1`,
       [tournamentId, champion ? "completed" : "bracket_published", champion],
     );
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'bracket.generate', $2::jsonb)`,
-      [tournamentId, JSON.stringify({ matchCount: built.length })],
-    );
+    await insertSrAudit(client, tournamentId, "bracket.generate", { matchCount: built.length }, actor);
     // New bracket, new reveal: reset UBR1 progress and bump the generation
     // so a stale client can never mistake old reveal progress for new-bracket
     // progress. Default is fully-revealed-looking (count starts at 0, but
@@ -756,7 +738,7 @@ export async function reportMatchResult(
   teamAScore: number,
   teamBScore: number,
 ): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
 
   const slug = await withTransaction(async (client) => {
     const { rows: mRows } = await client.sql`
@@ -804,12 +786,12 @@ export async function reportMatchResult(
       );
     }
 
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'match.report', $2::jsonb)`,
-      [
-        match.tournament_id,
-        JSON.stringify({ matchId, teamAScore, teamBScore, winnerId: result.winnerId }),
-      ],
+    await insertSrAudit(
+      client,
+      match.tournament_id,
+      "match.report",
+      { matchId, teamAScore, teamBScore, winnerId: result.winnerId },
+      actor,
     );
     return match.tournament_slug as string;
   });
@@ -818,7 +800,7 @@ export async function reportMatchResult(
 
 /** Undo a completed match, including transitive auto-bye advancement. */
 export async function undoMatchResult(matchId: string): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const slug = await withTransaction(async (client) => {
     const { rows: mRows } = await client.sql`
       SELECT m.*, t.slug as tournament_slug FROM sr_matches m
@@ -851,10 +833,7 @@ export async function undoMatchResult(matchId: string): Promise<void> {
        WHERE id = $1 AND active_match_id = $2`,
       [match.tournament_id, matchId],
     );
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'match.undo', $2::jsonb)`,
-      [match.tournament_id, JSON.stringify({ matchId })],
-    );
+    await insertSrAudit(client, match.tournament_id, "match.undo", { matchId }, actor);
     return match.tournament_slug as string;
   });
   refresh(slug);
@@ -876,7 +855,7 @@ export async function undoMatchResult(matchId: string): Promise<void> {
 // bad input yields a clear error before the composite FK is reached.
 
 export async function setScene(tournamentId: string, scene: SrMatchScene): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   if (!SR_SCENES.includes(scene)) throw new Error("Unknown scene.");
 
   const slug = await withTransaction(async (client) => {
@@ -886,11 +865,7 @@ export async function setScene(tournamentId: string, scene: SrMatchScene): Promi
       [tournamentId, scene],
     );
     if (rows.length === 0) throw new Error("Tournament not found.");
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail)
-       VALUES ($1, 'scene.set', $2::jsonb)`,
-      [tournamentId, JSON.stringify({ scene })],
-    );
+    await insertSrAudit(client, tournamentId, "scene.set", { scene }, actor);
     return rows[0].slug as string;
   });
   refresh(slug);
@@ -898,7 +873,7 @@ export async function setScene(tournamentId: string, scene: SrMatchScene): Promi
 
 /** Start a server-timestamped starting-soon countdown. */
 export async function startCountdown(tournamentId: string, seconds: number): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   if (!Number.isInteger(seconds) || seconds < 1 || seconds > 3600) {
     throw new Error("Countdown must be between 1 and 3600 seconds.");
   }
@@ -911,11 +886,7 @@ export async function startCountdown(tournamentId: string, seconds: number): Pro
       [tournamentId, endsAt],
     );
     if (rows.length === 0) throw new Error("Tournament not found.");
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail)
-       VALUES ($1, 'scene.set', $2::jsonb)`,
-      [tournamentId, JSON.stringify({ scene: "starting_soon", seconds })],
-    );
+    await insertSrAudit(client, tournamentId, "scene.set", { scene: "starting_soon", seconds }, actor);
     return rows[0].slug as string;
   });
   refresh(slug);
@@ -923,7 +894,7 @@ export async function startCountdown(tournamentId: string, seconds: number): Pro
 
 /** Select a tournament-owned match for the live screen, or return to bracket. */
 export async function setActiveMatch(tournamentId: string, matchId: string | null): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const slug = await withTransaction(async (client) => {
     const { rows: tournamentRows } = await client.query(
       `SELECT slug FROM sr_tournaments WHERE id = $1 FOR UPDATE`,
@@ -943,10 +914,12 @@ export async function setActiveMatch(tournamentId: string, matchId: string | nul
        WHERE id = $1`,
       [tournamentId, matchId, matchId ? "match" : "bracket"],
     );
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail)
-       VALUES ($1, 'scene.set', $2::jsonb)`,
-      [tournamentId, JSON.stringify({ scene: matchId ? "match" : "bracket", matchId })],
+    await insertSrAudit(
+      client,
+      tournamentId,
+      "scene.set",
+      { scene: matchId ? "match" : "bracket", matchId },
+      actor,
     );
     return tournamentRows[0].slug as string;
   });
@@ -955,7 +928,7 @@ export async function setActiveMatch(tournamentId: string, matchId: string | nul
 
 /** Admin override for deleting a stalled application and releasing reservations. */
 export async function withdrawTeamApplication(applicationId: string): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   await ensureSchema();
   const slug = await withTransaction(async (client) => {
     const { rows } = await client.query(
@@ -968,13 +941,12 @@ export async function withdrawTeamApplication(applicationId: string): Promise<vo
     );
     if (rows.length === 0) throw new Error("Application not found.");
     await client.query(`DELETE FROM sr_team_applications WHERE id = $1`, [applicationId]);
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail)
-       VALUES ($1, 'team.application_withdraw', $2::jsonb)`,
-      [
-        rows[0].tournament_id,
-        JSON.stringify({ applicationId, name: rows[0].team_name, by: "admin" }),
-      ],
+    await insertSrAudit(
+      client,
+      rows[0].tournament_id,
+      "team.application_withdraw",
+      { applicationId, name: rows[0].team_name, by: "admin" },
+      actor,
     );
     return rows[0].slug as string;
   });
@@ -998,7 +970,7 @@ export async function withdrawTeamApplication(applicationId: string): Promise<vo
  * never from a manually-clicked step count.
  */
 export async function startUbr1Reveal(tournamentId: string): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const slug = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `SELECT slug FROM sr_tournaments WHERE id = $1 FOR UPDATE`,
@@ -1018,10 +990,7 @@ export async function startUbr1Reveal(tournamentId: string): Promise<void> {
        WHERE id = $1`,
       [tournamentId, total, runId],
     );
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'reveal.start', $2::jsonb)`,
-      [tournamentId, JSON.stringify({ runId, total })],
-    );
+    await insertSrAudit(client, tournamentId, "reveal.start", { runId, total }, actor);
     return rows[0].slug as string;
   });
   refresh(slug);
@@ -1029,7 +998,7 @@ export async function startUbr1Reveal(tournamentId: string): Promise<void> {
 
 /** Hides every Round 1 matchup again and shows the full bracket immediately — does NOT bump the generation, so this is a true rewind, not a new bracket. */
 export async function resetUbr1Reveal(tournamentId: string): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const slug = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `UPDATE sr_tournaments
@@ -1038,10 +1007,7 @@ export async function resetUbr1Reveal(tournamentId: string): Promise<void> {
       [tournamentId],
     );
     if (rows.length === 0) throw new Error("Tournament not found.");
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'reveal.reset', '{}'::jsonb)`,
-      [tournamentId],
-    );
+    await insertSrAudit(client, tournamentId, "reveal.reset", {}, actor);
     return rows[0].slug as string;
   });
   refresh(slug);
@@ -1133,7 +1099,7 @@ export async function setSignupsOpen(
   tournamentId: string,
   open: boolean,
 ): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const slug = await withTransaction(async (client) => {
     const { rows } = await client.sql`
       SELECT slug, status FROM sr_tournaments WHERE id = ${tournamentId} FOR UPDATE
@@ -1148,10 +1114,7 @@ export async function setSignupsOpen(
       `UPDATE sr_tournaments SET signups_open = $2, updated_at = now() WHERE id = $1`,
       [tournamentId, open],
     );
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'signups.toggle', $2::jsonb)`,
-      [tournamentId, JSON.stringify({ open })],
-    );
+    await insertSrAudit(client, tournamentId, "signups.toggle", { open }, actor);
     return rows[0].slug as string;
   });
   refresh(slug);
@@ -1162,7 +1125,7 @@ export async function setTeamStatus(
   teamId: string,
   status: "pending" | "approved" | "rejected",
 ): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const slug = await withTransaction(async (client) => {
     // Lock the tournament first, then the team — same order every other
     // application/team code path uses, so this can never deadlock against
@@ -1239,9 +1202,12 @@ export async function setTeamStatus(
       }
       throw error;
     }
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'team.status', $2::jsonb)`,
-      [team.tournament_id, JSON.stringify({ teamId, name: team.name, status })],
+    await insertSrAudit(
+      client,
+      team.tournament_id,
+      "team.status",
+      { teamId, name: team.name, status },
+      actor,
     );
     return team.tournament_slug as string;
   });

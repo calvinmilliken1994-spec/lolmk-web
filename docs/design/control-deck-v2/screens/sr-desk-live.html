@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>SR desk — live phase</title>
+<!-- Control Deck v2 static reference. Frame: 1440x1000. Sample data is fake. See ../README.md -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Chakra+Petch:wght@400;500;600&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>body{margin:0;background:#0A0E1A} a{color:#7F97D6} button,input,select{font-family:inherit}</style>
+</head>
+<body>
+<div style="min-height: 1000px; background: #0A0E1A; color: #F5F5F7; font-family: Inter, Pretendard, system-ui, sans-serif; font-size: 14px; display: flex; flex-direction: column;">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #2D3A52; background: #10162A;">
+    <div style="display: flex; align-items: center; gap: 12px; flex: 1 1 320px; min-width: 0px;">
+      <a href="#" style="font-size: 13px; text-decoration: none;">← Summoner's Rift</a>
+      <span style="width: 1px; height: 18px; background: #2D3A52;"></span>
+      <h1 style="margin: 0px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 20px; font-weight: 600;">SR Cup · Double elim</h1>
+      <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; color: #B8BCC8; border: 1px solid #2D3A52; padding: 3px 8px;">LIVE · 7 / 14 MATCHES</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #BA263C; background: #2A0D16;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #E94560;"></span>
+      <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.06em;">ON AIR</span>
+      <span style="font-size: 13px;">Match · UB Semi 1</span>
+    </div>
+    <span style="font-size: 12px; color: #8B8D98;">● Synced 1s ago</span>
+    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+      <button type="button" style="height: 44px; padding: 0px 20px; background: #BA263C; color: #F5F5F7; border: 0px; border-radius: 2px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 15px; font-weight: 600; cursor: pointer;">Start LB Round 2</button>
+      <span style="font-size: 12px; color: #B8BCC8;">Room B is free · both teams ready</span>
+    </div>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; flex: 1 1 auto;">
+    <nav aria-label="Event phases" style="flex: 0 0 200px; border-right: 1px solid #1F2937; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; background: #0D1222;">
+      <p style="margin: 0px 0px 8px 8px; font-size: 11px; letter-spacing: 0.08em; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">PHASES</p>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #B8BCC8;"><span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #22C55E;"></span><span style="flex: 1 1 auto;">Setup</span><span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #B8BCC8;"><span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #22C55E;"></span><span style="flex: 1 1 auto;">Signups</span><span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">8 teams</span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #B8BCC8;"><span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #22C55E;"></span><span style="flex: 1 1 auto;">Seeding</span><span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #B8BCC8;"><span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #22C55E;"></span><span style="flex: 1 1 auto;">Bracket</span><span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; background: #1A2240; color: #F5F5F7; border: 1px solid #4A65A8;"><span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #E94560;"></span><span style="flex: 1 1 auto;">Live</span><span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">LIVE</span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px; font-size: 13px; text-decoration: none; border-radius: 2px; border: 1px solid transparent; color: #8B8D98;"><span style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; border: 1px solid #4A4D5A;"></span><span style="flex: 1 1 auto;">Complete</span><span style="font-size: 11px; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;"></span></a>
+      
+    </nav>
+
+    <main style="flex: 999 1 560px; min-width: 0px; padding: 20px; display: flex; flex-direction: column; gap: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <p style="margin: 0px; font-size: 11px; letter-spacing: 0.08em; color: #E94560; font-family: &quot;Chakra Petch&quot;, monospace;">MATCH QUEUE</p>
+          <h2 style="margin: 4px 0px 0px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 24px; font-weight: 600;">What's happening now</h2>
+        </div>
+        <a href="#" style="font-size: 13px;">Open full bracket →</a>
+      </div>
+
+      
+      <section style="border: 1px solid #4A65A8; background: #10162A; padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; color: #7F97D6;">NOW PLAYING · ROOM A · UB SEMIFINAL 1 · BO3</span>
+          <span style="font-size: 13px; color: #B8BCC8;">Game 2 · started 18m ago</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
+          <span style="flex: 1 1 200px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 22px; font-weight: 600; text-align: right;">Hanbit Five <span style="color: #8B8D98; font-size: 14px;">#1</span></span>
+          <span style="font-family: &quot;Bebas Neue&quot;, sans-serif; font-size: 52px; line-height: 1;">1 – 0</span>
+          <span style="flex: 1 1 200px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 22px; font-weight: 600;"><span style="color: #8B8D98; font-size: 14px;">#4</span> Poro Patrol</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0px, 1fr)); gap: 8px;">
+          <button type="button" style="height: 52px; background: #1A2547; color: #F5F5F7; border: 1px solid #4A65A8; border-radius: 2px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 16px; font-weight: 600;">Hanbit 2–0</button>
+          <button type="button" style="height: 52px; background: #1A2547; color: #F5F5F7; border: 1px solid #4A65A8; border-radius: 2px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 16px; font-weight: 600;">Hanbit 2–1</button>
+          <button type="button" style="height: 52px; background: #1A2240; color: #F5F5F7; border: 1px solid #2D3A52; border-radius: 2px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 16px; font-weight: 600;">Poro 2–1</button>
+          <button type="button" style="height: 52px; background: #1A2240; color: #F5F5F7; border: 1px solid #2D3A52; border-radius: 2px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 16px; font-weight: 600;">Poro 2–0</button>
+        </div>
+        <span style="font-size: 12px; color: #8B8D98;">Only scores that can end a Bo3 are offered. Game-by-game tracking stays optional.</span>
+      </section>
+
+      
+      <section style="display: flex; flex-direction: column; gap: 8px;">
+        <p style="margin: 0px; font-family: &quot;Chakra Petch&quot;, monospace; font-size: 11px; letter-spacing: 0.08em; color: #8B8D98;">UP NEXT</p>
+        
+          <div style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; background: #10162A; border: 1px solid #1F2937; flex-wrap: wrap;">
+            <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; color: #B8BCC8; width: 120px;">LB ROUND 2</span>
+            <span style="flex: 1 1 260px; font-size: 15px;">Mid Diff vs Baron Steal</span>
+            <span style="font-size: 12px; color: #4ADE80;">Both teams ready</span>
+            <button type="button" style="height: 36px; padding: 0px 14px; background: transparent; color: #F5F5F7; border: 1px solid #2D3A52; border-radius: 2px; font-size: 13px;">Start</button>
+          </div>
+        
+          <div style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; background: #10162A; border: 1px solid #1F2937; flex-wrap: wrap;">
+            <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; color: #B8BCC8; width: 120px;">UB SEMI 2</span>
+            <span style="flex: 1 1 260px; font-size: 15px;">Flash on D vs Gank Squad</span>
+            <span style="font-size: 12px; color: #B8BCC8;">Room A after current match</span>
+            <button type="button" style="height: 36px; padding: 0px 14px; background: transparent; color: #F5F5F7; border: 1px solid #2D3A52; border-radius: 2px; font-size: 13px;">Start</button>
+          </div>
+        
+      </section>
+
+      
+      <section style="display: flex; flex-direction: column; gap: 8px;">
+        <p style="margin: 0px; font-family: &quot;Chakra Petch&quot;, monospace; font-size: 11px; letter-spacing: 0.08em; color: #8B8D98;">WAITING ON RESULTS</p>
+        
+          <div style="display: flex; gap: 14px; padding: 10px 14px; border: 1px dashed #2D3A52; color: #B8BCC8; flex-wrap: wrap;">
+            <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; width: 120px;">UB FINAL</span>
+            <span style="font-size: 14px;">Winner UB Semi 1 vs Winner UB Semi 2</span>
+          </div>
+        
+          <div style="display: flex; gap: 14px; padding: 10px 14px; border: 1px dashed #2D3A52; color: #B8BCC8; flex-wrap: wrap;">
+            <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; width: 120px;">LB ROUND 3</span>
+            <span style="font-size: 14px;">Loser UB Semi 1 vs Winner LB Round 2</span>
+          </div>
+        
+          <div style="display: flex; gap: 14px; padding: 10px 14px; border: 1px dashed #2D3A52; color: #B8BCC8; flex-wrap: wrap;">
+            <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 12px; width: 120px;">GRAND FINAL</span>
+            <span style="font-size: 14px;">Winner UB Final vs Winner LB Final</span>
+          </div>
+        
+      </section>
+    </main>
+
+    <aside aria-label="Broadcast" style="flex: 1 1 340px; max-width: 420px; border-left: 1px solid #1F2937; padding: 16px; display: flex; flex-direction: column; gap: 14px; background: #0D1222;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <p style="margin: 0px; font-size: 11px; letter-spacing: 0.08em; color: #8B8D98; font-family: &quot;Chakra Petch&quot;, monospace;">BROADCAST</p>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #B8BCC8;"><input type="checkbox" checked="" style="width: 16px; height: 16px; accent-color: #4A65A8;"> Auto-follow</label>
+      </div>
+      <div>
+        <p style="margin: 0px 0px 6px; font-size: 12px; color: #B8BCC8;"><span style="font-family: &quot;Chakra Petch&quot;, monospace; color: #7F97D6;">PREVIEW</span> · Bracket</p>
+        <div style="aspect-ratio: 16 / 9; border: 2px solid #4A65A8; background: #0A0E1A; display: flex; align-items: center; justify-content: center; color: #8B8D98; font-size: 12px;">Live screen render (?scene=bracket&amp;preview=1)</div>
+      </div>
+      <button type="button" style="height: 48px; background: #BA263C; color: #F5F5F7; border: 0px; border-radius: 2px; font-family: &quot;Space Grotesk&quot;, sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.08em;">TAKE ▸ ON AIR</button>
+      <div>
+        <p style="margin: 0px 0px 6px; font-size: 12px; color: #B8BCC8;"><span style="font-family: &quot;Chakra Petch&quot;, monospace; color: #E94560;">● PROGRAM</span> · Match · UB Semi 1</p>
+        <div style="aspect-ratio: 16 / 9; border: 2px solid #BA263C; background: #0A0E1A; display: flex; align-items: center; justify-content: center; color: #8B8D98; font-size: 12px;">Existing SrLivePreview iframe</div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0px, 1fr)); gap: 6px;">
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Idle</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Starting soon</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Teams</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #1A2547; color: #F5F5F7; border: 1px solid #4A65A8;">Bracket</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #2A0D16; color: #F5F5F7; border: 1px solid #BA263C;">Match</button>
+        
+          <button type="button" style="height: 40px; border-radius: 2px; font-size: 13px; background: #10162A; color: #B8BCC8; border: 1px solid #2D3A52;">Champion</button>
+        
+      </div>
+      <div style="border: 1px solid #1F2937; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: &quot;Chakra Petch&quot;, monospace; font-size: 11px; color: #8B8D98;">UBR1 REVEAL</span>
+        <span style="font-size: 13px; color: #B8BCC8;">8 of 8 matchups revealed</span>
+        <button type="button" style="height: 34px; background: transparent; color: #B8BCC8; border: 1px solid #2D3A52; border-radius: 2px; font-size: 13px;">Replay reveal</button>
+      </div>
+    </aside>
+  </div></div>
+</body>
+</html>

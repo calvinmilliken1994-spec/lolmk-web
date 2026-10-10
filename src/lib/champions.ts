@@ -1,6 +1,10 @@
 import { sql } from "@vercel/postgres";
 import championsData from "@/data/champions.json";
 import type { ChampionRecord } from "@/types/champion";
+import { listChampionEvents } from "@/lib/rb-db";
+import { rbChampionRecord } from "@/lib/rb-cut";
+import { computeRbStandings } from "@/lib/rb-service";
+import type { RbTournamentFull } from "@/types/riftbound";
 import {
   ensureSchema,
   getChampionTeams,
@@ -145,10 +149,30 @@ export async function getLiveChampions(
   }
 }
 
+/**
+ * Completed Riftbound events. Same pattern as SR: completeEvent stores the
+ * status and champion_player_id, and the Hall reads them back. The runner-up is
+ * the other finalist.
+ */
+export async function getRiftboundChampions(
+  list: () => Promise<RbTournamentFull[]> = listChampionEvents,
+): Promise<ChampionRecord[]> {
+  try {
+    const events = await list();
+    return events.flatMap<ChampionRecord>((full) => {
+      const record = rbChampionRecord(full, computeRbStandings(full));
+      return record ? [record] : [];
+    });
+  } catch {
+    // Same boundary as the SR lookup: a failure here must not take down /tournaments.
+    return [];
+  }
+}
+
 /** All past champions, most recent final first. Live DB results and legacy backfill merged. */
 export async function getChampions(): Promise<ChampionRecord[]> {
-  const live = await getLiveChampions();
-  return [...live, ...legacyRecords].sort(
+  const [live, riftbound] = await Promise.all([getLiveChampions(), getRiftboundChampions()]);
+  return [...live, ...riftbound, ...legacyRecords].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
 }

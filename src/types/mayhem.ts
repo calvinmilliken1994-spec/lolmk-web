@@ -4,6 +4,8 @@
 // tournaments run same-day at meetups), not the seasonal League tournament
 // system described in assets/TOURNAMENT.md.
 
+import type { AuditActorKind } from "./audit-actor";
+
 export type MayhemScene =
   | "idle"
   | "starting_soon"
@@ -236,6 +238,34 @@ export interface MayhemEvent {
   /** If true and auto_reveal is true, the reveal timer's effective start is countdown_ends_at instead of the moment auto-reveal was armed. */
   reveal_start_on_countdown: boolean;
 }
+
+/** Who did something on the admin desk (getCurrentAdmin() at the time). */
+export interface MayhemActor {
+  discordId: string;
+  name: string;
+  /** "admin" when omitted: every Mayhem audit write today is a desk action. */
+  kind?: AuditActorKind;
+}
+
+/**
+ * One row of mayhem_audit_log: every admin action, with the acting admin.
+ * Admin-only (it carries Discord ids); never part of the venue or public reads.
+ */
+export interface MayhemAuditEntry {
+  id: string;
+  event_id: string;
+  at: string;
+  /** e.g. "player.add", "teams.randomize", "reveal.advance", "match.report". */
+  action: string;
+  detail: Record<string, unknown>;
+  actor_discord_id: string;
+  actor_name: string;
+  /** Null on rows written before actor_kind existed. */
+  actor_kind: AuditActorKind | null;
+}
+
+/** /api/mayhem/admin-state and the desk's initial props: full state plus the audit log. */
+export type MayhemAdminState = MayhemFull & { audit: MayhemAuditEntry[] };
 
 export interface MayhemFull {
   event: MayhemEvent;

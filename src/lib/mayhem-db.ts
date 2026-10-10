@@ -1,6 +1,9 @@
-import { sql } from "@vercel/postgres";
+import { sql, type VercelPoolClient } from "@vercel/postgres";
 import { randomUUID } from "node:crypto";
+import { isAuditActorKind } from "@/types/audit-actor";
 import type {
+  MayhemActor,
+  MayhemAuditEntry,
   MayhemEvent,
   MayhemFormatConfig,
   MayhemFull,
@@ -184,6 +187,28 @@ export function ensureSchema(): Promise<void> {
         ON mayhem_team_application_slots (application_id, member_discord_id) WHERE member_discord_id IS NOT NULL;`;
       await sql`CREATE INDEX IF NOT EXISTS mayhem_application_slots_application_idx
         ON mayhem_team_application_slots (application_id);`;
+      // Audit log: one row per admin action, with the acting admin's
+      // Discord id and display name (getCurrentAdmin()). Written by every
+      // admin server action in src/app/tools/mayhem/actions.ts; read by the
+      // desk's activity log. Admin-only: never joined into the venue or
+      // public reads.
+      await sql`
+        CREATE TABLE IF NOT EXISTS mayhem_audit_log (
+          id text PRIMARY KEY,
+          event_id text NOT NULL REFERENCES mayhem_events(id) ON DELETE CASCADE,
+          at timestamptz NOT NULL DEFAULT now(),
+          action text NOT NULL,
+          detail jsonb NOT NULL DEFAULT '{}'::jsonb,
+          actor_discord_id text NOT NULL,
+          actor_name text NOT NULL
+        );
+      `;
+      await sql`CREATE INDEX IF NOT EXISTS mayhem_audit_log_event_at_idx ON mayhem_audit_log (event_id, at DESC);`;
+      // 'admin' or 'member', matching rb_audit_log and sr_audit_log.
+      await sql`
+        ALTER TABLE mayhem_audit_log ADD COLUMN IF NOT EXISTS actor_kind text
+          CONSTRAINT mayhem_audit_actor_kind_check CHECK (actor_kind IN ('admin', 'member'));
+      `;
       // Ensure the singleton event row exists.
       await sql`
         INSERT INTO mayhem_events (id, title, format)
@@ -307,6 +332,55 @@ export async function getMayhemFull(): Promise<MayhemFull> {
 }
 
 export { SINGLETON_EVENT_ID };
+
+// ---------------------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------------------
+
+/**
+ * Record one admin action. Pass the transaction's client when the action runs
+ * inside withEventLock(), so the audit row commits or rolls back with the
+ * change; otherwise it is written right after the change.
+ */
+export async function writeMayhemAudit(
+  actor: MayhemActor,
+  action: string,
+  detail: Record<string, unknown> = {},
+  client?: VercelPoolClient,
+): Promise<void> {
+  const params = [
+    newId("audit"),
+    SINGLETON_EVENT_ID,
+    action,
+    JSON.stringify(detail),
+    actor.discordId,
+    actor.name,
+    actor.kind ?? "admin",
+  ];
+  const text = `INSERT INTO mayhem_audit_log (id, event_id, action, detail, actor_discord_id, actor_name, actor_kind)
+     VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)`;
+  if (client) await client.query(text, params);
+  else await sql.query(text, params);
+}
+
+/** Newest first. */
+export async function listMayhemAudit(limit = 50): Promise<MayhemAuditEntry[]> {
+  await ensureSchema();
+  const { rows } = await sql.query(
+    `SELECT * FROM mayhem_audit_log WHERE event_id = $1 ORDER BY at DESC, id DESC LIMIT $2`,
+    [SINGLETON_EVENT_ID, limit],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    event_id: r.event_id,
+    at: new Date(r.at).toISOString(),
+    action: r.action,
+    detail: (r.detail ?? {}) as Record<string, unknown>,
+    actor_discord_id: r.actor_discord_id,
+    actor_name: r.actor_name,
+    actor_kind: isAuditActorKind(r.actor_kind) ? r.actor_kind : null,
+  }));
+}
 
 // ---------------------------------------------------------------------------
 // Venue-safe read (no admin/session data, no Discord identities)

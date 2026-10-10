@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import type { MayhemVenueState } from "@/lib/mayhem-db";
-import type { MayhemMatch, MayhemTeam } from "@/types/mayhem";
+import type { MayhemMatch, MayhemScene } from "@/types/mayhem";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,8 +17,16 @@ import { cn } from "@/lib/utils";
  * mayhem-db.ts for why member_discord_id/captain_discord_id must never
  * reach this page or its poll payload.
  */
-export function MayhemLiveScreen({ initial }: { initial: MayhemVenueState }) {
+export function MayhemLiveScreen({
+  initial,
+  sceneOverride = null,
+}: {
+  initial: MayhemVenueState;
+  /** Preview mode (`?scene=<id>&preview=1`): show this scene instead of the one on air. */
+  sceneOverride?: MayhemScene | null;
+}) {
   const [data, setData] = useState(initial);
+  const scene = sceneOverride ?? data.event.scene;
 
   useEffect(() => {
     const id = setInterval(async () => {
@@ -53,14 +61,14 @@ export function MayhemLiveScreen({ initial }: { initial: MayhemVenueState }) {
       />
 
       <div className="relative z-10 w-full h-full flex items-center justify-center p-10">
-        {data.event.scene === "idle" && <IdleScene />}
-        {data.event.scene === "starting_soon" && <CountdownScene endsAt={data.event.countdown_ends_at} />}
-        {data.event.scene === "reveal" && <RevealScene data={data} />}
-        {data.event.scene === "teams" && <TeamListScene teams={data.teams} />}
-        {data.event.scene === "groups" && <GroupsScene data={data} />}
-        {data.event.scene === "bracket" && <BracketScene data={data} />}
-        {data.event.scene === "match" && <MatchScene data={data} />}
-        {data.event.scene === "champion" && <ChampionScene data={data} />}
+        {scene === "idle" && <IdleScene />}
+        {scene === "starting_soon" && <CountdownScene endsAt={data.event.countdown_ends_at} />}
+        {scene === "reveal" && <RevealScene data={data} />}
+        {scene === "teams" && <TeamListScene teams={data.teams} />}
+        {scene === "groups" && <GroupsScene data={data} />}
+        {scene === "bracket" && <BracketScene data={data} />}
+        {scene === "match" && <MatchScene data={data} />}
+        {scene === "champion" && <ChampionScene data={data} />}
       </div>
     </div>
   );

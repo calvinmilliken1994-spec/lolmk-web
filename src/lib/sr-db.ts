@@ -1,7 +1,9 @@
 import { sql, type VercelPoolClient } from "@vercel/postgres";
 import { randomUUID } from "node:crypto";
+import { isAuditActorKind } from "../types/audit-actor";
 import type {
   SrApplicationSlotStatus,
+  SrActor,
   SrAuditAction,
   SrAuditLogEntry,
   SrDeliveryStatus,
@@ -272,6 +274,15 @@ export function ensureSchema(): Promise<void> {
       await sql`CREATE INDEX IF NOT EXISTS sr_matches_tournament_idx ON sr_matches(tournament_id);`;
       await sql`CREATE INDEX IF NOT EXISTS sr_matches_status_idx ON sr_matches(tournament_id, status);`;
       await sql`CREATE INDEX IF NOT EXISTS sr_audit_log_tournament_idx ON sr_audit_log(tournament_id);`;
+      // Who acted, as on rb_audit_log and mayhem_audit_log: the admin
+      // (getCurrentAdmin()) for desk actions, the signed-in member for the
+      // captain/invite flow. Nullable: rows written before these existed.
+      await sql`ALTER TABLE sr_audit_log ADD COLUMN IF NOT EXISTS actor_discord_id text;`;
+      await sql`ALTER TABLE sr_audit_log ADD COLUMN IF NOT EXISTS actor_name text;`;
+      await sql`
+        ALTER TABLE sr_audit_log ADD COLUMN IF NOT EXISTS actor_kind text
+          CONSTRAINT sr_audit_actor_kind_check CHECK (actor_kind IN ('admin', 'member'));
+      `;
 
       // ---------------------------------------------------------------
       // Captain self-service additions (see src/app/captain/*)
@@ -776,15 +787,34 @@ export async function getTournamentBySlug(slug: string): Promise<SrTournamentFul
 // Audit
 // ---------------------------------------------------------------------------
 
+/**
+ * Append an audit row with its actor. Pass the transaction's client so the
+ * row commits (or rolls back) with the change it records.
+ */
+export async function insertSrAudit(
+  db: Pick<VercelPoolClient, "query">,
+  tournamentId: string,
+  action: SrAuditAction,
+  detail: Record<string, unknown> | null,
+  actor: SrActor,
+): Promise<void> {
+  if (!actor?.discordId?.trim() || !actor?.name?.trim()) {
+    throw new Error("An SR audit row needs an actor with a Discord id and a name.");
+  }
+  await db.query(
+    `INSERT INTO sr_audit_log (tournament_id, action, detail, actor_discord_id, actor_name, actor_kind)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6)`,
+    [tournamentId, action, detail ? JSON.stringify(detail) : null, actor.discordId, actor.name, actor.kind],
+  );
+}
+
 export async function writeAudit(
   tournamentId: string,
   action: SrAuditAction,
-  detail?: Record<string, unknown>,
+  detail: Record<string, unknown> | null,
+  actor: SrActor,
 ): Promise<void> {
-  await sql`
-    INSERT INTO sr_audit_log (tournament_id, action, detail)
-    VALUES (${tournamentId}, ${action}, ${detail ? JSON.stringify(detail) : null}::jsonb)
-  `;
+  await insertSrAudit(sql, tournamentId, action, detail, actor);
 }
 
 export async function listAudit(tournamentId: string): Promise<SrAuditLogEntry[]> {
@@ -797,6 +827,9 @@ export async function listAudit(tournamentId: string): Promise<SrAuditLogEntry[]
     tournament_id: r.tournament_id as string,
     action: r.action as SrAuditAction,
     detail: (r.detail as Record<string, unknown>) ?? null,
+    actor_discord_id: (r.actor_discord_id as string | null) ?? null,
+    actor_name: (r.actor_name as string | null) ?? null,
+    actor_kind: isAuditActorKind(r.actor_kind) ? r.actor_kind : null,
     created_at: new Date(r.created_at as string).toISOString(),
   }));
 }

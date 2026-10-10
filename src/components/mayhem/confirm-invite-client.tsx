@@ -79,7 +79,7 @@ export function ConfirmInviteClient({
             <p className="font-heading text-heading-md text-ink mb-1">Join this premade team?</p>
             <p className="text-body-sm text-ink-secondary">
               A captain invited you to their ARAM Mayhem team. Confirm below, or decline if this
-              wasn't meant for you.
+              wasn&apos;t meant for you.
             </p>
             <div className="flex justify-center gap-3 pt-2">
               <Button onClick={accept} disabled={status === "pending"}>

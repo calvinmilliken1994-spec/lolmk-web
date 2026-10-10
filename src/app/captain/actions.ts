@@ -2,12 +2,13 @@
 
 import { sql, type VercelPoolClient } from "@vercel/postgres";
 import { revalidatePath } from "next/cache";
+import { randomBytes } from "node:crypto";
 import { getCaptainSession } from "@/lib/discord-auth";
-import { ensureSchema, newId } from "@/lib/sr-db";
+import { ensureSchema, insertSrAudit, newId } from "@/lib/sr-db";
 import { assertOwnBlobUrl, deleteTeamLogo, uploadTeamLogo } from "@/lib/team-logo";
 import { lookupKrRank } from "@/lib/riot";
 import { SR_PLAYER_ROLES, SR_PREMADE_ROSTER_SIZE, SR_RANKS } from "@/types/sr-tournament";
-import type { SrPlayerRole, SrRank } from "@/types/sr-tournament";
+import type { SrActor, SrPlayerRole, SrRank } from "@/types/sr-tournament";
 
 /**
  * Captain self-service write layer.
@@ -44,6 +45,16 @@ async function requireCaptain() {
   const identity = await getCaptainSession();
   if (!identity) throw new Error("Not authorized.");
   return identity;
+}
+
+// Audit actors for this file. Everything here is a member acting for
+// themselves (captain or invited player), never an admin: kind "member".
+function captainActor(captain: { discordUserId: string; username: string }): SrActor {
+  return { discordId: captain.discordUserId, name: captain.username, kind: "member" };
+}
+
+function memberActor(member: { discordUserId: string; displayName: string }): SrActor {
+  return { discordId: member.discordUserId, name: member.displayName, kind: "member" };
 }
 
 /** Local copy of the transactional helper — "use server" modules can only export async functions. */
@@ -260,7 +271,6 @@ async function hashConfirmToken(token: string): Promise<string> {
 }
 
 function randomConfirmToken(): string {
-  const { randomBytes } = require("node:crypto") as typeof import("node:crypto");
   return randomBytes(CONFIRM_TOKEN_BYTES).toString("base64url");
 }
 
@@ -300,6 +310,7 @@ export async function createPremadeApplication(
   teamName: string,
 ): Promise<{ ok: true; applicationId: string } | { ok: false; reason: string }> {
   const captain = await requireCaptain();
+  const actor = captainActor(captain);
   const name = teamName.trim().slice(0, 60);
   if (!name) return { ok: false, reason: "Team name can't be empty." };
 
@@ -368,9 +379,12 @@ export async function createPremadeApplication(
           self?.avatarUrl ?? null,
         ],
       );
-      await client.query(
-        `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'team.application_create', $2::jsonb)`,
-        [tournamentId, JSON.stringify({ applicationId, name, captain: captain.discordUserId })],
+      await insertSrAudit(
+        client,
+        tournamentId,
+        "team.application_create",
+        { applicationId, name, captain: captain.discordUserId },
+        actor,
       );
       return { ok: true, applicationId };
     });
@@ -515,6 +529,7 @@ export async function sendApplicationInvites(
   applicationId: string,
 ): Promise<{ ok: true; results: SendInviteResult[] } | { ok: false; reason: string }> {
   const captain = await requireCaptain();
+  const actor = captainActor(captain);
   await ensureSchema();
   const tournamentId = await applicationTournamentId(applicationId);
   if (!tournamentId) return { ok: false, reason: "Application not found." };
@@ -593,9 +608,12 @@ export async function sendApplicationInvites(
       const { rows: nameRows } = await client.query(`SELECT name FROM sr_tournaments WHERE id = $1`, [
         tournamentId,
       ]);
-      await client.query(
-        `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'roster.invite_send', $2::jsonb)`,
-        [tournamentId, JSON.stringify({ applicationId, count: items.length, rosterVersion })],
+      await insertSrAudit(
+        client,
+        tournamentId,
+        "roster.invite_send",
+        { applicationId, count: items.length, rosterVersion },
+        actor,
       );
       return {
         ok: true,
@@ -658,6 +676,7 @@ export async function retryInviteDelivery(
   { ok: true; delivered: boolean; error?: string; manualLink?: string } | { ok: false; reason: string }
 > {
   const captain = await requireCaptain();
+  const actor = captainActor(captain);
   await ensureSchema();
   const tournamentId = await applicationTournamentId(applicationId);
   if (!tournamentId) return { ok: false, reason: "Application not found." };
@@ -684,11 +703,7 @@ export async function retryInviteDelivery(
     const { rows: tournamentRows } = await client.query(`SELECT name FROM sr_tournaments WHERE id = $1`, [
       tournamentId,
     ]);
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail)
-       VALUES ($1, 'roster.invite_retry', $2::jsonb)`,
-      [tournamentId, JSON.stringify({ applicationId, slotId })],
-    );
+    await insertSrAudit(client, tournamentId, "roster.invite_retry", { applicationId, slotId }, actor);
     return {
       ok: true as const,
       discordUserId: claimed[0].member_discord_id as string,
@@ -752,6 +767,7 @@ export async function confirmApplicationSlot(
   if (!member) {
     return { ok: false, reason: "You need to sign in with a verified Discord account first." };
   }
+  const actor = memberActor(member);
 
   await ensureSchema();
   const tournamentId = await slotTournamentId(slotId);
@@ -833,12 +849,12 @@ export async function confirmApplicationSlot(
          WHERE id = $1`,
         [slotId],
       );
-      await client.query(
-        `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'roster.slot_confirm', $2::jsonb)`,
-        [
-          tournamentId,
-          JSON.stringify({ applicationId: slot.application_id, slotId, member: member.discordUserId }),
-        ],
+      await insertSrAudit(
+        client,
+        tournamentId,
+        "roster.slot_confirm",
+        { applicationId: slot.application_id, slotId, member: member.discordUserId },
+        actor,
       );
       if (!completesRoster) return { ok: true, promoted: false, teamName: slot.team_name as string };
 
@@ -874,17 +890,12 @@ export async function confirmApplicationSlot(
         );
       }
       await client.query(`DELETE FROM sr_team_applications WHERE id = $1`, [slot.application_id]);
-      await client.query(
-        `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'team.signup', $2::jsonb)`,
-        [
-          tournamentId,
-          JSON.stringify({
-            teamId,
-            name: slot.team_name,
-            captain: slot.captain_discord_id,
-            via: "premade_application",
-          }),
-        ],
+      await insertSrAudit(
+        client,
+        tournamentId,
+        "team.signup",
+        { teamId, name: slot.team_name, captain: slot.captain_discord_id, via: "premade_application" },
+        actor,
       );
       return { ok: true, promoted: true, teamName: slot.team_name as string };
     });
@@ -910,6 +921,7 @@ export async function declineApplicationSlot(
   if (!member) {
     return { ok: false, reason: "You need to sign in with a verified Discord account first." };
   }
+  const actor = memberActor(member);
 
   await ensureSchema();
   const tournamentId = await slotTournamentId(slotId);
@@ -931,12 +943,12 @@ export async function declineApplicationSlot(
         return { ok: false, reason: "Invalid or expired invite link." };
       }
       await client.query(`DELETE FROM sr_team_application_slots WHERE id = $1`, [slotId]);
-      await client.query(
-        `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'roster.slot_decline', $2::jsonb)`,
-        [
-          tournamentId,
-          JSON.stringify({ applicationId: rows[0].application_id, slotId, member: member.discordUserId }),
-        ],
+      await insertSrAudit(
+        client,
+        tournamentId,
+        "roster.slot_decline",
+        { applicationId: rows[0].application_id, slotId, member: member.discordUserId },
+        actor,
       );
       return { ok: true };
     });
@@ -950,6 +962,7 @@ export async function withdrawApplication(
   applicationId: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const captain = await requireCaptain();
+  const actor = captainActor(captain);
   await ensureSchema();
   const tournamentId = await applicationTournamentId(applicationId);
   if (!tournamentId) return { ok: false, reason: "Application not found." };
@@ -965,12 +978,12 @@ export async function withdrawApplication(
         return { ok: false, reason: "Only the captain can withdraw this application." };
       }
       await client.query(`DELETE FROM sr_team_applications WHERE id = $1`, [applicationId]);
-      await client.query(
-        `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'team.application_withdraw', $2::jsonb)`,
-        [
-          tournamentId,
-          JSON.stringify({ applicationId, name: rows[0].team_name, by: "captain" }),
-        ],
+      await insertSrAudit(
+        client,
+        tournamentId,
+        "team.application_withdraw",
+        { applicationId, name: rows[0].team_name, by: "captain" },
+        actor,
       );
       return { ok: true };
     });
@@ -1041,6 +1054,7 @@ function deliveryErrorMessage(dm: { status: string; retryAfterMs?: number }): st
 
 export async function updateMyTeam(teamId: string, input: { name: string }): Promise<void> {
   const captain = await requireCaptain();
+  const actor = captainActor(captain);
   const name = input.name.trim();
   if (!name) throw new Error("Team name cannot be blank.");
   if (name.length > 60) throw new Error("Team name is too long.");
@@ -1064,10 +1078,7 @@ export async function updateMyTeam(teamId: string, input: { name: string }): Pro
       }
       throw e;
     }
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'team.update', $2::jsonb)`,
-      [team.tournament_id, JSON.stringify({ teamId, name, by: "captain" })],
-    );
+    await insertSrAudit(client, team.tournament_id, "team.update", { teamId, name, by: "captain" }, actor);
     return team.tournament_slug as string;
   });
   refresh(slug);
@@ -1075,14 +1086,18 @@ export async function updateMyTeam(teamId: string, input: { name: string }): Pro
 
 export async function disbandMyTeam(teamId: string): Promise<void> {
   const captain = await requireCaptain();
+  const actor = captainActor(captain);
   const { slug, logoUrl } = await withTransaction(async (client) => {
     const team = await lockOwnTeam(client, teamId, captain.discordUserId);
     assertEditable(team);
     // Roster rows cascade on the composite FK; the delete is one statement.
     await client.query(`DELETE FROM sr_teams WHERE id = $1`, [teamId]);
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'team.disband', $2::jsonb)`,
-      [team.tournament_id, JSON.stringify({ teamId, name: team.name, by: "captain" })],
+    await insertSrAudit(
+      client,
+      team.tournament_id,
+      "team.disband",
+      { teamId, name: team.name, by: "captain" },
+      actor,
     );
     return {
       slug: team.tournament_slug as string,
@@ -1125,6 +1140,7 @@ export async function addRosterPlayer(
   },
 ): Promise<void> {
   const captain = await requireCaptain();
+  const actor = captainActor(captain);
   const discordId = cleanDiscordId(input.discordId);
   const ign = cleanIgn(input.ign);
   const role = normaliseRole(input.role);
@@ -1187,10 +1203,7 @@ export async function addRosterPlayer(
       throw e;
     }
 
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'roster.add', $2::jsonb)`,
-      [team.tournament_id, JSON.stringify({ teamId, ign, role, discordId })],
-    );
+    await insertSrAudit(client, team.tournament_id, "roster.add", { teamId, ign, role, discordId }, actor);
     return team.tournament_slug as string;
   });
   refresh(slug);
@@ -1253,6 +1266,7 @@ export async function updateRosterPlayer(
 
 export async function removeRosterPlayer(playerId: string): Promise<void> {
   const captain = await requireCaptain();
+  const actor = captainActor(captain);
   const slug = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `SELECT p.*, t.seed, tr.slug AS tournament_slug, tr.status AS tournament_status
@@ -1270,10 +1284,7 @@ export async function removeRosterPlayer(playerId: string): Promise<void> {
       throw new Error("You can't remove yourself. Disband the team instead.");
     }
     await client.query(`DELETE FROM sr_team_players WHERE id = $1`, [playerId]);
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'roster.remove', $2::jsonb)`,
-      [player.tournament_id, JSON.stringify({ playerId, ign: player.ign })],
-    );
+    await insertSrAudit(client, player.tournament_id, "roster.remove", { playerId, ign: player.ign }, actor);
     return player.tournament_slug as string;
   });
   refresh(slug);
@@ -1294,6 +1305,7 @@ export async function uploadMyTeamLogo(
   formData: FormData,
 ): Promise<{ url: string }> {
   const captain = await requireCaptain();
+  const actor = captainActor(captain);
   const file = formData.get("file");
   if (!(file instanceof File)) throw new Error("No file was uploaded.");
 
@@ -1313,9 +1325,12 @@ export async function uploadMyTeamLogo(
   const slug = await withTransaction(async (client) => {
     const team = await lockOwnTeam(client, teamId, captain.discordUserId);
     await client.query(`UPDATE sr_teams SET logo_url = $2 WHERE id = $1`, [teamId, url]);
-    await client.query(
-      `INSERT INTO sr_audit_log (tournament_id, action, detail) VALUES ($1, 'team.update', $2::jsonb)`,
-      [team.tournament_id, JSON.stringify({ teamId, logoUrl: url, by: "captain" })],
+    await insertSrAudit(
+      client,
+      team.tournament_id,
+      "team.update",
+      { teamId, logoUrl: url, by: "captain" },
+      actor,
     );
     return team.tournament_slug as string;
   });

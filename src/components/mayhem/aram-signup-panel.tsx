@@ -97,7 +97,7 @@ export function AramSignupPanel({
   if (!registrationOpen) {
     return (
       <div className="border border-dashed border-line-strong bg-surface p-8 text-center">
-        <p className="font-heading text-heading-md text-ink mb-1">Signups aren't open yet.</p>
+        <p className="font-heading text-heading-md text-ink mb-1">Signups aren&apos;t open yet.</p>
         <p className="text-body-sm text-ink-secondary">
           Check Discord for when the next Mayhem opens for entries.
         </p>
@@ -150,7 +150,7 @@ export function AramSignupPanel({
             ) : soloStatus === "joined" ? (
               <div className="flex items-center justify-between gap-3 border border-success/40 bg-success/10 px-3 py-2">
                 <span className="inline-flex items-center gap-1.5 text-body-sm text-success">
-                  <Check className="h-4 w-4" /> You're signed up
+                  <Check className="h-4 w-4" /> You&apos;re signed up
                 </span>
                 <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => leaveMayhemAsMember())}>
                   Leave

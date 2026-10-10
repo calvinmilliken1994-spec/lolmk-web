@@ -25,10 +25,10 @@ export function FeaturedMembers({ members }: FeaturedMembersProps) {
     <section className="container-wide py-24">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
         <div className="max-w-2xl">
-          <p className="text-label uppercase text-ink-muted mb-4">Who's around</p>
+          <p className="text-label uppercase text-ink-muted mb-4">Who&apos;s around</p>
           <h2 className="font-heading text-display-md text-ink">Featured members</h2>
           <p className="mt-4 text-body-md text-ink-secondary">
-            Streamers, content creators, and community leaders you'll see in
+            Streamers, content creators, and community leaders you&apos;ll see in
             voice chat and at meetups. The full directory has everyone.
           </p>
         </div>

@@ -168,7 +168,7 @@ export default async function TournamentPreviewPage() {
               </p>
               <p className="text-body-sm text-ink-secondary">
                 Hand-authored placeholder so you can show others how the tournament
-                page will look. Once the Discord bot's HTTP API is connected,{" "}
+                page will look. Once the Discord bot&apos;s HTTP API is connected,{" "}
                 <code className="font-mono text-brand-blue-bright">
                   src/lib/tournaments.ts
                 </code>{" "}

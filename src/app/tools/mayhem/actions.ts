@@ -2,8 +2,10 @@
 
 import { sql, type VercelPoolClient } from "@vercel/postgres";
 import { revalidatePath } from "next/cache";
-import { isToolsSession } from "@/lib/tools-auth";
-import { ensureSchema, getMayhemFull, newId, SINGLETON_EVENT_ID } from "@/lib/mayhem-db";
+import { randomBytes } from "node:crypto";
+import { getCurrentAdmin, isToolsSession } from "@/lib/tools-auth";
+import { ensureSchema, getMayhemFull, newId, SINGLETON_EVENT_ID, writeMayhemAudit } from "@/lib/mayhem-db";
+import { isRevealStarted, REVEAL_LOCKED_MESSAGE } from "@/lib/mayhem-reveal";
 import { pickTeamIdentities, shuffle } from "@/lib/mayhem-icons";
 import { buildKnockoutBracket } from "@/lib/mayhem-bracket";
 import {
@@ -12,12 +14,20 @@ import {
   type BracketMatch,
 } from "@/lib/bracket-engine";
 import { buildGroupRoundRobin, computeGroupStandings } from "@/lib/mayhem-groups";
-import type { MayhemFormatConfig, MayhemScene, MayhemTeamFormat } from "@/types/mayhem";
+import type { MayhemActor, MayhemFormatConfig, MayhemScene, MayhemTeamFormat } from "@/types/mayhem";
 import { PREMADE_ROSTER_SIZE } from "@/types/mayhem";
 
-async function requireAdmin() {
+/**
+ * Every admin action starts here: a tools session, and the acting admin
+ * (getCurrentAdmin) for the audit row each action writes.
+ */
+async function requireAdmin(): Promise<MayhemActor> {
   const ok = await isToolsSession();
   if (!ok) throw new Error("Not authorized.");
+  const admin = await getCurrentAdmin();
+  if (!admin) throw new Error("Not authorized.");
+  await ensureSchema();
+  return { discordId: admin.discordUserId, name: admin.username };
 }
 
 function touch() {
@@ -76,8 +86,7 @@ async function withEventLock<T>(fn: (client: VercelPoolClient) => Promise<T>): P
 // ---------------------------------------------------------------------------
 
 export async function addPlayer(displayName: string) {
-  await requireAdmin();
-  await ensureSchema();
+  const actor = await requireAdmin();
   const name = displayName.trim();
   if (!name) return;
   await withEventLock(async (client) => {
@@ -97,6 +106,7 @@ export async function addPlayer(displayName: string) {
        VALUES ($1, $2, $3, $4, NULL, NULL)`,
       [newId("player"), SINGLETON_EVENT_ID, name, rows[0].next],
     );
+    await writeMayhemAudit(actor, "player.add", { name }, client);
   });
   await touch();
   refresh();
@@ -126,8 +136,7 @@ export interface BulkAddResult {
  * unexpected failure) none of it does.
  */
 export async function bulkAddPlayers(rawText: string): Promise<BulkAddResult> {
-  await requireAdmin();
-  await ensureSchema();
+  const actor = await requireAdmin();
   if (typeof rawText !== "string") throw new Error("Invalid input.");
   if (rawText.length > MAX_BULK_TEXT_LENGTH) {
     throw new Error(`That paste is too large (max ${MAX_BULK_TEXT_LENGTH.toLocaleString()} characters).`);
@@ -186,6 +195,12 @@ export async function bulkAddPlayers(rawText: string): Promise<BulkAddResult> {
 
     if (result.added > 0) {
       await client.query(`UPDATE mayhem_events SET updated_at = now() WHERE id = $1`, [SINGLETON_EVENT_ID]);
+      await writeMayhemAudit(
+        actor,
+        "player.bulk_add",
+        { added: result.added, skippedDuplicate: result.skippedDuplicate, skippedTooLong: result.skippedTooLong },
+        client,
+      );
     }
     return result;
   }).finally(() => {
@@ -196,20 +211,25 @@ export async function bulkAddPlayers(rawText: string): Promise<BulkAddResult> {
 }
 
 export async function removePlayer(playerId: string) {
-  await requireAdmin();
-  await sql`DELETE FROM mayhem_players WHERE id = ${playerId} AND event_id = ${SINGLETON_EVENT_ID}`;
+  const actor = await requireAdmin();
+  const { rows } = await sql`
+    DELETE FROM mayhem_players WHERE id = ${playerId} AND event_id = ${SINGLETON_EVENT_ID}
+    RETURNING display_name
+  `;
+  if (rows.length > 0) await writeMayhemAudit(actor, "player.remove", { playerId, name: rows[0].display_name });
   await touch();
   refresh();
 }
 
 export async function renamePlayer(playerId: string, displayName: string) {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const name = displayName.trim();
   if (!name) return;
   await sql`
     UPDATE mayhem_players SET display_name = ${name}
     WHERE id = ${playerId} AND event_id = ${SINGLETON_EVENT_ID}
   `;
+  await writeMayhemAudit(actor, "player.rename", { playerId, name });
   await touch();
   refresh();
 }
@@ -225,8 +245,18 @@ export async function renamePlayer(playerId: string, displayName: string) {
  * real team identity, not fix a generic placeholder.
  */
 export async function refreshTeamIdentities() {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const full = await getMayhemFull();
+  if (
+    isRevealStarted({
+      stage: full.event.stage,
+      revealIndex: full.event.reveal_index,
+      autoReveal: full.event.auto_reveal,
+      revealStartedAt: full.event.reveal_started_at,
+    })
+  ) {
+    throw new Error(REVEAL_LOCKED_MESSAGE);
+  }
   const randomizedTeams = full.teams.filter((t) => !t.captain_discord_id);
   if (randomizedTeams.length === 0) return;
 
@@ -239,12 +269,13 @@ export async function refreshTeamIdentities() {
       WHERE id = ${orderedTeams[i].id}
     `;
   }
+  await writeMayhemAudit(actor, "teams.refresh_identities", { teams: orderedTeams.length });
   await touch();
   refresh();
 }
 
 export async function clearAllPlayers() {
-  await requireAdmin();
+  const actor = await requireAdmin();
   await withEventLock(async (client) => {
     await client.query(`DELETE FROM mayhem_matches WHERE event_id = $1`, [SINGLETON_EVENT_ID]);
     await client.query(`DELETE FROM mayhem_teams WHERE event_id = $1`, [SINGLETON_EVENT_ID]);
@@ -265,11 +296,13 @@ export async function clearAllPlayers() {
     await client.query(
       `UPDATE mayhem_events
        SET stage = 'collecting', scene = 'idle', reveal_index = 0,
+           auto_reveal = false, reveal_started_at = NULL, reveal_start_on_countdown = false,
            active_match_id = NULL, champion_team_id = NULL, countdown_ends_at = NULL,
            registration_open = false, registration_generation = registration_generation + 1
        WHERE id = $1`,
       [SINGLETON_EVENT_ID],
     );
+    await writeMayhemAudit(actor, "event.reset", {}, client);
   });
   refresh();
 }
@@ -285,8 +318,7 @@ export async function clearAllPlayers() {
  * first, never a silent format-preserving wipe of just the roster.
  */
 export async function setTeamFormat(format: MayhemTeamFormat) {
-  await requireAdmin();
-  await ensureSchema();
+  const actor = await requireAdmin();
   await withEventLock(async (client) => {
     const { rows: countRows } = await client.query(
       `SELECT
@@ -302,6 +334,7 @@ export async function setTeamFormat(format: MayhemTeamFormat) {
       throw new Error("Can't change team format with players, teams, or pending applications already registered. Reset everything first.");
     }
     await client.query(`UPDATE mayhem_events SET team_format = $1 WHERE id = $2`, [format, SINGLETON_EVENT_ID]);
+    await writeMayhemAudit(actor, "event.team_format", { format }, client);
   });
   refresh();
 }
@@ -314,8 +347,7 @@ export async function setTeamFormat(format: MayhemTeamFormat) {
  * off signups right before randomizing, even mid-stage).
  */
 export async function setRegistrationOpen(open: boolean) {
-  await requireAdmin();
-  await ensureSchema();
+  const actor = await requireAdmin();
   await withEventLock(async (client) => {
     if (open) {
       const { rows } = await client.query(`SELECT stage FROM mayhem_events WHERE id = $1`, [SINGLETON_EVENT_ID]);
@@ -324,6 +356,7 @@ export async function setRegistrationOpen(open: boolean) {
       }
     }
     await client.query(`UPDATE mayhem_events SET registration_open = $1 WHERE id = $2`, [open, SINGLETON_EVENT_ID]);
+    await writeMayhemAudit(actor, open ? "registration.open" : "registration.close", {}, client);
   });
   refresh();
 }
@@ -496,7 +529,6 @@ async function hashConfirmToken(token: string): Promise<string> {
 }
 
 function randomConfirmToken(): string {
-  const { randomBytes } = require("node:crypto") as typeof import("node:crypto");
   return randomBytes(CONFIRM_TOKEN_BYTES).toString("base64url");
 }
 
@@ -1208,17 +1240,30 @@ export async function leavePremadeTeam(): Promise<{ ok: true } | { ok: false; re
  * signup/reset can't interleave with the read-then-write here.
  */
 export async function randomizeTeams() {
-  await requireAdmin();
-  await ensureSchema();
+  const actor = await requireAdmin();
 
   await withEventLock(async (client) => {
     const { rows: modeRows } = await client.query(
-      `SELECT team_format FROM mayhem_events WHERE id = $1`,
+      `SELECT team_format, stage, reveal_index, auto_reveal, reveal_started_at FROM mayhem_events WHERE id = $1`,
       [SINGLETON_EVENT_ID],
     );
-    const teamFormat = modeRows[0]?.team_format;
+    const ev = modeRows[0];
+    const teamFormat = ev?.team_format;
     if (teamFormat === "premade") {
       throw new Error('This event uses premade team signups — use "Finalize premade teams" instead.');
+    }
+    // Re-roll lock: checked on the locked row, so a reveal started a moment
+    // ago by another admin can't slip past. Restart the reveal to unlock.
+    if (
+      ev &&
+      isRevealStarted({
+        stage: ev.stage,
+        revealIndex: Number(ev.reveal_index),
+        autoReveal: Boolean(ev.auto_reveal),
+        revealStartedAt: ev.reveal_started_at ? new Date(ev.reveal_started_at).toISOString() : null,
+      })
+    ) {
+      throw new Error(REVEAL_LOCKED_MESSAGE);
     }
 
     // Existing confirmed premade teams (mixed mode only — always empty in
@@ -1296,9 +1341,19 @@ export async function randomizeTeams() {
 
     await client.query(
       `UPDATE mayhem_events
-       SET stage = 'randomized', scene = 'reveal', reveal_index = 0, registration_open = false
+       SET stage = 'randomized', scene = 'reveal', reveal_index = 0, registration_open = false,
+           -- A fresh team set starts unrevealed. Without clearing these, a
+           -- reveal_started_at left over from an earlier auto-reveal makes
+           -- getMayhemFull() derive every new team as already revealed.
+           auto_reveal = false, reveal_started_at = NULL, reveal_start_on_countdown = false
        WHERE id = $1`,
       [SINGLETON_EVENT_ID],
+    );
+    await writeMayhemAudit(
+      actor,
+      "teams.randomize",
+      { teams: soloTeamCount + premadeTeamCount, reroll: ev?.stage !== "collecting" },
+      client,
     );
   });
   refresh();
@@ -1334,8 +1389,7 @@ export async function randomizeTeams() {
  * damage (locking in a short-handed team).
  */
 export async function finalizePremadeTeams() {
-  await requireAdmin();
-  await ensureSchema();
+  const actor = await requireAdmin();
 
   await withEventLock(async (client) => {
     const { rows: modeRows } = await client.query(
@@ -1378,10 +1432,15 @@ export async function finalizePremadeTeams() {
 
     await client.query(
       `UPDATE mayhem_events
-       SET stage = 'randomized', scene = 'reveal', reveal_index = 0, registration_open = false
+       SET stage = 'randomized', scene = 'reveal', reveal_index = 0, registration_open = false,
+           -- A fresh team set starts unrevealed. Without clearing these, a
+           -- reveal_started_at left over from an earlier auto-reveal makes
+           -- getMayhemFull() derive every new team as already revealed.
+           auto_reveal = false, reveal_started_at = NULL, reveal_start_on_countdown = false
        WHERE id = $1`,
       [SINGLETON_EVENT_ID],
     );
+    await writeMayhemAudit(actor, "teams.finalize_premade", { teams: teamRows.length }, client);
   });
   refresh();
 }
@@ -1391,13 +1450,14 @@ export async function finalizePremadeTeams() {
 // ---------------------------------------------------------------------------
 
 export async function setScene(scene: MayhemScene) {
-  await requireAdmin();
+  const actor = await requireAdmin();
   await sql`UPDATE mayhem_events SET scene = ${scene} WHERE id = ${SINGLETON_EVENT_ID}`;
+  await writeMayhemAudit(actor, "scene.set", { scene });
   refresh();
 }
 
 export async function startCountdown(seconds: number) {
-  await requireAdmin();
+  const actor = await requireAdmin();
   if (!Number.isInteger(seconds) || seconds < 1 || seconds > 3600) {
     throw new Error("Countdown must be between 1 and 3600 seconds.");
   }
@@ -1407,12 +1467,13 @@ export async function startCountdown(seconds: number) {
     SET scene = 'starting_soon', countdown_ends_at = ${endsAt}
     WHERE id = ${SINGLETON_EVENT_ID}
   `;
+  await writeMayhemAudit(actor, "countdown.start", { seconds });
   refresh();
 }
 
 /** Manual single-step reveal advance. Only meaningful when auto_reveal is off — turns it off explicitly so a stray manual click can't fight a running auto-reveal timer. */
 export async function advanceReveal() {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const full = await getMayhemFull();
   const next = Math.min(full.event.reveal_index + 1, full.teams.length);
   const scene = next >= full.teams.length ? "teams" : "reveal";
@@ -1420,6 +1481,7 @@ export async function advanceReveal() {
     UPDATE mayhem_events SET reveal_index = ${next}, scene = ${scene}, auto_reveal = false
     WHERE id = ${SINGLETON_EVENT_ID}
   `;
+  await writeMayhemAudit(actor, "reveal.advance", { shown: next, of: full.teams.length });
   refresh();
 }
 
@@ -1436,7 +1498,7 @@ const MAX_REVEAL_INTERVAL_S = 60;
  * otherwise it starts immediately.
  */
 export async function startAutoReveal(intervalSeconds: number, startOnCountdownEnd: boolean) {
-  await requireAdmin();
+  const actor = await requireAdmin();
   if (!Number.isInteger(intervalSeconds) || intervalSeconds < MIN_REVEAL_INTERVAL_S || intervalSeconds > MAX_REVEAL_INTERVAL_S) {
     throw new Error(`Reveal interval must be between ${MIN_REVEAL_INTERVAL_S} and ${MAX_REVEAL_INTERVAL_S} seconds.`);
   }
@@ -1456,18 +1518,59 @@ export async function startAutoReveal(intervalSeconds: number, startOnCountdownE
         scene = ${startOnCountdownEnd ? "starting_soon" : "reveal"}
     WHERE id = ${SINGLETON_EVENT_ID}
   `;
+  await writeMayhemAudit(actor, "reveal.auto_start", { intervalSeconds, startOnCountdownEnd });
   refresh();
 }
 
 /** Freezes auto-reveal at its current derived count and hands control back to manual advanceReveal(). */
 export async function pauseAutoReveal() {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const full = await getMayhemFull();
   await sql`
     UPDATE mayhem_events
     SET auto_reveal = false, reveal_index = ${full.event.reveal_index}
     WHERE id = ${SINGLETON_EVENT_ID}
   `;
+  await writeMayhemAudit(actor, "reveal.auto_pause", { shown: full.event.reveal_index, of: full.teams.length });
+  refresh();
+}
+
+/**
+ * Take the most recently shown team off the venue screen. Stops auto-reveal
+ * first, freezing it at the count it had reached, so the timer can't put the
+ * team straight back.
+ */
+export async function hideLastReveal() {
+  const actor = await requireAdmin();
+  const full = await getMayhemFull();
+  if (full.teams.length === 0) throw new Error("No teams to reveal yet.");
+  if (full.event.reveal_index === 0) throw new Error("No team is on screen yet.");
+  const next = full.event.reveal_index - 1;
+  await sql`
+    UPDATE mayhem_events
+    SET reveal_index = ${next}, auto_reveal = false, scene = 'reveal'
+    WHERE id = ${SINGLETON_EVENT_ID}
+  `;
+  await writeMayhemAudit(actor, "reveal.hide_last", { shown: next, of: full.teams.length });
+  refresh();
+}
+
+/**
+ * Back to before the reveal: nothing shown, auto-reveal off and its start
+ * time cleared. This is what unlocks re-roll and name refresh again (see
+ * isRevealStarted); the desk asks for confirmation first.
+ */
+export async function restartReveal() {
+  const actor = await requireAdmin();
+  const full = await getMayhemFull();
+  if (full.teams.length === 0) throw new Error("No teams to reveal yet.");
+  await sql`
+    UPDATE mayhem_events
+    SET reveal_index = 0, auto_reveal = false, reveal_started_at = NULL,
+        reveal_start_on_countdown = false, scene = 'reveal'
+    WHERE id = ${SINGLETON_EVENT_ID}
+  `;
+  await writeMayhemAudit(actor, "reveal.restart", { wasShown: full.event.reveal_index, of: full.teams.length });
   refresh();
 }
 
@@ -1476,7 +1579,7 @@ export async function pauseAutoReveal() {
 // ---------------------------------------------------------------------------
 
 export async function updateFormat(format: MayhemFormatConfig) {
-  await requireAdmin();
+  const actor = await requireAdmin();
   if (format.knockout.doubleElimination && format.knockout.thirdPlaceMatch) {
     throw new Error("Third-place matches are not supported for double elimination.");
   }
@@ -1488,6 +1591,7 @@ export async function updateFormat(format: MayhemFormatConfig) {
     UPDATE mayhem_events SET format = ${JSON.stringify(format)}::jsonb
     WHERE id = ${SINGLETON_EVENT_ID}
   `;
+  await writeMayhemAudit(actor, "format.update", { format });
   refresh();
 }
 
@@ -1496,7 +1600,7 @@ export async function updateFormat(format: MayhemFormatConfig) {
 // ---------------------------------------------------------------------------
 
 export async function generateGroups() {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const full = await getMayhemFull();
   const { groupCount, seeding, seriesLength, advancePerGroup } = full.event.format.groupStage;
   if (full.teams.length < groupCount * 2) {
@@ -1555,12 +1659,13 @@ export async function generateGroups() {
   }
 
   await sql`UPDATE mayhem_events SET stage = 'group_stage', scene = 'groups' WHERE id = ${SINGLETON_EVENT_ID}`;
+  await writeMayhemAudit(actor, "groups.generate", { groups: groupCount, regenerated: full.groups.length > 0 });
   refresh();
 }
 
 /** Take group standings, seed qualifiers into the knockout bracket. */
 export async function generateKnockoutFromGroups() {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const full = await getMayhemFull();
   const qualifiers: string[] = [];
 
@@ -1571,18 +1676,18 @@ export async function generateKnockoutFromGroups() {
     qualifiers.push(...standings.slice(0, group.advance_count).map((s) => s.teamId));
   }
 
-  await generateKnockoutBracket(qualifiers);
+  await generateKnockoutBracket(qualifiers, actor, "groups");
 }
 
 /** Generate a knockout bracket directly (no group stage) from all teams, seeded by `seed`. */
 export async function generateKnockoutFromAllTeams() {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const full = await getMayhemFull();
   const seeded = [...full.teams].sort((a, b) => (a.seed ?? 0) - (b.seed ?? 0)).map((t) => t.id);
-  await generateKnockoutBracket(seeded);
+  await generateKnockoutBracket(seeded, actor, "all_teams");
 }
 
-async function generateKnockoutBracket(teamIdsBySeed: string[]) {
+async function generateKnockoutBracket(teamIdsBySeed: string[], actor: MayhemActor, source: "groups" | "all_teams") {
   const full = await getMayhemFull();
   const { knockout } = full.event.format;
 
@@ -1620,6 +1725,7 @@ async function generateKnockoutBracket(teamIdsBySeed: string[]) {
   }
 
   await sql`UPDATE mayhem_events SET stage = 'knockout', scene = 'bracket' WHERE id = ${SINGLETON_EVENT_ID}`;
+  await writeMayhemAudit(actor, "knockout.generate", { source, teams: teamIdsBySeed.length, matches: matches.length });
   refresh();
 }
 
@@ -1628,17 +1734,18 @@ async function generateKnockoutBracket(teamIdsBySeed: string[]) {
 // ---------------------------------------------------------------------------
 
 export async function setActiveMatch(matchId: string | null) {
-  await requireAdmin();
+  const actor = await requireAdmin();
   await sql`
     UPDATE mayhem_events SET active_match_id = ${matchId}, scene = ${matchId ? "match" : "bracket"}
     WHERE id = ${SINGLETON_EVENT_ID}
   `;
+  await writeMayhemAudit(actor, matchId ? "match.set_active" : "match.clear_active", { matchId });
   refresh();
 }
 
 /** Record a clinching result and persist all advancement/reset/bye effects. */
 export async function recordMatchResult(matchId: string, teamAScore: number, teamBScore: number) {
-  await requireAdmin();
+  const actor = await requireAdmin();
   if (!Number.isInteger(teamAScore) || !Number.isInteger(teamBScore) || teamAScore < 0 || teamBScore < 0) {
     throw new Error("Scores must be non-negative whole numbers.");
   }
@@ -1665,6 +1772,14 @@ export async function recordMatchResult(matchId: string, teamAScore: number, tea
   } else if (full.event.stage !== "completed") {
     await sql`UPDATE mayhem_events SET active_match_id = NULL, scene = 'bracket' WHERE id = ${SINGLETON_EVENT_ID}`;
   }
+  await writeMayhemAudit(actor, "match.report", {
+    matchId,
+    matchNumber: match.match_number,
+    teamAScore,
+    teamBScore,
+    winnerId: teamAScore > teamBScore ? match.team_a_id : match.team_b_id,
+    championId: result.championId ?? null,
+  });
 
   refresh();
 }
@@ -1691,7 +1806,7 @@ export async function reportBo1Winner(matchId: string, winnerTeamId: string) {
 
 /** Undo a result and retract dependent auto-resolved byes transitively. */
 export async function undoMatchResult(matchId: string) {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const full = await getMayhemFull();
   const graph = full.matches as unknown as BracketMatch[];
   const match = graph.find((candidate) => candidate.id === matchId);
@@ -1706,5 +1821,6 @@ export async function undoMatchResult(matchId: string) {
       WHERE id = ${SINGLETON_EVENT_ID}
     `;
   }
+  if (match) await writeMayhemAudit(actor, "match.undo", { matchId, matchNumber: match.match_number });
   refresh();
 }

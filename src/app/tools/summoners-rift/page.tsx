@@ -9,7 +9,7 @@ import {
 } from "@/lib/sr-db";
 import { isBlobConfigured } from "@/lib/team-logo";
 import { SrAdminList } from "@/components/sr/sr-admin-list";
-import { SrAdminDetail } from "@/components/sr/sr-admin-detail";
+import { SrDesk } from "@/components/sr/sr-desk";
 
 export const metadata: Metadata = {
   title: "Summoner's Rift tournaments",
@@ -50,10 +50,8 @@ export default async function SummonersRiftToolPage({
     ]);
     if (full) {
       return (
-        <SrAdminDetail
-          initial={full}
-          audit={audit}
-          applications={applications}
+        <SrDesk
+          initial={{ ...full, audit, applications }}
           blobConfigured={isBlobConfigured()}
         />
       );

@@ -101,10 +101,10 @@ export default async function AramPublicPage() {
             </div>
             <h1 className="font-heading text-heading-xl text-ink">ARAM meetup tournament</h1>
             <p className="text-body-md text-ink-secondary max-w-[62ch]">
-              LoLMK's ARAM Mayhem is a meetup tournament, usually run over the
+              LoLMK&apos;s ARAM Mayhem is a meetup tournament, usually run over the
               course of a day. Bring a full premade team, or sign up solo and
               get placed into a team — solo signups are genuinely encouraged,
-              especially if you haven't put a friend group together in Korea
+              especially if you haven&apos;t put a friend group together in Korea
               yet. Small prizes are up for grabs.
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-1">
