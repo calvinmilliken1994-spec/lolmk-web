@@ -38,7 +38,7 @@ export default function HowTosPage() {
                   href={`/how-tos/${g.slug}`}
                   className="group grid grid-cols-[56px_minmax(0,1fr)] gap-x-5 gap-y-2 py-7 transition-colors duration-150 hover:bg-ds-surface sm:grid-cols-[88px_minmax(0,1fr)_auto] sm:items-center sm:px-4"
                 >
-                  <span className="row-span-2 font-display text-[56px] leading-none text-ds-line-strong transition-colors group-hover:text-ds-red sm:row-span-1 sm:text-[72px]">
+                  <span className="row-span-2 font-display text-[56px] leading-none text-ds-text-dim transition-colors group-hover:text-ds-red sm:row-span-1 sm:text-[72px]">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <span className="min-w-0">

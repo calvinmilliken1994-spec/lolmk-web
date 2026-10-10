@@ -67,7 +67,7 @@ export function GuideLayout({ slug, children }: { slug: string; children: ReactN
               <span className="block font-heading text-ds-label text-ds-text-dim">Next guide</span>
               <span className="mt-1 block font-heading text-[24px] font-semibold text-white">{next.title}</span>
             </span>
-            <span className="font-display text-[56px] leading-none text-ds-line-strong group-hover:text-ds-text-muted">
+            <span className="font-display text-[56px] leading-none text-ds-text-dim group-hover:text-ds-text">
               {String(n + 1).padStart(2, "0")}
             </span>
           </Link>

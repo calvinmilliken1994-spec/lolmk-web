@@ -129,3 +129,13 @@ The handover says the bot calls a revalidation endpoint when an admin submits a 
 
 Discord is the only slow external call. Its stat strips on Members and About, and the Locker's RSVP stats and "Coming up" list, stream in behind `<Suspense>` with same-size skeletons. The tournament pages read Discord events and Postgres together in `getTournamentOverview`, which drives the status bar, plate chips and Hall of champions at once, so they rely on their `loading.tsx` skeletons rather than splitting that call.
 
+## Acceptance
+
+### 22. Homepage keeps two contrast misses outside the redesign's scope (acceptance)
+
+Lighthouse accessibility on `/` is 96 (pass). The remaining color-contrast items are homepage content the handover says not to redesign: the hero's red "Next event" chip (`#E94560` on `#5A1422`, 3.52:1) and `text-brand-blue-bright` links on navy (3.17:1, e.g. the Instagram link). The stats band's `<dl>` markup issue was ours and is fixed. **Needs:** your call on touching those two homepage styles.
+
+### 23. Invite-confirm pages don't use PageHeader (acceptance)
+
+`/tournaments/summoners-rift/confirm` and `/tournaments/aram/confirm` are single-use, noindexed invite links with their own small card UI and no H1. They aren't in the handover's page list, so they were left alone. `not-found.tsx` and `error.tsx` were added on PageHeader so the 404 and 500 pages match. **Needs:** confirm the invite pages can stay as they are.
+

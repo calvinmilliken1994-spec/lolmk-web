@@ -88,7 +88,7 @@ export function StatStrip({ cells, compact, bordered = true, className, countUp 
             )}
           </dd>
           {cell.hint && (
-            <p className="mt-1.5 truncate text-body-sm text-ds-text-dim">{cell.hint}</p>
+            <dd className="m-0 mt-1.5 truncate text-body-sm text-ds-text-dim">{cell.hint}</dd>
           )}
         </div>
       ))}
