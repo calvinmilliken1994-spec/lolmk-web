@@ -111,7 +111,12 @@ export default async function AboutPage() {
         </h2>
         <dl className="m-0 mt-8 grid gap-px border border-ds-line bg-ds-line sm:grid-cols-2">
           <div className="bg-ds-surface px-7 py-7">
-            <dt className="font-heading text-[20px] font-semibold text-white">Gen.G GGX</dt>
+            <dt className="font-heading text-[20px] font-semibold text-white">
+              {/* The venue site only serves plain http (https doesn't answer). */}
+              <a href="http://gengxperience.gg/" target="_blank" rel="noreferrer" className="ds-link">
+                Gen.G GGX
+              </a>
+            </dt>
             <dd className="m-0 mt-1 text-ds-body text-ds-text-muted">
               Partner venue in Seoul, where the in-person tournaments are played.
             </dd>

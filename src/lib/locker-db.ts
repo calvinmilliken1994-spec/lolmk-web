@@ -100,7 +100,7 @@ async function srHistory(discordId: string): Promise<LockerHistoryRow[]> {
 
   return list.map((r) => {
     const finished = SR_FINISHED.has(r.status);
-    const { placement, rank } = srPlacement(r, byTournament.get(r.tournament_id) ?? [], finished);
+    const { placement, rank } = bracketPlacement(r, byTournament.get(r.tournament_id) ?? [], finished);
     return {
       id: `sr:${r.tournament_id}`,
       formatKey: "sr",
@@ -115,8 +115,8 @@ async function srHistory(discordId: string): Promise<LockerHistoryRow[]> {
   });
 }
 
-function srPlacement(
-  r: SrRow,
+function bracketPlacement(
+  r: { team_id: string; champion_team_id: string | null },
   matches: SrMatchRow[],
   finished: boolean,
 ): { placement: string | null; rank: number | null } {
@@ -160,6 +160,90 @@ function srPlacement(
   }
   if (!finished) return { placement: matches.length > 0 ? "Still in" : null, rank: null };
   return { placement: null, rank: null };
+}
+
+interface MayhemRow {
+  event_id: string;
+  title: string;
+  stage: string;
+  archived_at: string | null;
+  updated_at: string;
+  champion_team_id: string | null;
+  team_id: string | null;
+  team_name: string | null;
+}
+
+/**
+ * ARAM Mayhem events the member played (as a listed player), excluding test
+ * and unpublished events. Placement comes from the knockout bracket; a team
+ * that only played group matches in a finished event went out in the groups.
+ */
+async function mayhemHistory(discordId: string): Promise<LockerHistoryRow[]> {
+  const { rows } = await sql`
+    SELECT e.id AS event_id, e.title, e.stage, e.archived_at, e.updated_at, e.champion_team_id,
+           tm.id AS team_id, tm.name AS team_name
+    FROM mayhem_players p
+    JOIN mayhem_events e ON e.id = p.event_id
+    LEFT JOIN mayhem_teams tm ON tm.id = p.team_id
+    WHERE p.member_discord_id = ${discordId}
+      AND e.is_test = false
+      AND e.published = true
+      AND e.stage <> 'collecting'
+  `;
+  if (rows.length === 0) return [];
+  const list = rows.map((r) => ({
+    ...(r as unknown as MayhemRow),
+    archived_at: iso(r.archived_at),
+    updated_at: iso(r.updated_at) as string,
+  }));
+  const { rows: matchRows } = await sql.query(
+    `SELECT id, event_id AS tournament_id, bracket, round_number, match_number, status,
+            team_a_id, team_b_id, winner_id, advances_to_match_id, drops_to_match_id
+     FROM mayhem_matches WHERE event_id = ANY($1)`,
+    [list.map((r) => r.event_id)],
+  );
+  type MayhemMatchRow = Omit<SrMatchRow, "bracket"> & { bracket: SrMatchRow["bracket"] | "group" };
+  const byEvent = new Map<string, MayhemMatchRow[]>();
+  for (const m of matchRows as MayhemMatchRow[]) {
+    const arr = byEvent.get(m.tournament_id) ?? [];
+    arr.push(m);
+    byEvent.set(m.tournament_id, arr);
+  }
+
+  return list.map((r) => {
+    const finished = r.stage === "completed";
+    const all = byEvent.get(r.event_id) ?? [];
+    const knockout = all.filter((m): m is SrMatchRow => m.bracket !== "group");
+    let placement: string | null = null;
+    let rank: number | null = null;
+    if (r.team_id) {
+      const inKnockout = knockout.some((m) => m.team_a_id === r.team_id || m.team_b_id === r.team_id);
+      const inGroups = all.some(
+        (m) => m.bracket === "group" && (m.team_a_id === r.team_id || m.team_b_id === r.team_id),
+      );
+      if (finished && !inKnockout && inGroups && r.champion_team_id !== r.team_id) {
+        placement = "Out in groups";
+      } else {
+        ({ placement, rank } = bracketPlacement(
+          { team_id: r.team_id, champion_team_id: r.champion_team_id },
+          knockout,
+          finished,
+        ));
+      }
+    }
+    return {
+      id: `aram:${r.event_id}`,
+      formatKey: "aram",
+      tournament: r.title,
+      date: r.updated_at,
+      team: r.team_name,
+      placement,
+      rank,
+      finished,
+      // Only the current, unarchived event has a public page.
+      href: r.archived_at ? null : "/tournaments/aram",
+    };
+  });
 }
 
 async function rbHistory(discordId: string): Promise<LockerHistoryRow[]> {
@@ -221,11 +305,12 @@ function ordinal(n: number): string {
 
 /** Every public tournament the member played, newest first. */
 export async function getMemberHistory(discordId: string): Promise<LockerHistoryRow[]> {
-  const [sr, rb] = await Promise.all([
+  const [sr, aram, rb] = await Promise.all([
     srHistory(discordId).catch(() => [] as LockerHistoryRow[]),
+    mayhemHistory(discordId).catch(() => [] as LockerHistoryRow[]),
     rbHistory(discordId).catch(() => [] as LockerHistoryRow[]),
   ]);
-  return [...sr, ...rb].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return [...sr, ...aram, ...rb].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 /**

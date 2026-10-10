@@ -47,7 +47,7 @@ export function Hero({ nextEventLabel, nextEventIsLive, discordOnline }: HeroPro
           <div className="lg:col-span-7 space-y-8">
             {nextEventLabel && (
               <div className="flex flex-wrap items-center gap-3">
-                <Badge variant="red" pulse={nextEventIsLive}>
+                <Badge variant="red" pulse={nextEventIsLive} className="bg-ds-red text-white [&>span]:bg-white">
                   {nextEventIsLive ? "Live" : "Next event"} · {nextEventLabel}
                 </Badge>
               </div>

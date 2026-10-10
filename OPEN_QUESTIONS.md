@@ -20,11 +20,11 @@ Things the redesign could not settle from the code, the database or the handover
 
 ### 2. ARAM Mayhem Sep 2026 result isn't in the database (Phase 0)
 
-The handover asks to seed "Sep 2026, Team Raptor, Gen.G GGX". The only `mayhem_events` row is the live `mayhem-main` (stage `collecting`, no champion), and seeding a real event needs rosters and matches we don't have.
+The handover asks to seed "Sep 2026, Team Raptor, Gen.G GGX". The only `mayhem_events` row is `mayhem-main` (stage `collecting`, no champion), and seeding a real event needs rosters and matches we don't have.
 
 **Decision (Calvin):** leave it out until it's entered through `/tools`. The Hall of Champions and the ARAM plate show nothing for ARAM until then.
 
-**Needs:** a way to record a finished Mayhem event in `/tools` (today `mayhem-main` is a single live event that gets reset), or a completed archived event row created through the admin flow.
+**Correction (11 Oct):** since `7d6ab3e`, `/tools/mayhem` supports multiple events with Archive, so a finished event stays in the DB instead of being reset. **Needs:** the Sep 2026 result entered by running that event through `/tools/mayhem` to completion (teams, bracket, final), since no rosters or matches exist for it.
 
 ### 3. Poro Cup (11 Oct) is not a Discord scheduled event (Phase 0)
 
@@ -83,7 +83,7 @@ After the Phase 0 test-data cleanup there is no completed, non-test tournament i
 
 ### 11. Members stats: Admins and Game coordinators count the people listed, not the Discord role (Phase 4)
 
-The handover asks for Admins and Game coordinators counts in the Members header. The site can only see members who have signed in (`member_profiles`); counting everyone with the Discord role needs the guild member list, which requires the bot's privileged Server Members intent. The stats count the people shown in each section, and a zero count is omitted. No profile has the coordinator category yet, because `DISCORD_COORDINATOR_ROLE_ID` isn't set. **Needs:** the coordinator role ID, and a decision on whether role totals matter enough to need the member list.
+The handover asks for Admins and Game coordinators counts in the Members header. The site can only see members who have signed in (`member_profiles`); counting everyone with the Discord role needs the guild member list, which requires the bot's privileged Server Members intent. The stats count the people shown in each section, and a zero count is omitted. No profile has the coordinator category yet, because `DISCORD_COORDINATOR_ROLE_ID` isn't set. **Resolved (11 Oct):** keep the "people listed" counts. Calvin supplied the coordinator role ID `1424291862633775255`; it's in `.env.local` and **must be added as `DISCORD_COORDINATOR_ROLE_ID` in Vercel (Production and Preview)**. Members get the coordinator label on their next sign-in.
 
 ### 12. Any signed-in member can now opt into Members (Phase 4)
 
@@ -91,7 +91,7 @@ The handover adds a "Members (opted in)" section, so `updateProfile` no longer r
 
 ### 13. Champion splash art on member cards (Phase 4)
 
-Cards use the member's favourite champion's splash from Riot Data Dragon (`ddragon.leagueoflegends.com/cdn/img/champion/splash/<Id>_0.jpg`). Riot's Legal Jibber Jabber policy (checked 10 Oct 2026) allows non-commercial fan use of game assets when the site shows its notice, so the footer now carries the policy's exact notice. **Needs:** confirmation that nothing on the site is paywalled or sold in a way that makes it commercial under that policy (the old /shop linked out to merch).
+Cards use the member's favourite champion's splash from Riot Data Dragon (`ddragon.leagueoflegends.com/cdn/img/champion/splash/<Id>_0.jpg`). Riot's Legal Jibber Jabber policy (checked 10 Oct 2026) allows non-commercial fan use of game assets when the site shows its notice, so the footer now carries the policy's exact notice. **Resolved (11 Oct):** Calvin confirmed the site is non-commercial; the splash art stays.
 
 ### 14. Two guides don't state when they were last checked (Phase 4)
 
@@ -99,17 +99,17 @@ Cards use the member's favourite champion's splash from Riot Data Dragon (`ddrag
 
 ### 15. About: partner details and history (Phase 4)
 
-The partners section names Gen.G GGX and the Naver Riftbound TCG cafe with one plain line each and no links, because the repo has no URL for either. The history timeline is left out until Calvin supplies milestones, as the handover says. **Needs:** partner URLs and any copy you want for them.
+The partners section names Gen.G GGX and the Naver Riftbound TCG cafe with one plain line each and no links, because the repo has no URL for either. The history timeline is left out until Calvin supplies milestones, as the handover says. **Partly resolved (11 Oct):** Gen.G GGX now links to `http://gengxperience.gg/` (the site doesn't answer over https). **Needs:** the Naver Riftbound cafe URL and history milestones.
 
 ## Locker
 
 ### 16. RSVPs come from Discord "Interested", not a bot table (Phase 5)
 
-The handover asks whether the bot tracks RSVPs per member. Nothing in the database does, but Discord does: members who click "Interested" on a scheduled event are listed by `GET /guilds/{guild}/scheduled-events/{event}/users`, which the site's existing bot token can read. The Locker's "Next RSVP" stat and "Coming up" list use that, read-only, cached for 5 minutes. No bot endpoint was added. **Needs:** confirm "Interested" is the RSVP you mean.
+The handover asks whether the bot tracks RSVPs per member. Nothing in the database does, but Discord does: members who click "Interested" on a scheduled event are listed by `GET /guilds/{guild}/scheduled-events/{event}/users`, which the site's existing bot token can read. The Locker's "Next RSVP" stat and "Coming up" list use that, read-only, cached for 5 minutes. No bot endpoint was added. **Resolved (11 Oct):** Calvin confirmed Discord "Interested" is the RSVP.
 
-### 17. Locker history covers Summoner's Rift and Riftbound only (Phase 5)
+### 17. Locker history covers all three formats (Phase 5, updated 11 Oct)
 
-History reads `sr_team_players.discord_id` and `rb_players.member_discord_id`. ARAM Mayhem keeps a single live event row that is overwritten each meetup (see #2), so there is no past Mayhem to list. Placements are derived from recorded results (champion, runner-up, third, or the round a team went out in; Swiss rank for Riftbound). **Needs:** a Mayhem results history if past meetups should show up.
+History reads `sr_team_players.discord_id`, `mayhem_players.member_discord_id` and `rb_players.member_discord_id`. Mayhem was added on 11 Oct, once the multi-event ARAM list made past events available (#2): published, non-test events past signups, with placement from the knockout bracket, or "Out in groups". Only the current, unarchived event links to `/tournaments/aram`. Placements are derived from recorded results (champion, runner-up, third, or the round a team went out in; Swiss rank for Riftbound). No Mayhem player is linked to a Discord account yet, so nothing shows until one is.
 
 ### 18. Locker was verified with a read-only render, not a real sign-in (Phase 5)
 
@@ -133,9 +133,9 @@ Discord is the only slow external call. Its stat strips on Members and About, an
 
 ### 22. Homepage keeps two contrast misses outside the redesign's scope (acceptance)
 
-Lighthouse accessibility on `/` is 96 (pass). The remaining color-contrast items are homepage content the handover says not to redesign: the hero's red "Next event" chip (`#E94560` on `#5A1422`, 3.52:1) and `text-brand-blue-bright` links on navy (3.17:1, e.g. the Instagram link). The stats band's `<dl>` markup issue was ours and is fixed. **Needs:** your call on touching those two homepage styles.
+Lighthouse accessibility on `/` is 96 (pass). The remaining color-contrast items are homepage content the handover says not to redesign: the hero's red "Next event" chip (`#E94560` on `#5A1422`, 3.52:1) and `text-brand-blue-bright` links on navy (3.17:1, e.g. the Instagram link). The stats band's `<dl>` markup issue was ours and is fixed. **Resolved (11 Oct):** fixed at Calvin's request. The chip is now white on brand red, and the homepage text links are white with an underline, since blue is fill-only in the redesign.
 
-### 23. Invite-confirm pages don't use PageHeader (acceptance)
+### 23. Invite-confirm pages moved onto PageHeader (acceptance, resolved 11 Oct)
 
-`/tournaments/summoners-rift/confirm` and `/tournaments/aram/confirm` are single-use, noindexed invite links with their own small card UI and no H1. They aren't in the handover's page list, so they were left alone. `not-found.tsx` and `error.tsx` were added on PageHeader so the 404 and 500 pages match. **Needs:** confirm the invite pages can stay as they are.
+`/tournaments/summoners-rift/confirm` and `/tournaments/aram/confirm` now use PageHeader in all three states (invalid link, sign in, confirm), with the confirm card restyled to the ds tokens. `not-found.tsx` and `error.tsx` also use PageHeader.
 

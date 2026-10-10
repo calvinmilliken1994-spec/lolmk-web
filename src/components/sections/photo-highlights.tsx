@@ -34,7 +34,7 @@ export function PhotoHighlights({ posts }: PhotoHighlightsProps) {
               href="https://instagram.com/lolmeetupkorea"
               target="_blank"
               rel="noreferrer"
-              className="text-brand-blue-bright hover:text-ink underline underline-offset-4"
+              className="text-ds-text underline decoration-ds-line-strong underline-offset-4 hover:decoration-ds-text"
             >
               @lolmeetupkorea
             </a>

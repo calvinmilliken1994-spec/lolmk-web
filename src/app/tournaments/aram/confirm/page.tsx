@@ -3,6 +3,9 @@ import { getMayhemInviteSelection } from "@/lib/mayhem-db";
 import { getMemberSession } from "@/lib/discord-auth";
 import { ConfirmInviteClient } from "@/components/mayhem/confirm-invite-client";
 import { pageMetadata } from "@/lib/metadata";
+import { PageHeader } from "@/components/ds/page-header";
+import { buttonVariants } from "@/components/ui/button";
+import { DiscordIcon } from "@/components/ui/brand-icons";
 
 // Invite confirmation links are single-use and identity-bound — never
 // worth indexing, and never worth leaking via a referrer header to
@@ -61,14 +64,11 @@ export default async function ConfirmInvitePage({
 
   if (!validParams) {
     return (
-      <section className="container-wide py-20 max-w-lg">
-        <div className="border border-line bg-surface p-8 text-center space-y-3">
-          <p className="font-heading text-heading-md text-ink">Invalid invite link</p>
-          <p className="text-body-sm text-ink-secondary">
-            This link is missing or malformed — ask the captain to send a fresh one.
-          </p>
-        </div>
-      </section>
+      <PageHeader
+        tag="ARAM Mayhem"
+        title="Invite link not valid."
+        deck="This link is missing or malformed. Ask the captain to send a fresh one."
+      />
     );
   }
 
@@ -77,22 +77,27 @@ export default async function ConfirmInvitePage({
     // never accepts an attacker-controlled redirect target.
     const returnTo = `/tournaments/aram/confirm?t=${encodeURIComponent(selection!.eventId)}&g=${selection!.generation}&slot=${encodeURIComponent(slotId)}&token=${encodeURIComponent(token)}`;
     return (
-      <section className="container-wide py-20 max-w-lg">
-        <div className="border border-line bg-surface p-8 text-center space-y-4">
-          <p className="font-heading text-heading-md text-ink mb-1">Sign in to view this invite.</p>
-          <p className="text-body-sm text-ink-secondary max-w-md mx-auto">
-            Team invites are tied to your verified Discord account — sign in to see who invited you and confirm.
-          </p>
+      <PageHeader
+        tag="ARAM Mayhem"
+        title="Confirm your spot."
+        deck="Team invites are tied to your verified Discord account. Sign in to see who invited you and confirm your spot."
+        actions={
           <a
             href={`/api/auth/member/login?next=${encodeURIComponent(returnTo)}`}
-            className="inline-flex items-center gap-2 border border-line-strong px-5 py-2.5 text-body-sm font-semibold text-ink hover:border-brand-red"
+            className={buttonVariants({ variant: "discord", size: "md" })}
           >
+            <DiscordIcon className="h-5 w-5" />
             Sign in with Discord
           </a>
-        </div>
-      </section>
+        }
+      />
     );
   }
 
-  return <ConfirmInviteClient selection={selection!} slotId={slotId} token={token} viewerDisplayName={member.displayName} />;
+  return (
+    <>
+      <PageHeader tag="ARAM Mayhem" title="Confirm your spot." />
+      <ConfirmInviteClient selection={selection!} slotId={slotId} token={token} viewerDisplayName={member.displayName} />
+    </>
+  );
 }
