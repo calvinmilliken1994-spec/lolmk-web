@@ -69,3 +69,13 @@ The handover's token names (`surface`, `line`, `text`, …) collide with existin
 
 The handover's nav is Tournaments, Members, How-tos, Locker, About, with the signed-in avatar linking to `/locker`. `/locker` doesn't exist until Phase 5, so in Phase 2 the nav has no Locker item and the avatar links to `/members/profile`. Both switch in Phase 5.
 
+## Tournaments
+
+### 9. "Message an admin on Kakao" points at the community open chat (Phase 3)
+
+The handover's signup band has an outline button "Message an admin on Kakao". The only Kakao link in the repo is the community open chat (`open.kakao.com/o/gIPbdi3e`, from `src/data/socials.json`), so the button uses that. **Needs:** an admin-specific Kakao link if there is one.
+
+### 10. Hall of champions is empty until a real final is recorded (Phase 3)
+
+After the Phase 0 test-data cleanup there is no completed, non-test tournament in the DB, and the legacy champions file only held a demo row (#5). The Hall of champions therefore shows its empty state, and the off-season status bar has no "Last winner" cell. Entering the September 2026 ARAM Mayhem result (#2) fills both automatically.
+

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Crown, Swords, Trophy, Tv, Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Crown, Swords, Trophy, Users } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
@@ -10,6 +9,10 @@ import { getMemberSession } from "@/lib/discord-auth";
 import type { MayhemPublic, MayhemPublicTeam } from "@/types/mayhem";
 import { AramSignupPanel } from "@/components/mayhem/aram-signup-panel";
 import { pageMetadata } from "@/lib/metadata";
+import { FormatStatus } from "@/components/ds/format-status";
+import { PageHeader } from "@/components/ds/page-header";
+import { statCells } from "@/components/ds/stat-strip";
+import { getTournamentOverview } from "@/lib/tournament-status";
 
 export const metadata: Metadata = pageMetadata({
   title: "ARAM Mayhem",
@@ -49,25 +52,23 @@ async function loadMayhemPublic(
   }
 }
 
-const STAGE_COPY: Record<
-  MayhemPublic["stage"],
-  { label: string; variant: "default" | "red" | "blue" | "success" | "warning" | "outline"; live: boolean }
-> = {
-  collecting: { label: "Signing people in", variant: "warning", live: true },
-  randomized: { label: "Teams drawn", variant: "blue", live: true },
-  group_stage: { label: "Group stage", variant: "red", live: true },
-  knockout: { label: "Knockout", variant: "red", live: true },
-  completed: { label: "Finished", variant: "success", live: false },
+const STAGE_COPY: Record<MayhemPublic["stage"], { label: string; live: boolean }> = {
+  collecting: { label: "Signups", live: true },
+  randomized: { label: "Teams drawn", live: true },
+  group_stage: { label: "Group stage", live: true },
+  knockout: { label: "Knockout", live: true },
+  completed: { label: "Finished", live: false },
 };
 
 export default async function AramPublicPage({ searchParams }: { searchParams: Promise<{ t?: string }> }) {
   const { t } = await searchParams;
   const tournaments = await listMayhemEvents(true).catch(() => []);
-  const [data, member] = await Promise.all([
+  const [data, member, overview] = await Promise.all([
     loadMayhemPublic(() => getMayhemPublic(t)),
     // Never let a Discord/session failure take the whole public page down —
     // an unauthenticated visitor just sees the signed-out signup state.
     getMemberSession().catch(() => null),
+    getTournamentOverview(),
   ]);
   const stage = STAGE_COPY[data.stage];
   const champion = data.champion_team_id
@@ -88,72 +89,48 @@ export default async function AramPublicPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      {tournaments.length > 0 && <nav aria-label="ARAM tournaments" className="container-wide py-6 flex flex-wrap gap-3">{tournaments.map(event => <Link key={event.id} href={`/tournaments/aram?t=${encodeURIComponent(event.id)}`} className={cn("border border-line px-3 py-2 text-body-sm", event.id === data.id && "text-brand-red-bright")}>{event.title}</Link>)}</nav>}
+      {tournaments.length > 1 && <nav aria-label="ARAM tournaments" className="ds-container flex flex-wrap gap-3 pt-6">{tournaments.map(event => <Link key={event.id} href={`/tournaments/aram?t=${encodeURIComponent(event.id)}`} aria-current={event.id === data.id ? "page" : undefined} className={cn("inline-flex min-h-11 items-center border px-4 font-heading text-ds-ui", event.id === data.id ? "border-ds-text text-white" : "border-ds-line-strong text-ds-text-muted hover:text-white")}>{event.title}</Link>)}</nav>}
       {t && !data.id && <p role="status" className="container-wide py-4 text-ink-muted">This tournament is not publicly available.</p>}
-      <section className="border-b border-line-subtle">
-        <div className="container-wide py-10 md:py-14">
-          <div className="max-w-3xl space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <Link href="/tournaments" className="text-body-sm text-ink-muted hover:text-ink">
-                Tournaments
-              </Link>
-              <span className="text-ink-muted">/</span>
-              <Badge variant="blue">ARAM Mayhem</Badge>
-              {!neverRun && (
-                <Badge variant={stage.variant} pulse={stage.live}>
-                  {stage.label}
-                </Badge>
-              )}
-            </div>
-            <h1 className="font-heading text-heading-xl text-ink">{data.id ? data.title : "ARAM meetup tournament"}</h1>
-            <p className="text-body-md text-ink-secondary max-w-[62ch]">
-              LoLMK&apos;s ARAM Mayhem is a meetup tournament, usually run over the
-              course of a day. Bring a full premade team, or sign up solo and
-              get placed into a team — solo signups are genuinely encouraged,
-              especially if you haven&apos;t put a friend group together in Korea
-              yet. Small prizes are up for grabs.
-            </p>
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              <a
-                href="https://discord.gg/lolmk"
-                target="_blank"
-                rel="noreferrer"
-                className={cn(buttonVariants({ variant: "discord", size: "md" }))}
+      <PageHeader
+        tag="ARAM Mayhem"
+        title={data.id && !neverRun ? data.title : "ARAM Mayhem."}
+        deck="The meetup tournament, usually run over a day. Bring a full premade team, or sign up solo and get placed into one. Solo signups are genuinely encouraged, especially if you haven't put a friend group together in Korea yet."
+        stats={
+          neverRun
+            ? undefined
+            : statCells([
+                { k: "Stage", v: stage.label },
+                { k: "Teams", v: data.team_format === "premade" ? "Premade" : "Drawn on the night" },
+                { k: "Players in", v: data.player_count > 0 ? String(data.player_count) : null },
+                { k: "Teams formed", v: data.teams.length > 0 ? String(data.teams.length) : null },
+              ])
+        }
+        actions={
+          <>
+            <a
+              href="https://discord.gg/lolmk"
+              target="_blank"
+              rel="noreferrer"
+              className={cn(buttonVariants({ variant: "discord", size: "md" }))}
+            >
+              <DiscordIcon className="h-5 w-5" />
+              Find the next one
+            </a>
+            {stage.live && !neverRun && data.stage !== "collecting" && (
+              <Link
+                href={`/mayhemlive?t=${encodeURIComponent(data.id ?? "")}`}
+                className={cn(buttonVariants({ variant: "outline", size: "md" }))}
               >
-                <DiscordIcon className="h-5 w-5" />
-                Find the next one
-              </a>
-              {stage.live && !neverRun && (
-                <Link
-                  href={`/mayhemlive?t=${encodeURIComponent(data.id ?? "")}`}
-                  className={cn(buttonVariants({ variant: "secondary", size: "md" }))}
-                >
-                  <Tv strokeWidth={1.5} className="h-4 w-4" />
-                  Venue screen
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
+                Venue screen
+              </Link>
+            )}
+          </>
+        }
+      />
 
-      {neverRun ? (
-        <section className="container-wide py-20">
-          <div className="border border-dashed border-line-strong bg-surface p-12 text-center flex flex-col items-center gap-4">
-            <Swords strokeWidth={1} className="h-14 w-14 text-ink-muted opacity-40" />
-            <div className="space-y-2">
-              <p className="font-heading text-heading-lg text-ink">
-                No Mayhem running right now.
-              </p>
-              <p className="text-body-md text-ink-secondary max-w-lg mx-auto">
-                Mayhem runs at meetups, announced in Discord a few days out.
-                When one is live this page fills in with signup, then the
-                teams and bracket as they happen.
-              </p>
-            </div>
-          </div>
-        </section>
-      ) : (
+      <FormatStatus overview={overview} format="aram" />
+
+      {neverRun ? null : (
         <>
           {canSignUp && (
             <section className="container-wide py-12 border-b border-line-subtle">

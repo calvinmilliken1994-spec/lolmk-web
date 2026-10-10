@@ -1,11 +1,19 @@
-import Image from "next/image";
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { HallOfChampions } from "@/components/sections/hall-of-champions";
-import { getChampions } from "@/lib/champions";
-import { formatChip, getTournamentOverview, type FormatKey } from "@/lib/tournament-status";
+import { buttonVariants } from "@/components/ui/button";
+import { DiscordIcon } from "@/components/ui/brand-icons";
+import { FormatPlate } from "@/components/ds/format-plate";
+import { HallOfChampions } from "@/components/ds/hall-of-champions";
+import { PageHeader } from "@/components/ds/page-header";
+import { StatusBar } from "@/components/ds/status-bar";
+import { cn } from "@/lib/utils";
 import { pageMetadata } from "@/lib/metadata";
+import {
+  FORMAT_HREFS,
+  deriveStatusBar,
+  formatChip,
+  formatKstWhen,
+  getTournamentOverview,
+  type FormatKey,
+} from "@/lib/tournament-status";
 
 export const metadata = pageMetadata({
   title: "Tournaments",
@@ -14,167 +22,140 @@ export const metadata = pageMetadata({
   path: "/tournaments",
 });
 
-// The Hall of Champions below is DB-backed (completed Summoner's Rift
-// tournaments merged with the legacy static file), so this page can't be
-// fully static.
+// Status, chips and the Hall of champions are derived from the DB and Discord
+// on every revalidation, so a change in a tournament record moves all three.
 export const revalidate = 300;
 
-interface GameEntry {
-  name: string;
-  href: string;
-  kicker: string;
-  description: string;
-  emblem: string;
-  emblemAlt: string;
-  emblemDims: { width: number; height: number };
-  /** Status comes from tournament-status.ts, never from this list. */
+interface PlateCopy {
   format: FormatKey;
+  title: string;
+  description: string;
+  facts: { k: string; v: string }[];
+  link: string;
 }
 
-const GAMES: GameEntry[] = [
+const PLATES: PlateCopy[] = [
   {
-    name: "Summoner's Rift",
-    href: "/tournaments/summoners-rift",
-    kicker: "5v5 · Full draft",
+    format: "sr",
+    title: "Summoner's Rift",
     description:
       "The main event. Fixed rosters and full draft, played out on the KR server over a week or a month.",
-    emblem: "/images/formats/summoners-rift-badge-new.png",
-    emblemAlt: "Summoner's Rift badge: rounded gold-framed navy crest",
-    emblemDims: { width: 493, height: 488 },
-    format: "sr",
+    facts: [
+      { k: "Teams", v: "5v5, fixed rosters" },
+      { k: "Bracket", v: "Double elimination" },
+      { k: "Where", v: "Online, KR server" },
+    ],
+    link: "Brackets and results",
   },
   {
-    name: "ARAM Mayhem",
-    href: "/tournaments/aram",
-    kicker: "5v5 · Howling Abyss",
+    format: "aram",
+    title: "ARAM Mayhem",
     description:
       "The meetup tournament. Turn up solo, get drawn into a random team on the venue screen, and play the whole bracket that night.",
-    emblem: "/images/formats/aram-badge-new.png",
-    emblemAlt: "ARAM badge: elongated gold-framed navy gem crest matching the Summoner's Rift palette",
-    emblemDims: { width: 469, height: 472 },
-    format: "aram",
+    facts: [
+      { k: "Teams", v: "Random, drawn on the night" },
+      { k: "Length", v: "One evening" },
+      { k: "Where", v: "In person, Gen.G GGX" },
+    ],
+    link: "Brackets and results",
   },
   {
-    name: "Riftbound",
-    href: "/tournaments/riftbound",
-    kicker: "Card game",
+    format: "rb",
+    title: "Riftbound",
     description:
       "The card game. In-person cups at GGX, plus a weekly online night anyone can join for free on tcg-arena.fr.",
-    emblem: "/images/formats/riftbound-badge-new-cropped.png",
-    emblemAlt:
-      "Riftbound badge: fanned trading cards in gold-framed navy panels matching the other two badges",
-    emblemDims: { width: 1077, height: 640 },
-    format: "rb",
+    facts: [
+      // "Next cup" is prepended from data at render time when one exists.
+      { k: "Weekly", v: "Online, Wed 8:30 PM KST" },
+      { k: "Where", v: "Gen.G GGX and online" },
+    ],
+    link: "Events and results",
   },
 ];
 
 export default async function TournamentsPage() {
-  // Seeded sample data is split out rather than sorted in with the rest:
-  // champions.json's demo row has a 2025 date and would otherwise sort to
-  // the top and be presented as the reigning champion. Real results only in
-  // latest/past; the sample is passed separately and only surfaces (badged)
-  // when there is nothing real to show.
-  const [champions, overview] = await Promise.all([getChampions(), getTournamentOverview()]);
+  const overview = await getTournamentOverview();
   const now = new Date(overview.now);
-  const real = champions.filter((r) => !r.placeholder);
-  const samples = champions.filter((r) => r.placeholder);
-  const latest = real[0] ?? null;
-  const past = real.slice(1);
+  const status = deriveStatusBar(overview);
+
+  const rbNext = overview.states.rb.next;
+  const rbNextWhen = rbNext ? formatKstWhen(rbNext) : null;
+
+  const soonest = (["sr", "aram", "rb"] as const)
+    .map((k) => overview.states[k].next)
+    .find(Boolean);
 
   return (
     <>
-      <section className="container-wide pt-12 pb-24 md:pt-16">
-        {/*
-          Hub header stays deliberately small: the formats grid is the page.
-          Entry (Discord) and the event calendar live in the header CTA and
-          the home page, so they only get a one-line pointer here.
-        */}
-        <div className="mb-12 flex flex-wrap items-end justify-between gap-x-12 gap-y-4 border-b border-line pb-8">
-          <div>
-            <p className="text-label uppercase text-ink-muted mb-2">
-              Tournaments
-            </p>
-            <h1 className="font-heading text-display-sm text-ink">
-              Pick your format.
-            </h1>
-          </div>
-          <p className="text-body-sm text-ink-secondary max-w-[45ch]">
-            Three ways to play, one community. Each format has its own page
-            with the live bracket, the field, and how to get in.
-          </p>
-        </div>
+      <PageHeader
+        tag="Tournaments"
+        title="Pick your format."
+        deck="Three ways to play, one community. Each format has its own page with the live bracket, the field, and how to get in."
+      />
 
-        <div className="grid gap-6 md:grid-cols-3">
-          {GAMES.map((game) => {
-            const chip = formatChip(overview.states[game.format], now);
+      <section aria-label="Tournament status" className="ds-container">
+        <StatusBar data={status} />
+      </section>
+
+      <section aria-label="Formats" className="ds-container pt-14">
+        <div className="flex flex-wrap gap-5">
+          {PLATES.map((plate) => {
+            const facts =
+              plate.format === "rb" && rbNext
+                ? [{ k: "Next cup", v: rbNextWhen ? `${rbNext.name}, ${rbNextWhen}` : rbNext.name }, ...plate.facts]
+                : plate.facts;
             return (
-            <Link
-              key={game.href}
-              href={game.href}
-              className="group flex flex-col border border-line bg-surface p-6 transition-all duration-200 ease-out-soft hover:-translate-y-0.5 hover:border-line-strong hover:bg-elevated/40"
-            >
-              <div className="flex items-start justify-between">
-                <span className="flex h-20 w-24 shrink-0 items-center justify-start">
-                  <Image
-                    src={game.emblem}
-                    alt={game.emblemAlt}
-                    width={game.emblemDims.width}
-                    height={game.emblemDims.height}
-                    className="h-20 w-auto"
-                  />
-                </span>
-                <Badge variant={chip.tone === "red" ? "red" : "outline"} pulse={chip.pulse}>
-                  {chip.label}
-                </Badge>
-              </div>
-              <div className="mt-6 flex-1">
-                <p className="text-caption font-mono uppercase tracking-wider text-ink-muted">
-                  {game.kicker}
-                </p>
-                <p className="mt-1 font-heading text-heading-lg text-ink group-hover:text-brand-red-bright transition-colors">
-                  {game.name}
-                </p>
-                <p className="mt-3 text-body-sm text-ink-secondary">
-                  {game.description}
-                </p>
-              </div>
-              <span className="mt-6 inline-flex items-center gap-1.5 text-body-sm font-medium text-brand-red-bright">
-                Open
-                <ArrowRight strokeWidth={2} className="h-4 w-4" />
-              </span>
-            </Link>
+              <FormatPlate
+                key={plate.format}
+                format={plate.format}
+                title={plate.title}
+                description={plate.description}
+                facts={facts.slice(0, 3)}
+                chip={formatChip(overview.states[plate.format], now)}
+                link={{ label: plate.link, href: FORMAT_HREFS[plate.format] }}
+              />
             );
           })}
         </div>
-
-        <p className="mt-8 text-body-sm text-ink-muted">
-          Signups open in the{" "}
-          <a
-            href="https://discord.gg/lolmk"
-            target="_blank"
-            rel="noreferrer"
-            className="text-brand-blue-bright underline underline-offset-4 hover:text-ink"
-          >
-            Discord
-          </a>
-          . Full event calendar on the{" "}
-          <Link
-            href="/#events"
-            className="text-brand-blue-bright underline underline-offset-4 hover:text-ink"
-          >
-            home page
-          </Link>
-          .
-        </p>
       </section>
 
-      {/*
-        Hall of Champions stays on the hub rather than moving to a per-game
-        page: it spans every format LoLMK has ever run, and splitting it three
-        ways would leave two near-empty halls and bury the one result that
-        actually exists. Each record carries its own game label.
-      */}
-      <HallOfChampions latest={latest} past={past} samples={samples} />
+      <HallOfChampions
+        results={overview.results}
+        next={soonest ? { name: soonest.name, when: formatKstWhen(soonest), href: soonest.href } : null}
+      />
+
+      <section aria-label="How to enter" className="ds-container pt-[clamp(80px,9vw,120px)]">
+        <div className="flex flex-wrap items-center justify-between gap-7 border border-ds-line bg-ds-surface px-8 py-10 [clip-path:polygon(0_0,calc(100%-24px)_0,100%_24px,100%_100%,0_100%)] sm:px-11">
+          <div className="min-w-0 flex-[1_1_420px]">
+            <h2 className="m-0 font-display text-[clamp(40px,5vw,60px)] font-normal leading-[0.92] text-white">
+              Signups open in Discord.
+            </h2>
+            <p className="mb-0 mt-2.5 max-w-[52ch] text-ds-body text-ds-text-muted">
+              Captains register teams there and every player confirms their own slot. This page
+              updates the moment a bracket is drawn.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href="https://discord.gg/lolmk"
+              target="_blank"
+              rel="noreferrer"
+              className={cn(buttonVariants({ variant: "discord", size: "lg" }))}
+            >
+              <DiscordIcon className="h-5 w-5" />
+              Join the Discord
+            </a>
+            <a
+              href="https://open.kakao.com/o/gIPbdi3e"
+              target="_blank"
+              rel="noreferrer"
+              className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
+            >
+              Message an admin on Kakao
+            </a>
+          </div>
+        </div>
+      </section>
     </>
   );
 }

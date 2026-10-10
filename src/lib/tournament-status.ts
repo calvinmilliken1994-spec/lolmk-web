@@ -406,7 +406,11 @@ function weeklyInHouse(recurring: RecurringSchedule[]): string | null {
  * The broadcast lower third at the top of /tournaments, or on a format page
  * when `only` is passed. Mode is derived here, never set by hand.
  */
-export function deriveStatusBar(overview: TournamentOverview, only?: FormatKey): StatusBarData {
+export function deriveStatusBar(
+  overview: TournamentOverview,
+  only?: FormatKey,
+  opts: { weekly?: StatusCell | null } = {},
+): StatusBarData {
   const keys = only ? [only] : FORMAT_ORDER;
 
   const live = keys.map((k) => overview.states[k].live).find(Boolean);
@@ -435,6 +439,18 @@ export function deriveStatusBar(overview: TournamentOverview, only?: FormatKey):
     };
   }
 
+  // Nothing dated, but a format is taking signups: that is the next thing.
+  const open = keys.find((k) => overview.states[k].signupsOpen);
+  if (open) {
+    return {
+      mode: "next",
+      title: `${FORMAT_NAMES[open]} signups are open`,
+      sub: "Register on the format page. The date is announced in Discord.",
+      cta: { label: "Sign up", href: FORMAT_HREFS[open] },
+      cells: [],
+    };
+  }
+
   const results = only ? overview.results.filter((r) => r.formatKey === only) : overview.results;
   const last = results[0];
   const cells: StatusCell[] = [];
@@ -443,8 +459,14 @@ export function deriveStatusBar(overview: TournamentOverview, only?: FormatKey):
     const fmt = last.formatKey ? FORMAT_NAMES[last.formatKey] : last.game;
     cells.push({ k: "Won", v: `${fmt}, ${formatMonthYear(last.date)}` });
   }
-  const weekly = weeklyInHouse(overview.recurring);
-  if (weekly) cells.push({ k: "Weekly in-house night", v: weekly });
+  // The weekly night shown off-season: the in-house night from the homepage
+  // schedule by default; a format page can pass its own (or null for none).
+  if (opts.weekly !== undefined) {
+    if (opts.weekly) cells.push(opts.weekly);
+  } else {
+    const weekly = weeklyInHouse(overview.recurring);
+    if (weekly) cells.push({ k: "Weekly in-house night", v: weekly });
+  }
   return {
     mode: "offseason",
     title: last ? `${last.champion.name} hold the crown` : "Between seasons",

@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Swords, Trophy, Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
@@ -16,6 +14,10 @@ import { getCaptainSession } from "@/lib/discord-auth";
 import type { SrPublicTournament, SrTournament } from "@/types/sr-tournament";
 import { SrPublicSignupGate, SrSignupSection } from "@/components/sr/sr-public-signup";
 import { pageMetadata } from "@/lib/metadata";
+import { FormatStatus } from "@/components/ds/format-status";
+import { LiveDot } from "@/components/ds/live-dot";
+import { PageHeader } from "@/components/ds/page-header";
+import { getTournamentOverview } from "@/lib/tournament-status";
 
 export const metadata: Metadata = pageMetadata({
   title: "Summoner's Rift tournaments",
@@ -36,25 +38,23 @@ const DATE_FMT = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
-const STATUS_COPY: Record<
-  SrPublicTournament["status"],
-  { label: string; variant: "default" | "red" | "blue" | "success" | "warning" | "outline"; pulse?: boolean }
-> = {
-  draft: { label: "Draft", variant: "outline" },
-  seeding: { label: "Seeded — bracket soon", variant: "warning" },
-  bracket_published: { label: "Bracket live", variant: "blue" },
-  in_progress: { label: "In progress", variant: "red", pulse: true },
-  completed: { label: "Completed", variant: "success" },
-  archived: { label: "Archived", variant: "default" },
+const STATUS_COPY: Record<SrPublicTournament["status"], { label: string; live: boolean }> = {
+  draft: { label: "Draft", live: false },
+  seeding: { label: "Seeded, bracket soon", live: false },
+  bracket_published: { label: "Bracket live", live: true },
+  in_progress: { label: "Live now", live: true },
+  completed: { label: "Finished", live: false },
+  archived: { label: "Archived", live: false },
 };
 
 export default async function SummonersRiftPublicPage() {
   // Same shape as the ARAM page: a session failure degrades to the
   // signed-out state, never a failed request.
   const captain = await getCaptainSession().catch(() => null);
-  const [tournaments, signupOpen] = await Promise.all([
+  const [tournaments, signupOpen, overview] = await Promise.all([
     listPublicTournaments(),
     listSignupOpenTournaments(),
+    getTournamentOverview(),
   ]);
   const fieldBySlug = await getTeamCountsBySlug(tournaments.map((t) => t.slug));
 
@@ -77,47 +77,32 @@ export default async function SummonersRiftPublicPage() {
 
   return (
     <>
-      <section className="border-b border-line-subtle">
-        <div className="container-wide py-10 md:py-14">
-          <div className="max-w-3xl space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <Link href="/tournaments" className="text-body-sm text-ink-muted hover:text-ink">
-                Tournaments
-              </Link>
-              <span className="text-ink-muted">/</span>
-              <Badge variant="red">Summoner&apos;s Rift</Badge>
-            </div>
-            <h1 className="font-heading text-heading-xl text-ink">5v5 team tournaments</h1>
-            <p className="text-body-md text-ink-secondary max-w-[62ch]">
-              Full-draft 5v5s on the KR server, run over a week or a month.
-              Captains register a team, every player confirms their own slot,
-              rosters lock before kickoff, and the bracket below updates as
-              results come in.
-            </p>
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              <a
-                href="https://discord.gg/lolmk"
-                target="_blank"
-                rel="noreferrer"
-                className={cn(buttonVariants({ variant: "discord", size: "md" }))}
-              >
-                <DiscordIcon className="h-5 w-5" />
-                Enter via Discord
-              </a>
-              <Link
-                href="/captain"
-                className={cn(buttonVariants({ variant: "secondary", size: "md" }))}
-              >
-                <Swords strokeWidth={1.5} className="h-4 w-4" />
-                Captain dashboard
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      <PageHeader
+        tag="Summoner's Rift"
+        title="5v5 on the KR server."
+        deck="Full-draft 5v5s, run over a week or a month. Captains register a team, every player confirms their own slot, rosters lock before kickoff, and the bracket updates as results come in."
+        actions={
+          <>
+            <a
+              href="https://discord.gg/lolmk"
+              target="_blank"
+              rel="noreferrer"
+              className={cn(buttonVariants({ variant: "discord", size: "md" }))}
+            >
+              <DiscordIcon className="h-5 w-5" />
+              Enter via Discord
+            </a>
+            <Link href="/captain" className={cn(buttonVariants({ variant: "outline", size: "md" }))}>
+              Captain dashboard
+            </Link>
+          </>
+        }
+      />
+
+      <FormatStatus overview={overview} format="sr" />
 
       {signupOpen.length > 0 && (
-        <section className="container-wide py-12 border-b border-line-subtle space-y-4">
+        <section className="ds-container space-y-4 pt-14">
           {enterable.map((tournament) => (
             <SrSignupSection key={tournament.id} tournament={tournament} />
           ))}
@@ -125,40 +110,31 @@ export default async function SummonersRiftPublicPage() {
         </section>
       )}
 
-      <section className="container-wide py-20 space-y-14">
-        <div className="space-y-6">
-          <h2 className="font-heading text-display-sm text-ink">Running now</h2>
-          {live.length === 0 ? (
-            <div className="border border-dashed border-line-strong bg-surface p-10 text-center space-y-2">
-              <p className="font-heading text-heading-lg text-ink">
-                No Summoner&apos;s Rift tournament is live right now.
-              </p>
-              <p className="text-body-md text-ink-secondary max-w-lg mx-auto">
-                The next one is announced in Discord first. Signups and rosters
-                are handled there; this page goes live the moment the bracket
-                is drawn.
-              </p>
-            </div>
-          ) : (
-            <ul className="grid gap-4 md:grid-cols-2">
-              {live.map((t) => (
-                <TournamentCard key={t.slug} tournament={t} field={fieldBySlug.get(t.slug)} />
-              ))}
-            </ul>
-          )}
-        </div>
+      {live.length > 0 && (
+        <section aria-labelledby="sr-running" className="ds-container pt-14">
+          <h2 id="sr-running" className="m-0 font-display text-[clamp(40px,5vw,60px)] font-normal leading-[0.92] text-ds-text">
+            Running now
+          </h2>
+          <ul className="mt-6 grid gap-5 md:grid-cols-2">
+            {live.map((t) => (
+              <TournamentCard key={t.slug} tournament={t} field={fieldBySlug.get(t.slug)} />
+            ))}
+          </ul>
+        </section>
+      )}
 
-        {finished.length > 0 && (
-          <div className="space-y-6 border-t border-line-subtle pt-14">
-            <h2 className="font-heading text-display-sm text-ink">Finished</h2>
-            <ul className="grid gap-4 md:grid-cols-2">
-              {finished.map((t) => (
-                <TournamentCard key={t.slug} tournament={t} field={fieldBySlug.get(t.slug)} />
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
+      {finished.length > 0 && (
+        <section aria-labelledby="sr-finished" className="ds-container pt-14">
+          <h2 id="sr-finished" className="m-0 font-display text-[clamp(40px,5vw,60px)] font-normal leading-[0.92] text-ds-text">
+            Finished
+          </h2>
+          <ul className="mt-6 grid gap-5 md:grid-cols-2">
+            {finished.map((t) => (
+              <TournamentCard key={t.slug} tournament={t} field={fieldBySlug.get(t.slug)} />
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }
@@ -173,44 +149,43 @@ function TournamentCard({
 }) {
   const status = STATUS_COPY[tournament.status];
   const window = formatWindow(tournament);
+  const facts = [
+    {
+      k: "Format",
+      v: `${tournament.format === "double_elim" ? "Double elimination" : "Single elimination"}, best of ${tournament.best_of}`,
+    },
+    field ? { k: "Field", v: `${field} ${field === 1 ? "team" : "teams"}` } : null,
+    window ? { k: "When", v: window } : null,
+  ].filter((f): f is { k: string; v: string } => f !== null);
   return (
-    <li>
+    <li className="cut-plate flex flex-col border border-ds-line bg-ds-surface transition-[transform,border-color] duration-[250ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:-translate-y-1 hover:border-ds-line-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+      <div className="flex flex-col gap-3 px-7 pt-6">
+        <span
+          className={cn(
+            "inline-flex min-h-7 items-center gap-2 self-start px-3 font-heading text-ds-label font-semibold",
+            status.live ? "bg-ds-red text-white" : "bg-ds-line-soft text-[#C9D0E3]",
+          )}
+        >
+          {status.live && <LiveDot size="sm" />}
+          {status.label}
+        </span>
+        <h3 className="m-0 font-display text-ds-plate font-normal text-white [overflow-wrap:anywhere]">
+          {tournament.name}
+        </h3>
+        <dl className="mb-0 mt-1 font-heading text-ds-ui">
+          {facts.map((f) => (
+            <div key={f.k} className="flex justify-between gap-4 border-t border-ds-line-soft py-[11px]">
+              <dt className="text-ds-text-dim">{f.k}</dt>
+              <dd className="m-0 text-right font-semibold text-ds-text">{f.v}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
       <Link
         href={`/tournaments/summoners-rift/${tournament.slug}`}
-        className="group flex h-full flex-col gap-4 border border-line bg-surface p-6 transition-all duration-200 ease-out-soft hover:-translate-y-0.5 hover:border-line-strong hover:bg-elevated/40"
+        className="mt-4 flex min-h-14 items-center border-t border-ds-line px-7 font-heading text-ds-ui font-semibold text-white transition-colors duration-150 hover:bg-ds-surface-2"
       >
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-heading text-heading-lg text-ink group-hover:text-brand-red-bright transition-colors">
-            {tournament.name}
-          </h3>
-          <Badge variant={status.variant} pulse={status.pulse}>
-            {status.label}
-          </Badge>
-        </div>
-        <ul className="space-y-1.5 text-body-sm text-ink-secondary">
-          <li className="inline-flex items-center gap-2">
-            <Trophy strokeWidth={1.5} className="h-4 w-4 text-ink-muted" />
-            {tournament.format === "double_elim" ? "Double elimination" : "Single elimination"}
-            {" · "}
-            Best of {tournament.best_of}
-          </li>
-          {field ? (
-            <li className="inline-flex items-center gap-2">
-              <Users strokeWidth={1.5} className="h-4 w-4 text-ink-muted" />
-              {field} {field === 1 ? "team" : "teams"}
-            </li>
-          ) : null}
-          {window && (
-            <li className="inline-flex items-center gap-2">
-              <CalendarDays strokeWidth={1.5} className="h-4 w-4 text-ink-muted" />
-              {window}
-            </li>
-          )}
-        </ul>
-        <span className="mt-auto inline-flex items-center gap-1.5 text-body-sm font-medium text-brand-red-bright">
-          {tournament.status === "completed" ? "See the result" : "Open the bracket"}
-          <ArrowRight strokeWidth={2} className="h-4 w-4" />
-        </span>
+        {tournament.status === "completed" ? "See the result" : "Open the bracket"}
       </Link>
     </li>
   );

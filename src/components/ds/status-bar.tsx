@@ -26,7 +26,7 @@ export function StatusBar({ data, className }: { data: StatusBarData; className?
       <div className="flex flex-wrap items-stretch">
         <div
           className={cn(
-            "flex min-w-[180px] flex-[0_0_auto] items-center gap-3.5 px-7 py-6",
+            "flex min-w-[180px] flex-[0_0_auto] items-center gap-3.5 px-7 py-6 max-sm:w-full",
             tag.tone === "blue" ? "bg-ds-blue" : "bg-ds-red",
           )}
         >
