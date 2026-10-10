@@ -2,6 +2,7 @@
 
 import { sql, type VercelPoolClient } from "@vercel/postgres";
 import { revalidatePath } from "next/cache";
+import { randomBytes } from "node:crypto";
 import { getCurrentAdmin, isToolsSession } from "@/lib/tools-auth";
 import { ensureSchema, getMayhemFull, newId, SINGLETON_EVENT_ID, writeMayhemAudit } from "@/lib/mayhem-db";
 import { isRevealStarted, REVEAL_LOCKED_MESSAGE } from "@/lib/mayhem-reveal";
@@ -528,7 +529,6 @@ async function hashConfirmToken(token: string): Promise<string> {
 }
 
 function randomConfirmToken(): string {
-  const { randomBytes } = require("node:crypto") as typeof import("node:crypto");
   return randomBytes(CONFIRM_TOKEN_BYTES).toString("base64url");
 }
 

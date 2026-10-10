@@ -767,12 +767,14 @@ function BracketOrReveal({
   useEffect(() => {
     if (!startedAt) return;
     const startMs = Date.parse(startedAt);
-    let id: number;
     const tick = () => {
       setNow(Date.now());
       if (Date.now() - startMs >= revealDurationMs) window.clearInterval(id);
     };
-    id = window.setInterval(tick, 100);
+    // `const` is safe here: `tick` only runs on interval callbacks, which
+    // fire strictly after this initializer completes — the self-reference
+    // never reads `id` before it is assigned.
+    const id = window.setInterval(tick, 100);
     return () => window.clearInterval(id);
   }, [startedAt, runId, revealDurationMs]);
 
