@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { isAppSurface } from "@/lib/app-surfaces";
 
 /**
  * The signature transition: an angled red clip-path sweep of about 350ms,
@@ -19,11 +20,14 @@ function sectionOf(pathname: string): string {
 export function SectionWipe() {
   const pathname = usePathname();
   const prev = useRef<string | null>(null);
+  const prevPath_ = useRef<string | null>(null);
   const [run, setRun] = useState(0);
 
   useEffect(() => {
     const section = sectionOf(pathname);
-    if (prev.current !== null && prev.current !== section) {
+    const prevPath = prevPath_.current;
+    prevPath_.current = pathname;
+    if (prev.current !== null && prev.current !== section && !isAppSurface(pathname) && !isAppSurface(prevPath)) {
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (!reduce) setRun((n) => n + 1);
     }

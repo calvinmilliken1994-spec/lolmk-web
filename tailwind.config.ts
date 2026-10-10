@@ -225,7 +225,7 @@ const config: Config = {
       animation: {
         "pulse-dot": "pulse-dot 1.6s ease-in-out infinite",
         "ds-pulse": "ds-pulse 1.6s ease-out infinite",
-        "ds-rise": "ds-rise 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "ds-rise": "ds-rise 200ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards",
         "ds-wipe": "ds-wipe 350ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
         "ds-progress": "ds-progress 8s cubic-bezier(0.2, 0.8, 0.2, 1) both",
         "marquee": "marquee 40s linear infinite",
