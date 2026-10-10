@@ -10,7 +10,7 @@ import {
   type DeckWorkspaceProps,
 } from "@/components/control-deck";
 import type { MayhemAdminState } from "@/types/mayhem";
-import { mayhemActions, type MayhemActions } from "./mayhem-actions";
+import { bindMayhemActions, mayhemActions, type MayhemActions } from "./mayhem-actions";
 import { MayhemBroadcast } from "./mayhem-broadcast";
 import {
   MAYHEM_SCENE_LABEL,
@@ -77,14 +77,16 @@ export function makeMayhemDeckDefinition(actions: MayhemActions = mayhemActions)
  */
 export function MayhemDesk({
   initial,
-  actions = mayhemActions,
-  stateUrl = "/api/mayhem/admin-state",
+  actions: providedActions,
+  stateUrl,
 }: {
   initial: MayhemAdminState;
   actions?: MayhemActions;
   stateUrl?: string;
 }) {
-  const { state, pending, error, setError, run, lastSyncedAt } = useDeckState<MayhemAdminState>({ initial, url: stateUrl });
+  const url = stateUrl ?? `/api/mayhem/admin-state?t=${encodeURIComponent(initial.event.id)}`;
+  const { state, pending, error, setError, run, lastSyncedAt } = useDeckState<MayhemAdminState>({ initial, url });
+  const actions = useMemo(() => providedActions ?? bindMayhemActions({ eventId: state.event.id, generation: state.event.registration_generation }), [providedActions, state.event.id, state.event.registration_generation]);
   const definition = useMemo(() => makeMayhemDeckDefinition(actions), [actions]);
 
   // View the phase the operator picked; follow the event when it moves on.
@@ -107,6 +109,7 @@ export function MayhemDesk({
       <MayhemCompleteWorkspace {...props} />
     );
 
+  if (state.event.archived_at) return <main className="container-wide py-8 space-y-4"><a href="/tools/mayhem" className="text-link">← Tournament list</a><p>This tournament was archived and is now read-only. Reload to view saved history.</p></main>;
   return (
     // Covers the site header (z-50), like the live screens: the deck has its own top bar.
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-base">
@@ -118,8 +121,8 @@ export function MayhemDesk({
         selectedPhaseId={selected}
         onSelectPhase={(id) => setPicked(id as MayhemPhaseId)}
         topBar={{
-          backHref: "/tools",
-          backLabel: "Tools",
+          backHref: "/tools/mayhem",
+          backLabel: "Tournaments",
           title: mayhemTitle(state),
           status: mayhemStatusChip(state),
           onAirScene: mayhemOnAirLabel(state),

@@ -23,6 +23,6 @@ export default async function RiftboundToolPage() {
   const signedIn = await isToolsSession();
   if (!signedIn) redirect("/tools/login?next=/tools/riftbound");
 
-  const tournaments = await listTournaments();
+  const tournaments = await listTournaments(true);
   return <RbAdminList tournaments={tournaments} />;
 }

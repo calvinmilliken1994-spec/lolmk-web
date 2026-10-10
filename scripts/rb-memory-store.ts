@@ -151,6 +151,26 @@ export class MemoryStore implements RbStore {
     Object.assign(t, this.clone(patch));
     if (t.status === "completed" && !t.champion_player_id) throw new Error("constraint: completed has champion");
   }
+  async deleteTournament(tid: string) {
+    this.requireLock("tournament", tid);
+    for (const [id, row] of this.matches) {
+      if (row.tournament_id !== tid) continue;
+      this.requireLock("match", id);
+      this.matches.delete(id);
+    }
+    for (const [id, row] of this.rounds) {
+      if (row.tournament_id !== tid) continue;
+      this.requireLock("round", id);
+      this.rounds.delete(id);
+    }
+    for (const [id, row] of this.players) {
+      if (row.tournament_id !== tid) continue;
+      this.requireLock("player", id);
+      this.players.delete(id);
+    }
+    this.audits = this.audits.filter((row) => row.tournamentId !== tid);
+    this.tournaments.delete(tid);
+  }
   async insertPlayer(p: RbPlayer) {
     this.requireLock("tournament", p.tournament_id);
     this.players.set(p.id, this.clone(p));

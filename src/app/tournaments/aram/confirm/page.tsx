@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getMayhemInviteSelection } from "@/lib/mayhem-db";
 import { getMemberSession } from "@/lib/discord-auth";
 import { ConfirmInviteClient } from "@/components/mayhem/confirm-invite-client";
 
@@ -39,12 +40,18 @@ function isValidToken(v: string): boolean {
 export default async function ConfirmInvitePage({
   searchParams,
 }: {
-  searchParams: Promise<{ slot?: string; token?: string }>;
+  searchParams: Promise<{ slot?: string; token?: string; t?: string; g?: string }>;
 }) {
   const params = await searchParams;
   const slotId = params.slot ?? "";
   const token = params.token ?? "";
-  const validParams = isValidSlotId(slotId) && isValidToken(token);
+  const storedSelection = isValidSlotId(slotId) ? await getMayhemInviteSelection(slotId).catch(() => null) : null;
+  const selection = params.t && params.g !== undefined
+    ? { eventId: params.t, generation: Number(params.g) }
+    : storedSelection;
+  const validParams = isValidSlotId(slotId) && isValidToken(token) && selection !== null &&
+    Number.isInteger(selection.generation) && selection.generation >= 0 &&
+    storedSelection?.eventId === selection.eventId && storedSelection.generation === selection.generation;
 
   const member = validParams ? await getMemberSession().catch(() => null) : null;
 
@@ -64,7 +71,7 @@ export default async function ConfirmInvitePage({
   if (!member) {
     // Same-origin relative path only, built from already-validated slot/token —
     // never accepts an attacker-controlled redirect target.
-    const returnTo = `/tournaments/aram/confirm?slot=${encodeURIComponent(slotId)}&token=${encodeURIComponent(token)}`;
+    const returnTo = `/tournaments/aram/confirm?t=${encodeURIComponent(selection!.eventId)}&g=${selection!.generation}&slot=${encodeURIComponent(slotId)}&token=${encodeURIComponent(token)}`;
     return (
       <section className="container-wide py-20 max-w-lg">
         <div className="border border-line bg-surface p-8 text-center space-y-4">
@@ -83,5 +90,5 @@ export default async function ConfirmInvitePage({
     );
   }
 
-  return <ConfirmInviteClient slotId={slotId} token={token} viewerDisplayName={member.displayName} />;
+  return <ConfirmInviteClient selection={selection!} slotId={slotId} token={token} viewerDisplayName={member.displayName} />;
 }

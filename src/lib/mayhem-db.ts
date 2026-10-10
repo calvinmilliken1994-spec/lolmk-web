@@ -1,4 +1,5 @@
-import { sql, type VercelPoolClient } from "@vercel/postgres";
+import { sql as schemaSql, type VercelPoolClient } from "@vercel/postgres";
+import { mayhemSql as sql } from "@/lib/mayhem-operation";
 import { randomUUID } from "node:crypto";
 import { isAuditActorKind } from "@/types/audit-actor";
 import type {
@@ -16,26 +17,23 @@ import type {
   MayhemTeam,
   MayhemTeamFormat,
 } from "@/types/mayhem";
-import { DEFAULT_FORMAT_CONFIG, PREMADE_ROSTER_SIZE } from "@/types/mayhem";
+
 import { computeAutoRevealIndex } from "@/lib/mayhem-reveal";
 
 /**
  * ARAM Mayhem persistence layer (Vercel Postgres).
  *
- * Single active event model: we only ever run one Mayhem tournament at a
- * time (same-day venue events), so there's one "current" row per table,
- * looked up by a well-known singleton event id. `ensureSchema()` is called
- * lazily on first use — cheap `CREATE TABLE IF NOT EXISTS`, safe to run on
- * every cold start.
+ * Independent saved events, migrated additively from the old singleton.
+ * Schema initialization preserves rows and never creates/resurrects events.
  */
 
-const SINGLETON_EVENT_ID = "mayhem-main";
+
 let schemaReady: Promise<void> | null = null;
 
 export function ensureSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
-      await sql`
+      await schemaSql`
         CREATE TABLE IF NOT EXISTS mayhem_events (
           id text PRIMARY KEY,
           title text NOT NULL DEFAULT 'ARAM Mayhem',
@@ -54,9 +52,9 @@ export function ensureSchema(): Promise<void> {
       `;
       // Additive migrations for events created before these columns existed —
       // safe to run every cold start; a no-op once applied.
-      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS team_format text NOT NULL DEFAULT 'randomized';`;
-      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS registration_open boolean NOT NULL DEFAULT false;`;
-      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS registration_generation integer NOT NULL DEFAULT 0;`;
+      await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS team_format text NOT NULL DEFAULT 'randomized';`;
+      await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS registration_open boolean NOT NULL DEFAULT false;`;
+      await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS registration_generation integer NOT NULL DEFAULT 0;`;
       // Auto-reveal: a persisted start timestamp is the single source of
       // truth for "how many teams are visible" — every reader (admin,
       // venue screen, public page) derives the count from elapsed time via
@@ -64,11 +62,11 @@ export function ensureSchema(): Promise<void> {
       // no admin browser tab is open. reveal_index remains the source of
       // truth for MANUAL mode and doubles as the frozen value the moment
       // auto-reveal is paused.
-      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS auto_reveal boolean NOT NULL DEFAULT false;`;
-      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS reveal_started_at timestamptz;`;
-      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS reveal_interval_ms integer NOT NULL DEFAULT 10000;`;
-      await sql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS reveal_start_on_countdown boolean NOT NULL DEFAULT false;`;
-      await sql`
+      await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS auto_reveal boolean NOT NULL DEFAULT false;`;
+      await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS reveal_started_at timestamptz;`;
+      await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS reveal_interval_ms integer NOT NULL DEFAULT 10000;`;
+      await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS reveal_start_on_countdown boolean NOT NULL DEFAULT false;`;
+      await schemaSql`
         CREATE TABLE IF NOT EXISTS mayhem_players (
           id text PRIMARY KEY,
           event_id text NOT NULL REFERENCES mayhem_events(id) ON DELETE CASCADE,
@@ -78,14 +76,14 @@ export function ensureSchema(): Promise<void> {
           member_discord_id text
         );
       `;
-      await sql`ALTER TABLE mayhem_players ADD COLUMN IF NOT EXISTS member_discord_id text;`;
+      await schemaSql`ALTER TABLE mayhem_players ADD COLUMN IF NOT EXISTS member_discord_id text;`;
       // A verified member can only hold one entrant row per event — without
       // this, a double-submitted join request (e.g. a rapid double-click)
       // could enroll the same Discord account twice under the display name
       // they had at each moment.
-      await sql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_players_member_unique
+      await schemaSql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_players_member_unique
         ON mayhem_players (event_id, member_discord_id) WHERE member_discord_id IS NOT NULL;`;
-      await sql`
+      await schemaSql`
         CREATE TABLE IF NOT EXISTS mayhem_teams (
           id text PRIMARY KEY,
           event_id text NOT NULL REFERENCES mayhem_events(id) ON DELETE CASCADE,
@@ -98,13 +96,13 @@ export function ensureSchema(): Promise<void> {
           captain_discord_id text
         );
       `;
-      await sql`ALTER TABLE mayhem_teams ADD COLUMN IF NOT EXISTS is_ready boolean NOT NULL DEFAULT true;`;
-      await sql`ALTER TABLE mayhem_teams ADD COLUMN IF NOT EXISTS captain_discord_id text;`;
+      await schemaSql`ALTER TABLE mayhem_teams ADD COLUMN IF NOT EXISTS is_ready boolean NOT NULL DEFAULT true;`;
+      await schemaSql`ALTER TABLE mayhem_teams ADD COLUMN IF NOT EXISTS captain_discord_id text;`;
       // One premade team per captain per event — a captain re-submitting
       // "create team" must not silently spawn a second roster.
-      await sql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_teams_captain_unique
+      await schemaSql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_teams_captain_unique
         ON mayhem_teams (event_id, captain_discord_id) WHERE captain_discord_id IS NOT NULL;`;
-      await sql`
+      await schemaSql`
         CREATE TABLE IF NOT EXISTS mayhem_groups (
           id text PRIMARY KEY,
           event_id text NOT NULL REFERENCES mayhem_events(id) ON DELETE CASCADE,
@@ -112,7 +110,7 @@ export function ensureSchema(): Promise<void> {
           advance_count integer NOT NULL DEFAULT 1
         );
       `;
-      await sql`
+      await schemaSql`
         CREATE TABLE IF NOT EXISTS mayhem_matches (
           id text PRIMARY KEY,
           event_id text NOT NULL REFERENCES mayhem_events(id) ON DELETE CASCADE,
@@ -136,7 +134,7 @@ export function ensureSchema(): Promise<void> {
       // Pending premade applications — never counted as registered teams
       // until every slot is confirmed. See confirmPremadeApplicationSlot()
       // in actions.ts for the promotion path into mayhem_teams/mayhem_players.
-      await sql`
+      await schemaSql`
         CREATE TABLE IF NOT EXISTS mayhem_team_applications (
           id text PRIMARY KEY,
           event_id text NOT NULL REFERENCES mayhem_events(id) ON DELETE CASCADE,
@@ -148,13 +146,13 @@ export function ensureSchema(): Promise<void> {
           send_in_progress boolean NOT NULL DEFAULT false
         );
       `;
-      await sql`ALTER TABLE mayhem_team_applications ADD COLUMN IF NOT EXISTS roster_version integer NOT NULL DEFAULT 0;`;
-      await sql`ALTER TABLE mayhem_team_applications ADD COLUMN IF NOT EXISTS send_in_progress boolean NOT NULL DEFAULT false;`;
+      await schemaSql`ALTER TABLE mayhem_team_applications ADD COLUMN IF NOT EXISTS roster_version integer NOT NULL DEFAULT 0;`;
+      await schemaSql`ALTER TABLE mayhem_team_applications ADD COLUMN IF NOT EXISTS send_in_progress boolean NOT NULL DEFAULT false;`;
       // One open application per captain per event — matches the same
       // one-team-per-captain rule as mayhem_teams' own unique index.
-      await sql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_team_applications_captain_unique
+      await schemaSql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_team_applications_captain_unique
         ON mayhem_team_applications (event_id, captain_discord_id);`;
-      await sql`
+      await schemaSql`
         CREATE TABLE IF NOT EXISTS mayhem_team_application_slots (
           id text PRIMARY KEY,
           application_id text NOT NULL REFERENCES mayhem_team_applications(id) ON DELETE CASCADE,
@@ -171,11 +169,11 @@ export function ensureSchema(): Promise<void> {
           created_at timestamptz NOT NULL DEFAULT now()
         );
       `;
-      await sql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS confirm_token_expires_at timestamptz;`;
-      await sql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS delivery_status text NOT NULL DEFAULT 'not_sent';`;
-      await sql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS token_roster_version integer;`;
-      await sql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();`;
-      await sql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS delivery_error text;`;
+      await schemaSql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS confirm_token_expires_at timestamptz;`;
+      await schemaSql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS delivery_status text NOT NULL DEFAULT 'not_sent';`;
+      await schemaSql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS token_roster_version integer;`;
+      await schemaSql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();`;
+      await schemaSql`ALTER TABLE mayhem_team_application_slots ADD COLUMN IF NOT EXISTS delivery_error text;`;
       // A given Discord account can only be invited into ONE slot of a
       // given application (no duplicate invites to the same person), and
       // — critically — only one PENDING-OR-CONFIRMED slot across ALL
@@ -183,16 +181,16 @@ export function ensureSchema(): Promise<void> {
       // actions.ts rather than a DB constraint (which can't easily express
       // "across applications" without a separate reservation table; the
       // event-lock transaction is what actually prevents the race).
-      await sql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_application_slots_member_unique
+      await schemaSql`CREATE UNIQUE INDEX IF NOT EXISTS mayhem_application_slots_member_unique
         ON mayhem_team_application_slots (application_id, member_discord_id) WHERE member_discord_id IS NOT NULL;`;
-      await sql`CREATE INDEX IF NOT EXISTS mayhem_application_slots_application_idx
+      await schemaSql`CREATE INDEX IF NOT EXISTS mayhem_application_slots_application_idx
         ON mayhem_team_application_slots (application_id);`;
       // Audit log: one row per admin action, with the acting admin's
       // Discord id and display name (getCurrentAdmin()). Written by every
       // admin server action in src/app/tools/mayhem/actions.ts; read by the
       // desk's activity log. Admin-only: never joined into the venue or
       // public reads.
-      await sql`
+      await schemaSql`
         CREATE TABLE IF NOT EXISTS mayhem_audit_log (
           id text PRIMARY KEY,
           event_id text NOT NULL REFERENCES mayhem_events(id) ON DELETE CASCADE,
@@ -203,18 +201,24 @@ export function ensureSchema(): Promise<void> {
           actor_name text NOT NULL
         );
       `;
-      await sql`CREATE INDEX IF NOT EXISTS mayhem_audit_log_event_at_idx ON mayhem_audit_log (event_id, at DESC);`;
+      await schemaSql`CREATE INDEX IF NOT EXISTS mayhem_audit_log_event_at_idx ON mayhem_audit_log (event_id, at DESC);`;
       // 'admin' or 'member', matching rb_audit_log and sr_audit_log.
-      await sql`
+      await schemaSql`
         ALTER TABLE mayhem_audit_log ADD COLUMN IF NOT EXISTS actor_kind text
           CONSTRAINT mayhem_audit_actor_kind_check CHECK (actor_kind IN ('admin', 'member'));
       `;
-      // Ensure the singleton event row exists.
-      await sql`
-        INSERT INTO mayhem_events (id, title, format)
-        VALUES (${SINGLETON_EVENT_ID}, 'ARAM Mayhem', ${JSON.stringify(DEFAULT_FORMAT_CONFIG)}::jsonb)
-        ON CONFLICT (id) DO NOTHING;
-      `;
+      // Existing mayhem-main rows and children remain untouched. New events
+      // are created explicitly; a deleted legacy event is never resurrected.
+      await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS archived_at timestamptz;`;
+      await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS published boolean NOT NULL DEFAULT false;`;
+      await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();`;
+      // One-time backfill only: preserve the old public event, not new drafts.
+      await schemaSql`CREATE TABLE IF NOT EXISTS mayhem_schema_migrations (id text PRIMARY KEY);`;
+      await schemaSql`WITH migration AS (
+        INSERT INTO mayhem_schema_migrations (id) VALUES ('multi-event-publication-v1')
+        ON CONFLICT DO NOTHING RETURNING id
+      ) UPDATE mayhem_events SET published = true WHERE id = 'mayhem-main'
+        AND EXISTS (SELECT 1 FROM migration);`;
     })();
   }
   return schemaReady;
@@ -228,18 +232,19 @@ export function newId(prefix: string): string {
 // Reads
 // ---------------------------------------------------------------------------
 
-export async function getMayhemFull(): Promise<MayhemFull> {
+export async function getMayhemFull(eventId: string): Promise<MayhemFull> {
   await ensureSchema();
 
   const [eventRes, playersRes, teamsRes, groupsRes, matchesRes] = await Promise.all([
-    sql`SELECT * FROM mayhem_events WHERE id = ${SINGLETON_EVENT_ID}`,
-    sql`SELECT * FROM mayhem_players WHERE event_id = ${SINGLETON_EVENT_ID} ORDER BY entry_order ASC`,
-    sql`SELECT * FROM mayhem_teams WHERE event_id = ${SINGLETON_EVENT_ID} ORDER BY reveal_order ASC`,
-    sql`SELECT * FROM mayhem_groups WHERE event_id = ${SINGLETON_EVENT_ID} ORDER BY label ASC`,
-    sql`SELECT * FROM mayhem_matches WHERE event_id = ${SINGLETON_EVENT_ID} ORDER BY match_number ASC`,
+    sql`SELECT * FROM mayhem_events WHERE id = ${eventId}`,
+    sql`SELECT * FROM mayhem_players WHERE event_id = ${eventId} ORDER BY entry_order ASC`,
+    sql`SELECT * FROM mayhem_teams WHERE event_id = ${eventId} ORDER BY reveal_order ASC`,
+    sql`SELECT * FROM mayhem_groups WHERE event_id = ${eventId} ORDER BY label ASC`,
+    sql`SELECT * FROM mayhem_matches WHERE event_id = ${eventId} ORDER BY match_number ASC`,
   ]);
 
   const row = eventRes.rows[0];
+  if (!row) throw new Error("Tournament not found.");
   const rawRevealIndex: number = row.reveal_index;
   const autoReveal = Boolean(row.auto_reveal);
   const revealStartedAt = row.reveal_started_at ? new Date(row.reveal_started_at).toISOString() : null;
@@ -249,6 +254,8 @@ export async function getMayhemFull(): Promise<MayhemFull> {
 
   const event: MayhemEvent = {
     id: row.id,
+    archived_at: row.archived_at ? new Date(row.archived_at).toISOString() : null,
+    published: Boolean(row.published),
     title: row.title,
     stage: row.stage as MayhemStage,
     scene: row.scene as MayhemScene,
@@ -331,7 +338,7 @@ export async function getMayhemFull(): Promise<MayhemFull> {
   return { event, players, teams, groups, matches };
 }
 
-export { SINGLETON_EVENT_ID };
+
 
 // ---------------------------------------------------------------------------
 // Audit log
@@ -343,6 +350,7 @@ export { SINGLETON_EVENT_ID };
  * change; otherwise it is written right after the change.
  */
 export async function writeMayhemAudit(
+  eventId: string,
   actor: MayhemActor,
   action: string,
   detail: Record<string, unknown> = {},
@@ -350,7 +358,7 @@ export async function writeMayhemAudit(
 ): Promise<void> {
   const params = [
     newId("audit"),
-    SINGLETON_EVENT_ID,
+    eventId,
     action,
     JSON.stringify(detail),
     actor.discordId,
@@ -364,11 +372,11 @@ export async function writeMayhemAudit(
 }
 
 /** Newest first. */
-export async function listMayhemAudit(limit = 50): Promise<MayhemAuditEntry[]> {
+export async function listMayhemAudit(eventId: string, limit = 50): Promise<MayhemAuditEntry[]> {
   await ensureSchema();
   const { rows } = await sql.query(
     `SELECT * FROM mayhem_audit_log WHERE event_id = $1 ORDER BY at DESC, id DESC LIMIT $2`,
-    [SINGLETON_EVENT_ID, limit],
+    [eventId, limit],
   );
   return rows.map((r) => ({
     id: r.id,
@@ -429,29 +437,37 @@ export interface MayhemVenueState {
  * full state and stripping fields, not by reusing a cached getMayhemFull()
  * result, so this is always in sync with what admins see.
  */
-export async function getMayhemVenueState(): Promise<MayhemVenueState> {
-  const full = await getMayhemFull();
+export async function getMayhemVenueState(eventId?: string, preview = false): Promise<MayhemVenueState> {
+  const id = eventId ?? await defaultMayhemPublicId();
+  if (!id) throw new Error("Tournament not found.");
+  const full = await getMayhemFull(id);
+  if (!preview && (!full.event.published || full.event.archived_at)) throw new Error("Tournament not found.");
   const stripPlayer = (p: MayhemPlayer): MayhemVenuePlayer => ({
     id: p.id,
     display_name: p.display_name,
     entry_order: p.entry_order,
     team_id: p.team_id,
   });
+  const visible = preview ? full.teams : full.event.stage === "collecting" ? [] :
+    full.event.scene === "reveal" ? full.teams.slice(0, full.event.reveal_index) : full.teams;
+  const visibleIds = new Set(visible.map(team => team.id));
   return {
-    event: full.event,
-    players: full.players.map(stripPlayer),
-    teams: full.teams.map((t) => ({
-      id: t.id,
-      name: t.name,
-      icon_url: t.icon_url,
-      seed: t.seed,
-      reveal_order: t.reveal_order,
-      group_id: t.group_id,
-      players: t.players.map(stripPlayer),
-      is_ready: t.is_ready,
-    })),
+    event: { ...full.event,
+      champion_team_id: visibleIds.has(full.event.champion_team_id ?? "") ? full.event.champion_team_id : null,
+      active_match_id: full.matches.some(match => match.id === full.event.active_match_id &&
+        (!match.team_a_id || visibleIds.has(match.team_a_id)) && (!match.team_b_id || visibleIds.has(match.team_b_id))) ? full.event.active_match_id : null },
+    players: preview ? full.players.map(stripPlayer) : visible.flatMap(team => team.players.map(stripPlayer)),
+    // Anonymous placeholders preserve the presentation's total/hidden tiles,
+    // not the unrevealed teams' ids, names, seeds, roster or group assignment.
+    teams: full.teams.map((t, index) => visibleIds.has(t.id) ? {
+      id: t.id, name: t.name, icon_url: t.icon_url, seed: t.seed,
+      reveal_order: t.reveal_order, group_id: t.group_id,
+      players: t.players.map(stripPlayer), is_ready: t.is_ready,
+    } : { id: `hidden_${index}`, name: "", icon_url: "", seed: null,
+      reveal_order: index, group_id: null, players: [], is_ready: false }),
     groups: full.groups,
-    matches: full.matches,
+    matches: full.matches.filter(match => (!match.team_a_id || visibleIds.has(match.team_a_id)) &&
+      (!match.team_b_id || visibleIds.has(match.team_b_id))),
   };
 }
 
@@ -474,8 +490,11 @@ export async function getMayhemVenueState(): Promise<MayhemVenueState> {
  * the room is still watching them get revealed one by one, which is the
  * entire point of the format.
  */
-export async function getMayhemPublic(): Promise<MayhemPublic> {
-  const full = await getMayhemFull();
+export async function getMayhemPublic(eventId?: string): Promise<MayhemPublic> {
+  const id = eventId ?? await defaultMayhemPublicId();
+  if (!id) throw new Error("Tournament not found.");
+  const full = await getMayhemFull(id);
+  if (!full.event.published || full.event.archived_at) throw new Error("Tournament not found.");
   const { event, players, teams, matches } = full;
 
   const revealing = event.scene === "reveal";
@@ -483,6 +502,7 @@ export async function getMayhemPublic(): Promise<MayhemPublic> {
     event.stage === "collecting" ? [] : revealing ? teams.slice(0, event.reveal_index) : teams;
 
   return {
+    id: event.id,
     title: event.title,
     stage: event.stage,
     team_format: event.team_format,
@@ -527,4 +547,27 @@ export async function getMayhemPublic(): Promise<MayhemPublic> {
       })),
     updated_at: event.updated_at,
   };
+}
+
+export interface MayhemEventSummary {
+  id: string; title: string; stage: MayhemStage; archived_at: string | null;
+  published: boolean; registration_generation: number; updated_at: string;
+}
+export async function listMayhemEvents(publicOnly = false): Promise<MayhemEventSummary[]> {
+  await ensureSchema();
+  const { rows } = await sql.query(`SELECT id, title, stage, archived_at, published, registration_generation, updated_at
+    FROM mayhem_events ${publicOnly ? "WHERE published = true AND archived_at IS NULL" : ""}
+    ORDER BY created_at DESC, id ASC`);
+  return rows.map(row => ({ ...row, archived_at: row.archived_at ? new Date(row.archived_at).toISOString() : null,
+    updated_at: new Date(row.updated_at).toISOString() })) as MayhemEventSummary[];
+}
+export async function defaultMayhemPublicId(): Promise<string | undefined> {
+  return (await listMayhemEvents(true))[0]?.id;
+}
+/** Legacy invite URLs resolve by their immutable slot/application, never current event. */
+export async function getMayhemInviteSelection(slotId: string) {
+  await ensureSchema();
+  const { rows } = await sql.query(`SELECT a.event_id, a.registration_generation FROM mayhem_team_application_slots s
+    JOIN mayhem_team_applications a ON a.id = s.application_id WHERE s.id = $1`, [slotId]);
+  return rows[0] ? { eventId: rows[0].event_id as string, generation: Number(rows[0].registration_generation) } : null;
 }

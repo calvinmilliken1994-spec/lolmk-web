@@ -20,25 +20,29 @@ import { cn } from "@/lib/utils";
 export function MayhemLiveScreen({
   initial,
   sceneOverride = null,
+  preview = false,
 }: {
   initial: MayhemVenueState;
+  preview?: boolean;
   /** Preview mode (`?scene=<id>&preview=1`): show this scene instead of the one on air. */
   sceneOverride?: MayhemScene | null;
 }) {
   const [data, setData] = useState(initial);
+  const [unavailable, setUnavailable] = useState(false);
   const scene = sceneOverride ?? data.event.scene;
 
   useEffect(() => {
     const id = setInterval(async () => {
       try {
-        const res = await fetch("/api/mayhem/state", { cache: "no-store" });
-        if (res.ok) setData(await res.json());
+        const res = await fetch(`/api/mayhem/state?t=${encodeURIComponent(initial.event.id)}${preview ? "&preview=1" : ""}`, { cache: "no-store" });
+        if (res.ok) { setData(await res.json()); setUnavailable(false); }
+        else if (res.status === 404 || res.status === 401) setUnavailable(true);
       } catch {
         /* transient network hiccup — keep showing the last good state */
       }
     }, 1500);
     return () => clearInterval(id);
-  }, []);
+  }, [initial.event.id, preview]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -47,6 +51,8 @@ export function MayhemLiveScreen({
       document.body.style.overflow = prev;
     };
   }, []);
+
+  if (unavailable) return <div className="fixed inset-0 z-[60] bg-base text-ink flex items-center justify-center">This tournament is no longer available.</div>;
 
   return (
     <div className="fixed inset-0 z-[60] overflow-hidden bg-base text-ink flex items-center justify-center">

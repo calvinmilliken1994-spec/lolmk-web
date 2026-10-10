@@ -251,6 +251,10 @@ export async function archiveEvent(tournamentId: string) {
   return run((ctx) => svc.archiveEvent(ctx, { tournamentId }));
 }
 
+export async function deleteEvent(tournamentId: string) {
+  return run((ctx) => svc.deleteEvent(ctx, { tournamentId }));
+}
+
 // ---------------------------------------------------------------------------
 // Broadcast
 // ---------------------------------------------------------------------------

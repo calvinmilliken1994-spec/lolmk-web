@@ -60,12 +60,13 @@ export function MayhemBroadcast({
     available: mayhemSceneUnavailableReason(id, state) === null,
   }));
 
-  const previewSrc = `/mayhemlive?scene=${encodeURIComponent(previewId)}&preview=1`;
+  const liveSrc = `/mayhemlive?t=${encodeURIComponent(state.event.id)}`;
+  const previewSrc = `${liveSrc}&scene=${encodeURIComponent(previewId)}&preview=1`;
 
   return (
     <BroadcastColumn
       preview={<ScenePreview sceneLabel={MAYHEM_SCENE_TITLE[previewId]} src={previewSrc} />}
-      program={<SceneProgram sceneLabel={MAYHEM_SCENE_TITLE[scene]} src="/mayhemlive" />}
+      program={<SceneProgram sceneLabel={MAYHEM_SCENE_TITLE[scene]} src={`${liveSrc}&preview=1`} />}
       scenes={scenes}
       programId={scene}
       previewId={previewId}
@@ -76,7 +77,7 @@ export function MayhemBroadcast({
         <div className="flex flex-col gap-3.5">
           {state.teams.length > 0 && <RevealTool state={state} run={run} pending={pending} actions={actions} />}
           <CountdownTool state={state} run={run} pending={pending} actions={actions} />
-          <a href="/mayhemlive" target="_blank" rel="noreferrer" className="text-[12px] text-link hover:text-ink">
+          <a href={`${liveSrc}&preview=1`} target="_blank" rel="noreferrer" className="text-[12px] text-link hover:text-ink">
             Open /mayhemlive full screen ↗
           </a>
         </div>

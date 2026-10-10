@@ -1,5 +1,6 @@
 "use client";
 
+import type { MayhemSelection } from "@/lib/mayhem-operation";
 import { useState } from "react";
 import Link from "next/link";
 import { Check, Loader2, ShieldAlert, X } from "lucide-react";
@@ -16,10 +17,12 @@ import { confirmApplicationSlot, declineApplicationSlot } from "@/app/tools/mayh
  * confirmApplicationSlot()/declineApplicationSlot() itself.
  */
 export function ConfirmInviteClient({
+  selection,
   slotId,
   token,
   viewerDisplayName,
 }: {
+  selection: MayhemSelection;
   slotId: string;
   token: string;
   viewerDisplayName: string;
@@ -29,7 +32,7 @@ export function ConfirmInviteClient({
 
   async function accept() {
     setStatus("pending");
-    const result = await confirmApplicationSlot(slotId, token);
+    const result = await confirmApplicationSlot(selection, slotId, token);
     if (!result.ok) {
       setStatus("error");
       setMessage(result.reason);
@@ -45,7 +48,7 @@ export function ConfirmInviteClient({
 
   async function decline() {
     setStatus("pending");
-    const result = await declineApplicationSlot(slotId, token);
+    const result = await declineApplicationSlot(selection, slotId, token);
     if (!result.ok) {
       setStatus("error");
       setMessage(result.reason);
@@ -91,7 +94,7 @@ export function ConfirmInviteClient({
             </div>
           </>
         )}
-        <Link href="/tournaments/aram" className="block text-caption text-ink-muted hover:text-ink pt-2">
+        <Link href={`/tournaments/aram?t=${encodeURIComponent(selection.eventId)}`} className="block text-caption text-ink-muted hover:text-ink pt-2">
           Back to ARAM Mayhem
         </Link>
       </div>

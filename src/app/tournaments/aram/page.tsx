@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
-import { getMayhemPublic } from "@/lib/mayhem-db";
+import { getMayhemPublic, listMayhemEvents } from "@/lib/mayhem-db";
 import { getMemberSession } from "@/lib/discord-auth";
 import type { MayhemPublic, MayhemPublicTeam } from "@/types/mayhem";
 import { AramSignupPanel } from "@/components/mayhem/aram-signup-panel";
@@ -58,9 +58,11 @@ const STAGE_COPY: Record<
   completed: { label: "Finished", variant: "success", live: false },
 };
 
-export default async function AramPublicPage() {
+export default async function AramPublicPage({ searchParams }: { searchParams: Promise<{ t?: string }> }) {
+  const { t } = await searchParams;
+  const tournaments = await listMayhemEvents(true).catch(() => []);
   const [data, member] = await Promise.all([
-    loadMayhemPublic(),
+    loadMayhemPublic(() => getMayhemPublic(t)),
     // Never let a Discord/session failure take the whole public page down —
     // an unauthenticated visitor just sees the signed-out signup state.
     getMemberSession().catch(() => null),
@@ -80,10 +82,12 @@ export default async function AramPublicPage() {
   // stays 0 forever). registration_open is the actual signal for "is this
   // page live right now", not player_count.
   const neverRun = data.stage === "collecting" && data.player_count === 0 && !data.registration_open;
-  const canSignUp = data.stage === "collecting";
+  const canSignUp = Boolean(data.id) && data.stage === "collecting";
 
   return (
     <>
+      {tournaments.length > 0 && <nav aria-label="ARAM tournaments" className="container-wide py-6 flex flex-wrap gap-3">{tournaments.map(event => <Link key={event.id} href={`/tournaments/aram?t=${encodeURIComponent(event.id)}`} className={cn("border border-line px-3 py-2 text-body-sm", event.id === data.id && "text-brand-red-bright")}>{event.title}</Link>)}</nav>}
+      {t && !data.id && <p role="status" className="container-wide py-4 text-ink-muted">This tournament is not publicly available.</p>}
       <section className="border-b border-line-subtle">
         <div className="container-wide py-10 md:py-14">
           <div className="max-w-3xl space-y-4">
@@ -99,7 +103,7 @@ export default async function AramPublicPage() {
                 </Badge>
               )}
             </div>
-            <h1 className="font-heading text-heading-xl text-ink">ARAM meetup tournament</h1>
+            <h1 className="font-heading text-heading-xl text-ink">{data.id ? data.title : "ARAM meetup tournament"}</h1>
             <p className="text-body-md text-ink-secondary max-w-[62ch]">
               LoLMK&apos;s ARAM Mayhem is a meetup tournament, usually run over the
               course of a day. Bring a full premade team, or sign up solo and
@@ -119,7 +123,7 @@ export default async function AramPublicPage() {
               </a>
               {stage.live && !neverRun && (
                 <Link
-                  href="/mayhemlive"
+                  href={`/mayhemlive?t=${encodeURIComponent(data.id ?? "")}`}
                   className={cn(buttonVariants({ variant: "secondary", size: "md" }))}
                 >
                   <Tv strokeWidth={1.5} className="h-4 w-4" />
@@ -152,6 +156,8 @@ export default async function AramPublicPage() {
           {canSignUp && (
             <section className="container-wide py-12 border-b border-line-subtle">
               <AramSignupPanel
+                key={data.id}
+                selection={{ eventId: data.id!, generation: data.registration_generation }}
                 teamFormat={data.team_format}
                 registrationOpen={data.registration_open}
                 member={
