@@ -107,9 +107,9 @@ export default async function AboutPage() {
 
       <section aria-labelledby="partners" className="ds-container pt-[clamp(64px,8vw,104px)]">
         <h2 id="partners" className={H2}>
-          Partners.
+          Partner.
         </h2>
-        <dl className="m-0 mt-8 grid gap-px border border-ds-line bg-ds-line sm:grid-cols-2">
+        <dl className="m-0 mt-8 max-w-[640px] border border-ds-line">
           <div className="bg-ds-surface px-7 py-7">
             <dt className="font-heading text-[20px] font-semibold text-white">
               {/* The venue site only serves plain http (https doesn't answer). */}
@@ -119,12 +119,6 @@ export default async function AboutPage() {
             </dt>
             <dd className="m-0 mt-1 text-ds-body text-ds-text-muted">
               Partner venue in Seoul, where the in-person tournaments are played.
-            </dd>
-          </div>
-          <div className="bg-ds-surface px-7 py-7">
-            <dt className="font-heading text-[20px] font-semibold text-white">Naver Riftbound TCG cafe</dt>
-            <dd className="m-0 mt-1 text-ds-body text-ds-text-muted">
-              Partner community for Riftbound in Korea.
             </dd>
           </div>
         </dl>

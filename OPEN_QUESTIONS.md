@@ -99,7 +99,7 @@ Cards use the member's favourite champion's splash from Riot Data Dragon (`ddrag
 
 ### 15. About: partner details and history (Phase 4)
 
-The partners section names Gen.G GGX and the Naver Riftbound TCG cafe with one plain line each and no links, because the repo has no URL for either. The history timeline is left out until Calvin supplies milestones, as the handover says. **Partly resolved (11 Oct):** Gen.G GGX now links to `http://gengxperience.gg/` (the site doesn't answer over https). **Needs:** the Naver Riftbound cafe URL and history milestones.
+The partners section named Gen.G GGX and the Naver Riftbound TCG cafe with one plain line each and no links, because the repo had no URL for either. The history timeline is left out until Calvin supplies milestones, as the handover says. **Partly resolved (11 Oct):** Gen.G GGX now links to `http://gengxperience.gg/` (the site doesn't answer over https). The Naver Riftbound TCG cafe was removed: it was a one-event collaboration, not a partner (Calvin, 11 Oct). **Needs:** history milestones.
 
 ## Locker
 
