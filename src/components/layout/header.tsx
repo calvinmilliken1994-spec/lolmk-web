@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X, BadgeCheck, ShieldCheck } from "lucide-react";
+import { Menu, X, ShieldCheck } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,15 @@ const NAV_LINKS = [
   { href: "/how-tos", label: "How-tos" },
   { href: "/about", label: "About" },
 ];
+
+/** Active for the section root and everything under it. */
+function isActive(pathname: string | null, href: string): boolean {
+  if (!pathname) return false;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** Where the signed-in avatar goes. */
+const MEMBER_HOME = "/members/profile";
 
 interface HeaderMemberState {
   displayName: string;
@@ -53,10 +62,12 @@ export function Header({ member }: { member?: HeaderMemberState | null }) {
     <>
       <header
         className={cn(
-          "fixed inset-x-0 top-0 z-40 h-16 transition-colors duration-150",
-          scrolled
-            ? "bg-base/85 backdrop-blur-md border-b border-line-subtle"
-            : "bg-transparent",
+          "fixed inset-x-0 top-0 z-40 h-16 border-b transition-colors duration-150",
+          // Transparent over the homepage hero until scrolled; solid ground
+          // with a line-soft border everywhere else. No blur (no glassmorphism).
+          scrolled || pathname !== "/"
+            ? "border-ds-line-soft bg-ds-ground"
+            : "border-transparent bg-transparent",
         )}
       >
         <div className="container-wide flex h-full items-center justify-between">
@@ -78,16 +89,25 @@ export function Header({ member }: { member?: HeaderMemberState | null }) {
             </span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-1">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="px-4 py-2 text-body-md font-medium text-ink-secondary hover:text-ink transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
+          <nav aria-label="Main" className="hidden lg:flex items-center gap-7 self-stretch">
+            {NAV_LINKS.map((link) => {
+              const active = isActive(pathname, link.href);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex h-full items-center font-heading text-ds-ui transition-colors duration-150",
+                    active
+                      ? "text-white shadow-[inset_0_-2px_0_#BA263C]"
+                      : "text-ds-text-muted hover:text-white",
+                  )}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="hidden lg:flex items-center gap-3">
@@ -103,38 +123,42 @@ export function Header({ member }: { member?: HeaderMemberState | null }) {
                   </Link>
                 )}
                 <Link
-                  href="/members/profile"
-                  className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "pl-2")}
+                  href={MEMBER_HOME}
+                  aria-label={`Your profile (${member.displayName})`}
+                  className="flex h-11 w-11 items-center justify-center"
                 >
                   {member.avatarUrl ? (
                     <Image
                       src={member.avatarUrl}
                       alt=""
-                      width={24}
-                      height={24}
-                      className="h-6 w-6 rounded-full"
+                      width={44}
+                      height={44}
+                      className="cut-avatar h-11 w-11 object-cover"
                     />
                   ) : (
-                    <span className="h-6 w-6 rounded-full bg-elevated" aria-hidden />
+                    <span
+                      aria-hidden
+                      className="cut-avatar flex h-11 w-11 items-center justify-center bg-ds-line-soft font-display text-ds-tag text-ds-text"
+                    >
+                      {member.displayName.slice(0, 1)}
+                    </span>
                   )}
-                  Profile
                 </Link>
               </>
             ) : (
               <a
                 href={loginHref}
-                className={cn(buttonVariants({ variant: "discord", size: "sm" }))}
+                className={cn(buttonVariants({ variant: "discord", size: "sm" }), "px-5")}
               >
                 <DiscordIcon className="h-5 w-5" />
-                Verified members login
-                <BadgeCheck strokeWidth={2} className="h-4 w-4 text-success" />
+                Sign in with Discord
               </a>
             )}
           </div>
 
           <button
             type="button"
-            className="lg:hidden p-2 text-ink"
+            className="lg:hidden flex h-11 w-11 items-center justify-center text-ds-text"
             aria-label="Open menu"
             onClick={() => setMobileOpen(true)}
           >
@@ -144,7 +168,7 @@ export function Header({ member }: { member?: HeaderMemberState | null }) {
       </header>
 
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 bg-base lg:hidden flex flex-col">
+        <div className="fixed inset-0 z-50 bg-ds-ground lg:hidden flex flex-col">
           <div className="container-wide h-16 flex items-center justify-between">
             <Link
               href="/"
@@ -156,24 +180,31 @@ export function Header({ member }: { member?: HeaderMemberState | null }) {
             </Link>
             <button
               type="button"
-              className="p-2 text-ink"
+              className="flex h-11 w-11 items-center justify-center text-ds-text"
               aria-label="Close menu"
               onClick={() => setMobileOpen(false)}
             >
               <X strokeWidth={1.5} className="h-6 w-6" />
             </button>
           </div>
-          <nav className="flex-1 container-wide flex flex-col justify-start gap-2 pt-12">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className="font-heading text-display-sm text-ink py-3 border-b border-line-subtle hover:text-brand-red-bright transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
+          <nav aria-label="Main" className="flex-1 container-wide flex flex-col justify-start gap-2 pt-12">
+            {NAV_LINKS.map((link) => {
+              const active = isActive(pathname, link.href);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "font-display text-[44px] leading-none py-3 border-b border-ds-line-soft transition-colors",
+                    active ? "text-white" : "text-ds-text-muted hover:text-white",
+                  )}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
             {member ? (
               <>
                 {member.isAdmin && (
@@ -187,7 +218,7 @@ export function Header({ member }: { member?: HeaderMemberState | null }) {
                   </Link>
                 )}
                 <Link
-                  href="/members/profile"
+                  href={MEMBER_HOME}
                   onClick={() => setMobileOpen(false)}
                   className={cn(
                     buttonVariants({ variant: "secondary", size: "lg" }),
@@ -204,8 +235,7 @@ export function Header({ member }: { member?: HeaderMemberState | null }) {
                 className={cn(buttonVariants({ variant: "discord", size: "lg" }), "mt-8 w-full")}
               >
                 <DiscordIcon className="h-6 w-6" />
-                Verified members login
-                <BadgeCheck strokeWidth={2} className="h-5 w-5 text-success" />
+                Sign in with Discord
               </a>
             )}
           </nav>

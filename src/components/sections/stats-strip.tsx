@@ -1,27 +1,35 @@
+import { StatStrip, statCells } from "@/components/ds/stat-strip";
 import type { CommunityStat } from "@/types/stat";
 
 interface StatsStripProps {
   stats: CommunityStat[];
 }
 
+/**
+ * Homepage stats band, on the shared StatStrip. Stats whose value is
+ * unknown (Discord unreachable, nothing scheduled) are omitted rather than
+ * shown as a dash or "TBA".
+ */
 export function StatsStrip({ stats }: StatsStripProps) {
+  const cells = statCells(
+    stats.map((stat) => ({
+      k: stat.label,
+      v: isKnown(stat.value) ? stat.value : null,
+      hint: stat.hint || undefined,
+      dot: stat.id === "discord-online" ? ("online" as const) : undefined,
+    })),
+  );
+  if (cells.length === 0) return null;
   return (
-    <section className="border-y border-line-subtle bg-surface">
-      <div className="container-wide grid grid-cols-2 lg:grid-cols-4 divide-x divide-line-subtle">
-        {stats.map((stat) => (
-          <div key={stat.id} className="py-8 px-6 first:pl-0 last:pr-0 min-w-0">
-            <p className="text-label uppercase text-ink-muted mb-2">{stat.label}</p>
-            <p className="font-display text-score text-ink tabular leading-none">
-              {stat.value}
-            </p>
-            {stat.hint && (
-              <p className="mt-2 text-caption text-ink-muted font-mono line-clamp-1">
-                {stat.hint}
-              </p>
-            )}
-          </div>
-        ))}
+    <section aria-label="LoLMK in numbers" className="border-y border-ds-line bg-ds-surface">
+      <div className="container-wide">
+        <StatStrip cells={cells} bordered={false} className="border-x border-ds-line" countUp />
       </div>
     </section>
   );
+}
+
+function isKnown(value: string): boolean {
+  const v = value.trim();
+  return v !== "" && v !== "—" && v !== "-" && v.toUpperCase() !== "TBA";
 }

@@ -79,6 +79,25 @@
   .container-wide {
     @apply mx-auto w-full max-w-wide px-4 md:px-8 lg:px-12;
   }
+  /* Text links on redesigned pages. */
+  .ds-link {
+    text-decoration: none;
+  }
+  .ds-link:hover,
+  .ds-link:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  /* Redesigned pages: 1280px column, fluid 20–48px gutters. */
+  .ds-container {
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    max-width: 1280px;
+    padding-left: clamp(20px, 4vw, 48px);
+    padding-right: clamp(20px, 4vw, 48px);
+  }
   /* -------------------------------------------------------------------
    * Redesign shapes (handover Phase 1). One cut corner is the signature.
    * No border-radius anywhere in redesigned UI except status dots.

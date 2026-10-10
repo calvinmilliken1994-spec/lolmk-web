@@ -64,3 +64,8 @@ In Phase 1, `CLAUDE.md` was restored locally from `3fc138c^` and the redesign ru
 The handover's token names (`surface`, `line`, `text`, …) collide with existing Tailwind tokens used by the homepage and `/tools` with different values (`surface` `#10162A`, `line` `#1F2937`). Overwriting them would change the homepage, which must stay as it is. The new tokens live under `ds` (`bg-ds-surface`, `border-ds-line`, …). The handover's `ground` `#0B1021` is within a shade of the existing `#0A0E1A`, so the existing value is kept, as the handover allows.
 
 **Needs:** when the homepage is redesigned, fold the old tokens into `ds` and drop the namespace.
+
+### 8. Locker nav item waits for Phase 5 (Phase 2)
+
+The handover's nav is Tournaments, Members, How-tos, Locker, About, with the signed-in avatar linking to `/locker`. `/locker` doesn't exist until Phase 5, so in Phase 2 the nav has no Locker item and the avatar links to `/members/profile`. Both switch in Phase 5.
+

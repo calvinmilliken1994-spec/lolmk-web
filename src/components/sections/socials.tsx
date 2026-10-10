@@ -28,7 +28,8 @@ const ICONS: Record<SocialPlatform, ComponentType<SVGProps<SVGSVGElement>>> = {
 // Each platform's official chip: brand background + the text color the brand
 // pairs it with, so a card reads as "this is Discord/Kakao/…" at a glance.
 const CHIP: Record<SocialPlatform, string> = {
-  discord: "bg-[#5865F2] text-white",
+  // Brand red, not Discord blurple (redesign rule).
+  discord: "bg-ds-red text-white",
   kakao: "bg-[#FEE500] text-[#181600]",
   instagram: "bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#515BD4] text-white",
   twitch: "bg-[#9146FF] text-white",

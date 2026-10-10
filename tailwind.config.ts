@@ -160,6 +160,12 @@ const config: Config = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.4" },
         },
+        // Redesign live dot: a white ring that expands and fades (1.6s).
+        "ds-pulse": {
+          "0%": { boxShadow: "0 0 0 0 rgba(255,255,255,0.75)" },
+          "70%": { boxShadow: "0 0 0 10px rgba(255,255,255,0)" },
+          "100%": { boxShadow: "0 0 0 0 rgba(255,255,255,0)" },
+        },
         "marquee": {
           from: { transform: "translateX(0)" },
           to: { transform: "translateX(-50%)" },
@@ -196,6 +202,7 @@ const config: Config = {
       },
       animation: {
         "pulse-dot": "pulse-dot 1.6s ease-in-out infinite",
+        "ds-pulse": "ds-pulse 1.6s ease-out infinite",
         "marquee": "marquee 40s linear infinite",
         "time-flash": "time-flash 1.1s ease-in-out infinite",
       },
