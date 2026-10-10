@@ -51,7 +51,6 @@ export function MemberProfileEditor({
   const [directoryOptIn, setDirectoryOptIn] = useState(profile.directoryOptIn);
   const [saved, setSaved] = useState(false);
 
-  const canBeListed = profile.directoryCategory !== null;
 
   function toggle(list: string[], value: string, setter: (v: string[]) => void) {
     setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
@@ -185,26 +184,18 @@ export function MemberProfileEditor({
         </fieldset>
 
         <div className="border-t border-line-subtle pt-5 space-y-2">
-          {canBeListed ? (
-            <label className="inline-flex items-start gap-2.5 text-body-sm text-ink-secondary">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={directoryOptIn}
-                onChange={(e) => setDirectoryOptIn(e.target.checked)}
-              />
-              <span>
-                List me on the public <span className="text-ink">/members</span> directory. Your
-                display name, avatar, bio, roles, and favorite champion would be visible to anyone
-                — nothing else on your profile.
-              </span>
-            </label>
-          ) : (
-            <p className="text-caption text-ink-muted">
-              The public directory currently lists Admins and Game Coordinators only. Your account
-              isn&apos;t in either group, so there&apos;s no directory listing to opt into.
-            </p>
-          )}
+          <label className="inline-flex items-start gap-2.5 text-body-sm text-ink-secondary">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={directoryOptIn}
+              onChange={(e) => setDirectoryOptIn(e.target.checked)}
+            />
+            <span>
+              Show me on Members. Your display name, avatar, Riot ID, bio, roles, and favorite
+              champion would be visible to anyone, nothing else on your profile.
+            </span>
+          </label>
         </div>
 
         <div className="flex items-center gap-3">

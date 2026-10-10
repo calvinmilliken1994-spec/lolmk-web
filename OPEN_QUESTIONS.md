@@ -79,3 +79,25 @@ The handover's signup band has an outline button "Message an admin on Kakao". Th
 
 After the Phase 0 test-data cleanup there is no completed, non-test tournament in the DB, and the legacy champions file only held a demo row (#5). The Hall of champions therefore shows its empty state, and the off-season status bar has no "Last winner" cell. Entering the September 2026 ARAM Mayhem result (#2) fills both automatically.
 
+## Members, How-tos, About
+
+### 11. Members stats: Admins and Game coordinators count the people listed, not the Discord role (Phase 4)
+
+The handover asks for Admins and Game coordinators counts in the Members header. The site can only see members who have signed in (`member_profiles`); counting everyone with the Discord role needs the guild member list, which requires the bot's privileged Server Members intent. The stats count the people shown in each section, and a zero count is omitted. No profile has the coordinator category yet, because `DISCORD_COORDINATOR_ROLE_ID` isn't set. **Needs:** the coordinator role ID, and a decision on whether role totals matter enough to need the member list.
+
+### 12. Any signed-in member can now opt into Members (Phase 4)
+
+The handover adds a "Members (opted in)" section, so `updateProfile` no longer requires an admin or coordinator category to opt in. Sign-in is still limited to admins and verified members by the OAuth callback. The editor's toggle now reads "Show me on Members".
+
+### 13. Champion splash art on member cards (Phase 4)
+
+Cards use the member's favourite champion's splash from Riot Data Dragon (`ddragon.leagueoflegends.com/cdn/img/champion/splash/<Id>_0.jpg`). Riot's Legal Jibber Jabber policy (checked 10 Oct 2026) allows non-commercial fan use of game assets when the site shows its notice, so the footer now carries the policy's exact notice. **Needs:** confirmation that nothing on the site is paywalled or sold in a way that makes it commercial under that policy (the old /shop linked out to merch).
+
+### 14. Two guides don't state when they were last checked (Phase 4)
+
+"Make a KR account" and "Buy RP" say "Last checked: September 2026", so they carry `lastChecked: 2026-09`. "Switch the client to English" and "PC bang guide" don't, so they show no date rather than an invented one. The guides are TSX pages rather than MDX, so `lastChecked` and `readTime` live in `src/data/how-tos.ts` instead of frontmatter. Read times are the rendered word counts at 200 words a minute. **Needs:** check dates for the two guides.
+
+### 15. About: partner details and history (Phase 4)
+
+The partners section names Gen.G GGX and the Naver Riftbound TCG cafe with one plain line each and no links, because the repo has no URL for either. The history timeline is left out until Calvin supplies milestones, as the handover says. **Needs:** partner URLs and any copy you want for them.
+

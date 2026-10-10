@@ -78,9 +78,16 @@ export function Footer() {
         </div>
 
         <div className="mt-16 pt-8 border-t border-line-subtle flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-          <p className="text-caption text-ink-muted">
-            © {new Date().getFullYear()} LoLMK. Not affiliated with Riot Games or LCK.
-          </p>
+          <div className="space-y-1.5">
+            <p className="text-caption text-ink-muted">
+              © {new Date().getFullYear()} LoLMK. Not affiliated with Riot Games or LCK.
+            </p>
+            {/* Notice required by Riot's Legal Jibber Jabber policy (champion art on /members). */}
+            <p className="max-w-[72ch] text-caption text-ink-muted">
+              LoLMK was created under Riot Games&apos; &ldquo;Legal Jibber Jabber&rdquo; policy using
+              assets owned by Riot Games. Riot Games does not endorse or sponsor this project.
+            </p>
+          </div>
           <div className="flex items-center gap-6">
             <CursorToggle />
             <p className="text-caption text-ink-muted font-mono">

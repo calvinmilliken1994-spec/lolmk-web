@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { AlertTriangle, ArrowRight, CreditCard, Smartphone, Wallet } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, CreditCard, Smartphone, Wallet } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
 import { pageMetadata } from "@/lib/metadata";
+import { GuideLayout } from "@/components/ds/guide-layout";
 
 export const metadata: Metadata = pageMetadata({
   title: "Buy RP in Korea",
@@ -16,26 +15,8 @@ export const metadata: Metadata = pageMetadata({
 
 export default function BuyRpPage() {
   return (
-    <>
-      <section className="container-wide pt-16 pb-16 md:pt-20 border-b border-line-subtle">
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          <Link href="/how-tos" className="text-body-sm text-ink-muted hover:text-ink">
-            How-tos
-          </Link>
-          <span className="text-ink-muted">/</span>
-          <Badge variant="outline">Buy RP</Badge>
-        </div>
-        <h1 className="font-heading text-display-md text-ink leading-tight max-w-3xl">
-          Buying RP on the KR server.
-        </h1>
-        <p className="mt-6 text-body-lg text-ink-secondary max-w-[60ch]">
-          Riot Korea&apos;s payment menu looks nothing like NA or EUW&apos;s. Here&apos;s what
-          actually clears for a foreign resident, and what almost always fails. Last checked:
-          September 2026.
-        </p>
-      </section>
-
-      <section className="container-wide py-16 border-b border-line-subtle">
+    <GuideLayout slug="buy-rp">
+      <section className="py-16 border-b border-line-subtle">
         <div className="border border-warning/40 bg-warning/10 p-6 md:p-8 flex gap-5">
           <AlertTriangle strokeWidth={1.5} className="h-7 w-7 shrink-0 text-warning" />
           <p className="text-body-md text-ink-secondary max-w-[65ch]">
@@ -47,8 +28,8 @@ export default function BuyRpPage() {
         </div>
       </section>
 
-      <section className="container-wide py-16 border-b border-line-subtle">
-        <p className="text-label uppercase text-ink-muted mb-4">What actually works</p>
+      <section id="payment-methods" className="py-16 border-b border-line-subtle">
+        <p className="font-heading text-ds-label text-ds-text-dim mb-4">What actually works</p>
         <h2 className="font-heading text-display-sm text-ink mb-8">Payment methods, ranked by how easy they are to get.</h2>
 
         <div className="grid gap-6 md:grid-cols-3">
@@ -84,8 +65,8 @@ export default function BuyRpPage() {
         </div>
       </section>
 
-      <section className="container-wide py-16 border-b border-line-subtle">
-        <p className="text-label uppercase text-ink-muted mb-4">Steps for the gift card route</p>
+      <section id="no-korean-banking" className="py-16 border-b border-line-subtle">
+        <p className="font-heading text-ds-label text-ds-text-dim mb-4">Steps for the gift card route</p>
         <h2 className="font-heading text-display-sm text-ink mb-6">
           The easiest path if you don&apos;t have Korean banking yet.
         </h2>
@@ -119,8 +100,8 @@ export default function BuyRpPage() {
         </p>
       </section>
 
-      <section className="container-wide py-16 border-b border-line-subtle">
-        <p className="text-label uppercase text-ink-muted mb-4">Spending limits</p>
+      <section id="monthly-cap" className="py-16 border-b border-line-subtle">
+        <p className="font-heading text-ds-label text-ds-text-dim mb-4">Spending limits</p>
         <h2 className="font-heading text-display-sm text-ink mb-6">Korea caps how much RP you can buy per month.</h2>
         <div className="max-w-[70ch] space-y-4 text-body-md text-ink-secondary">
           <p>
@@ -136,7 +117,7 @@ export default function BuyRpPage() {
         </div>
       </section>
 
-      <section className="container-wide py-16">
+      <section className="py-16">
         <div className="border border-line-subtle bg-surface p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 justify-between">
           <div>
             <p className="font-heading text-heading-lg text-ink">Payment declined and not sure why?</p>
@@ -152,10 +133,9 @@ export default function BuyRpPage() {
           >
             <DiscordIcon className="h-6 w-6" />
             Ask in Discord
-            <ArrowRight strokeWidth={2} className="h-5 w-5" />
           </a>
         </div>
       </section>
-    </>
+    </GuideLayout>
   );
 }

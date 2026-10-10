@@ -34,9 +34,10 @@ import { isKnownChampionId } from "@/lib/ddragon";
  *     roster actions are scoped to captain_discord_id.
  *
  * A profile row's mere EXISTENCE is not publication: getDirectoryEntries()
- * additionally requires directory_opt_in = true AND directory_category IS
- * NOT NULL. Logging in once enrolls a person (a row exists so they *could*
- * appear); it is not consent to being listed.
+ * additionally requires directory_opt_in = true. Logging in once enrolls a
+ * person (a row exists so they *could* appear); it is not consent to being
+ * listed. directory_category only decides which section a listed person
+ * appears in (Admins, Game coordinators, or Members when null).
  */
 
 let schemaReady: Promise<void> | null = null;
@@ -235,18 +236,15 @@ export async function updateProfile(
         ? input.favoriteChampion
         : null;
 
-  // A member can only opt into the directory if they actually have a
-  // category (admin or coordinator) — checked here, server-side, not just
-  // hidden in the UI, since directoryOptIn arrives straight from a form.
+  // Any signed-in member can opt into the directory (2026 redesign: the
+  // Members page has a "Members (opted in)" section alongside Admins and
+  // Game coordinators). Sign-in itself is already limited to admins and
+  // verified members by the OAuth callback.
   const { rows: existingRows } = await sql`
-    SELECT directory_category FROM member_profiles WHERE discord_user_id = ${discordUserId}
+    SELECT 1 FROM member_profiles WHERE discord_user_id = ${discordUserId}
   `;
   if (existingRows.length === 0) throw new Error("Profile not found. Sign in first.");
-  const category = existingRows[0].directory_category as MemberDirectoryCategory;
-  const directoryOptIn =
-    input.directoryOptIn === undefined
-      ? undefined
-      : input.directoryOptIn && category !== null;
+  const directoryOptIn = input.directoryOptIn === undefined ? undefined : input.directoryOptIn;
 
   // Array-valued columns can't go through the tagged-template `sql` helper
   // (its bind values are single primitives per interpolation, same
@@ -426,6 +424,7 @@ export async function resolveMemberRiotId(
 export async function getDirectoryEntries(): Promise<{
   admins: MemberDirectoryEntry[];
   coordinators: MemberDirectoryEntry[];
+  members: MemberDirectoryEntry[];
 }> {
   await ensureMemberProfileSchema();
   // The primary linked Riot ID (if any) is joined in for the card's
@@ -435,11 +434,12 @@ export async function getDirectoryEntries(): Promise<{
            p.favorite_champion, r.game_name AS riot_game_name, r.tag_line AS riot_tag_line
     FROM member_profiles p
     LEFT JOIN member_riot_ids r ON r.discord_user_id = p.discord_user_id AND r.is_primary
-    WHERE p.directory_opt_in = true AND p.directory_category IS NOT NULL
+    WHERE p.directory_opt_in = true
     ORDER BY p.display_name ASC
   `;
   const admins: MemberDirectoryEntry[] = [];
   const coordinators: MemberDirectoryEntry[] = [];
+  const members: MemberDirectoryEntry[] = [];
   for (const row of rows) {
     const split = splitDisplayName(row.display_name as string);
     const linkedRiotId =
@@ -450,15 +450,16 @@ export async function getDirectoryEntries(): Promise<{
       displayName: split.name,
       riotId: linkedRiotId ?? split.riotId,
       avatarUrl: (row.avatar_url as string) ?? null,
-      category: row.directory_category as "admin" | "coordinator",
+      category: (row.directory_category as "admin" | "coordinator" | null) ?? "member",
       bio: (row.bio as string) ?? "",
       preferredRoles: normaliseRoles(row.preferred_roles),
       favoriteChampion: (row.favorite_champion as string) ?? null,
     };
     if (entry.category === "admin") admins.push(entry);
-    else coordinators.push(entry);
+    else if (entry.category === "coordinator") coordinators.push(entry);
+    else members.push(entry);
   }
-  return { admins, coordinators };
+  return { admins, coordinators, members };
 }
 
 async function withTransaction<T>(fn: (client: VercelPoolClient) => Promise<T>): Promise<T> {

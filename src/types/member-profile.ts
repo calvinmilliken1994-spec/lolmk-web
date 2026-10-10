@@ -98,7 +98,8 @@ export interface MemberDirectoryEntry {
   /** Primary linked Riot ID, else one parsed from the Discord nickname. Null when neither exists. */
   riotId: string | null;
   avatarUrl: string | null;
-  category: "admin" | "coordinator";
+  /** "member" when the person has no staff category (opted-in members). */
+  category: "admin" | "coordinator" | "member";
   bio: string;
   preferredRoles: MemberPreferredRole[];
   favoriteChampion: string | null;

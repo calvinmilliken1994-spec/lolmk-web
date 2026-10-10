@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import { AlertTriangle, ShieldCheck, Sparkles } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AlertTriangle } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { DiscordIcon } from "@/components/ui/brand-icons";
+import { MemberCard, type MemberCardData } from "@/components/ds/member-card";
+import { PageHeader } from "@/components/ds/page-header";
+import { statCells } from "@/components/ds/stat-strip";
+import { cn } from "@/lib/utils";
 import { getDirectoryEntries } from "@/lib/member-db";
-import { discordAvatarUrl } from "@/lib/member-display";
+import { getDiscordStats } from "@/lib/discord";
+import { getChampionById } from "@/lib/ddragon";
 import type { MemberDirectoryEntry } from "@/types/member-profile";
 import { pageMetadata } from "@/lib/metadata";
 
@@ -25,11 +30,11 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   discord_error: "Couldn't reach Discord to verify your account. Try again in a moment.",
 };
 
+const numberFmt = new Intl.NumberFormat("en-US");
+
 /**
- * /members — the public-facing directory. Deliberately not gated behind
- * login: enrollment (having a profile row) is separate from viewer access,
- * and this page has always been a public route. Only entries that opted in
- * (getDirectoryEntries()'s directory_opt_in check) ever render here.
+ * /members: the public directory. Not gated behind login; only profiles
+ * that opted in (directory_opt_in) ever render here.
  */
 export default async function MembersPage({
   searchParams,
@@ -37,122 +42,108 @@ export default async function MembersPage({
   searchParams: Promise<{ authError?: string }>;
 }) {
   const params = await searchParams;
-  const { admins, coordinators } = await getDirectoryEntries();
+  const [{ admins, coordinators, members }, discord] = await Promise.all([
+    getDirectoryEntries(),
+    getDiscordStats(),
+  ]);
   const authErrorMessage = params.authError
     ? AUTH_ERROR_MESSAGES[params.authError] ?? AUTH_ERROR_MESSAGES.discord_error
     : null;
 
-  const isEmpty = admins.length === 0 && coordinators.length === 0;
+  const toCard = async (m: MemberDirectoryEntry): Promise<MemberCardData> => {
+    const champ = m.favoriteChampion ? await getChampionById(m.favoriteChampion) : null;
+    return {
+      displayName: m.displayName,
+      riotId: m.riotId,
+      avatarUrl: m.avatarUrl,
+      bio: m.bio,
+      preferredRoles: m.preferredRoles,
+      championId: m.favoriteChampion,
+      championName: champ?.name ?? null,
+    };
+  };
+  const [adminCards, coordinatorCards, memberCards] = await Promise.all([
+    Promise.all(admins.map(toCard)),
+    Promise.all(coordinators.map(toCard)),
+    Promise.all(members.map(toCard)),
+  ]);
+
+  const loginHref = `/api/auth/member/login?next=${encodeURIComponent("/members")}`;
+  const isEmpty = admins.length + coordinators.length + members.length === 0;
 
   return (
-    <section className="container-wide py-20 md:py-28 space-y-16">
-      <div className="max-w-2xl space-y-4">
-        <h1 className="font-display text-display-lg text-ink leading-[0.95]">
-          Members
-        </h1>
-        <p className="text-body-lg text-ink-secondary">
-          The admins and game coordinators behind the tournaments, events, and the Discord itself.
-          Listed here once they sign in and choose to be shown.
-        </p>
-      </div>
+    <>
+      <PageHeader
+        tag="Members"
+        title="Meet the regulars."
+        deck="Admins, game coordinators, and members who've opted in to be shown. Sign in with Discord to add your own card."
+        stats={statCells([
+          { k: "In the Discord", v: discord ? numberFmt.format(discord.members) : null },
+          { k: "Online now", v: discord ? numberFmt.format(discord.online) : null, dot: "online" },
+          // Counts of the people listed below. The Discord role totals would
+          // need the guild member list (a privileged intent); see
+          // OPEN_QUESTIONS.md. Zero is omitted rather than shown, since it
+          // would read as "LoLMK has no coordinators".
+          { k: "Admins", v: admins.length > 0 ? String(admins.length) : null },
+          { k: "Game coordinators", v: coordinators.length > 0 ? String(coordinators.length) : null },
+        ])}
+        actions={
+          <a href={loginHref} className={cn(buttonVariants({ variant: "discord", size: "md" }))}>
+            <DiscordIcon className="h-5 w-5" />
+            Add your card
+          </a>
+        }
+      />
 
       {authErrorMessage && (
-        <p
-          role="alert"
-          className="flex items-start gap-2.5 text-body-sm text-danger border border-danger/40 bg-danger/10 px-4 py-3 rounded-sm max-w-2xl"
-        >
-          <AlertTriangle strokeWidth={1.5} className="h-5 w-5 shrink-0 mt-0.5" />
-          {authErrorMessage}
-        </p>
+        <div className="ds-container">
+          <p
+            role="alert"
+            className="flex max-w-deck items-start gap-2.5 border border-danger/40 bg-danger/10 px-4 py-3 text-ds-body text-ds-text"
+          >
+            <AlertTriangle strokeWidth={1.5} className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
+            {authErrorMessage}
+          </p>
+        </div>
       )}
 
       {isEmpty ? (
-        <p className="text-body-md text-ink-secondary border border-dashed border-line-strong bg-surface p-10 text-center max-w-2xl">
-          No one has opted into the directory yet.
-        </p>
+        <section className="ds-container">
+          <div className="cut-plate flex flex-wrap items-center justify-between gap-6 border border-ds-line bg-ds-surface px-8 py-8">
+            <p className="m-0 max-w-deck text-ds-deck text-ds-text-muted">
+              Nobody has added their card yet. Be the first.
+            </p>
+            <a href={loginHref} className={cn(buttonVariants({ variant: "outline", size: "md" }))}>
+              Sign in with Discord
+            </a>
+          </div>
+        </section>
       ) : (
-        <>
-          {admins.length > 0 && (
-            <DirectorySection title="Admins" icon={ShieldCheck} entries={admins} />
-          )}
-          {coordinators.length > 0 && (
-            <DirectorySection title="Game Coordinators" icon={Sparkles} entries={coordinators} />
-          )}
-        </>
+        <div className="space-y-[clamp(56px,7vw,88px)]">
+          <DirectorySection id="admins" title="Admins" cards={adminCards} />
+          <DirectorySection id="coordinators" title="Game coordinators" cards={coordinatorCards} />
+          <DirectorySection id="members" title="Members" cards={memberCards} />
+        </div>
       )}
-
-      <div className="border-t border-line-subtle pt-8">
-        <p className="text-body-sm text-ink-muted">
-          Verified member?{" "}
-          <a
-            href={`/api/auth/member/login?next=${encodeURIComponent("/members")}`}
-            className="text-brand-blue-bright hover:text-ink underline underline-offset-4"
-          >
-            Sign in with Discord
-          </a>{" "}
-          to set up your profile.
-        </p>
-      </div>
-    </section>
+    </>
   );
 }
 
-function DirectorySection({
-  title,
-  icon: Icon,
-  entries,
-}: {
-  title: string;
-  icon: typeof ShieldCheck;
-  entries: MemberDirectoryEntry[];
-}) {
+function DirectorySection({ id, title, cards }: { id: string; title: string; cards: MemberCardData[] }) {
+  if (cards.length === 0) return null;
   return (
-    <div>
-      <h2 className="font-heading text-display-sm text-ink mb-6 flex items-center gap-2.5">
-        <Icon strokeWidth={1.5} className="h-6 w-6 text-brand-red-bright" />
+    <section aria-labelledby={`${id}-title`} className="ds-container">
+      <h2
+        id={`${id}-title`}
+        className="m-0 font-display text-[clamp(40px,5vw,60px)] font-normal leading-[0.92] text-ds-text"
+      >
         {title}
       </h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-        {entries.map((m) => (
-          <div key={m.displayName} className="bg-surface border border-line p-5 flex flex-col gap-3">
-            <div className="aspect-square bg-elevated border border-line-subtle overflow-hidden flex items-center justify-center">
-              {m.avatarUrl ? (
-                <Image
-                  src={discordAvatarUrl(m.avatarUrl, 512) ?? m.avatarUrl}
-                  alt=""
-                  width={512}
-                  height={512}
-                  sizes="(min-width: 1024px) 280px, (min-width: 768px) 30vw, 45vw"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <span className="font-display text-display-sm text-ink-muted leading-none">
-                  {m.displayName.slice(0, 2).toUpperCase()}
-                </span>
-              )}
-            </div>
-            <div>
-              <p className="font-heading text-heading-md text-ink leading-tight">{m.displayName}</p>
-              {m.riotId && <p className="mt-0.5 text-body-sm text-ink-muted">{m.riotId}</p>}
-              {m.preferredRoles.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {m.preferredRoles.map((r) => (
-                    <Badge key={r} variant="outline">
-                      {r}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-            {m.bio && <p className="text-body-sm text-ink-secondary line-clamp-3">{m.bio}</p>}
-            {m.favoriteChampion && (
-              <p className="mt-auto text-caption font-mono text-ink-muted uppercase tracking-wide">
-                Mains {m.favoriteChampion}
-              </p>
-            )}
-          </div>
+      <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map((c) => (
+          <MemberCard key={`${c.displayName}-${c.riotId ?? ""}`} member={c} />
         ))}
       </div>
-    </div>
+    </section>
   );
 }
