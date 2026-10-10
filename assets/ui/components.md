@@ -209,9 +209,22 @@ Standings tables are a major visual element — they need to feel broadcast-grad
 
 ## Motion
 
-- Default duration: 150ms for color, 200ms for transform, 300ms for opacity fades
-- Default easing: `ease-out` for entrances, `ease-in` for exits, `ease-in-out` rare
-- Reduced motion: respect `prefers-reduced-motion` — disable transforms, keep color transitions
+Redesign rules (handover Phase 6). One easing curve, one signature transition, quiet everything else.
+
+| Token | Tailwind | Value | Use |
+| --- | --- | --- | --- |
+| Easing | `ease-ds` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Everything |
+| Fast | `duration-fast` | 150ms | Hover and press feedback |
+| Base | `duration-base` | 250ms | Reveals, plate lift |
+| Route | `duration-route` | 350ms | Page transitions |
+
+- Route change: 200ms fade with an 8px rise on the page content (`src/app/template.tsx`). Header and footer stay put.
+- Signature: the red angled wipe (`SectionWipe`), only between top-level nav sections.
+- Navigation: 2px red progress bar after 120ms (`NavProgress`), `aria-busy` on `<main>` while pending.
+- Loading: each route's `loading.tsx` renders its static header copy for real and turns data regions into `.ds-skeleton` blocks of the final size (surface-2, 1.4s shimmer). Slow external calls (Discord) stream in behind `<Suspense>`.
+- Small touches: stat values count up once (600ms, tabular-nums, `CountUp`); live dots pulse at 1.6s; format plates lift 4px; `.ds-link` underlines sweep in.
+- Never: scale-up on cards, scroll-triggered fade-ins on every section, smooth-scroll libraries.
+- Reduced motion: nothing animates. `globals.css` ends every animation and transition on its first frame, and the JS effects (wipe, count-up) check the media query.
 
 ## Component file structure
 

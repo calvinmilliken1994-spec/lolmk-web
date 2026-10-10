@@ -42,7 +42,7 @@ export function MemberCard({ member, className }: { member: MemberCardData; clas
   return (
     <article
       className={cn(
-        "cut-plate flex min-w-0 flex-col border border-ds-line bg-ds-surface transition-[transform,border-color] duration-[250ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:-translate-y-1 hover:border-ds-line-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+        "cut-plate flex min-w-0 flex-col border border-ds-line bg-ds-surface transition-[transform,border-color] duration-base ease-ds hover:-translate-y-1 hover:border-ds-line-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         className,
       )}
     >

@@ -1,7 +1,11 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk, Bebas_Neue, Chakra_Petch } from "next/font/google";
 import { Header } from "@/components/layout/header";
 import { ConditionalFooter } from "@/components/layout/conditional-footer";
+import { CountUp } from "@/components/motion/count-up";
+import { NavProgress } from "@/components/motion/nav-progress";
+import { SectionWipe } from "@/components/motion/section-wipe";
 import { getMemberSession } from "@/lib/discord-auth";
 import { rootMetadata } from "@/lib/metadata";
 import "./globals.css";
@@ -70,7 +74,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               : null
           }
         />
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         <main className="pt-16">{children}</main>
+        <SectionWipe />
+        <CountUp />
         <ConditionalFooter />
       </body>
     </html>

@@ -19,7 +19,8 @@ async function fetchInvite(): Promise<DiscordInviteResponse | null> {
   try {
     const res = await fetch(INVITE_ENDPOINT, {
       headers: { "User-Agent": DISCORD_USER_AGENT },
-      next: { revalidate: 300, tags: ["discord"] },
+      // Online count: about a minute (handover Phase 6).
+      next: { revalidate: 60, tags: ["discord"] },
     });
     if (!res.ok) return null;
     return (await res.json()) as DiscordInviteResponse;

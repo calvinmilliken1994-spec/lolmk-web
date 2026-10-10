@@ -115,3 +115,17 @@ History reads `sr_team_players.discord_id` and `rb_players.member_discord_id`. A
 
 The local `.env.local` has no member-auth config (`DISCORD_CLIENT_ID` is empty), so sign-in redirects to `/members?authError=config` locally. The signed-out redirect (`/locker` to `/api/auth/member/login?next=/locker`), `/shop` and `/members/profile` permanent redirects to `/locker` were checked on a production build; the signed-in page was checked by rendering its content for Calvin's member ID through a temporary route that was deleted before the commit. **Needs:** a real sign-in on a preview deploy.
 
+## Motion and loading
+
+### 19. View transitions: `experimental.viewTransition` left off on Next 15.5.25 (Phase 6)
+
+Checked for the installed version (Next 15.5.25). The flag is still `experimental.viewTransition` in `config-shared.d.ts`; Next's docs call it experimental and "strongly advise against using this feature in production"; and turning it on makes Next swap in its bundled `react-experimental` build (`needs-experimental-react.js` lists `viewTransition` beside `ppr` and `taint`). The stable React that ships with 15.5 has no `ViewTransition` export. So the route transition is CSS instead: `src/app/template.tsx` gives page content the 200ms fade-and-rise and `SectionWipe` runs the red wipe between top-level sections. Both are off under reduced motion, and browsers without animation support just navigate. **Needs:** revisit when the flag is stable (Next 16+), then swap the template for `<ViewTransition>`.
+
+### 20. On-demand revalidation runs in the site's own admin actions, not a bot callback (Phase 6)
+
+The handover says the bot calls a revalidation endpoint when an admin submits a result. In this repo the admin tools (`/tools/*` server actions) are the writers, and they already call `revalidatePath` for `/tournaments`, the format pages and the tournament detail page; Phase 6 added `/tournaments` to the Mayhem actions so the hub's status bar and chips refresh too. Discord stats now revalidate every 60s and Discord events every 5 minutes. No endpoint was added, since nothing outside the site writes tournament data. **Needs:** an authenticated `/api/revalidate` only if the Discord bot ever starts writing results.
+
+### 21. Suspense covers the Discord calls; tournament pages use route-level loading (Phase 6)
+
+Discord is the only slow external call. Its stat strips on Members and About, and the Locker's RSVP stats and "Coming up" list, stream in behind `<Suspense>` with same-size skeletons. The tournament pages read Discord events and Postgres together in `getTournamentOverview`, which drives the status bar, plate chips and Hall of champions at once, so they rely on their `loading.tsx` skeletons rather than splitting that call.
+

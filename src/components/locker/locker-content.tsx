@@ -2,10 +2,14 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { MemberCard } from "@/components/ds/member-card";
 import { PageHeader } from "@/components/ds/page-header";
+import { Suspense } from "react";
+import { AsyncStatStrip } from "@/components/ds/async-stat-strip";
+import { StatStripSkeleton } from "@/components/ds/skeleton";
 import { ResultsTable } from "@/components/ds/results-table";
 import { statCells } from "@/components/ds/stat-strip";
 import { MemberProfileEditor } from "@/components/members/member-profile-editor";
 import { getMemberRsvps } from "@/lib/discord-events";
+import type { CommunityEvent } from "@/types/event";
 import { getChampionById, listChampions } from "@/lib/ddragon";
 import { getMemberCurrentTeam, getMemberHistory, type LockerHistoryRow } from "@/lib/locker-db";
 import { getProfile, listRiotIds } from "@/lib/member-db";
@@ -23,13 +27,14 @@ const H2 = "m-0 font-display text-[clamp(40px,5vw,60px)] font-normal leading-[0.
  * supply are omitted.
  */
 export async function LockerContent({ discordUserId }: { discordUserId: string }) {
-  const [profile, riotIds, champions, history, team, rsvps] = await Promise.all([
+  // RSVPs come from Discord, the slow call; they stream in behind Suspense.
+  const rsvpsPromise = getMemberRsvps(discordUserId);
+  const [profile, riotIds, champions, history, team] = await Promise.all([
     getProfile(discordUserId),
     listRiotIds(discordUserId),
     listChampions(),
     getMemberHistory(discordUserId),
     getMemberCurrentTeam(discordUserId).catch(() => null),
-    getMemberRsvps(discordUserId),
   ]);
   // The OAuth callback enrols a profile row on every sign-in; a session that
   // outlived its row signs in again.
@@ -44,7 +49,6 @@ export async function LockerContent({ discordUserId }: { discordUserId: string }
   const best = history
     .filter((h) => h.finished && h.rank !== null)
     .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))[0];
-  const nextRsvp = rsvps?.[0] ?? null;
 
   return (
     <>
@@ -65,7 +69,12 @@ export async function LockerContent({ discordUserId }: { discordUserId: string }
             />
           ) : undefined
         }
-        stats={statCells([
+        statsSlot={
+          <Suspense fallback={<StatStripSkeleton count={4} />}>
+            <AsyncStatStrip
+              cells={rsvpsPromise.then((rsvps) => {
+                const nextRsvp = rsvps?.[0] ?? null;
+                return statCells([
           { k: "Tournaments played", v: played > 0 ? String(played) : null },
           best
             ? {
@@ -81,7 +90,11 @@ export async function LockerContent({ discordUserId }: { discordUserId: string }
             v: nextRsvp ? formatKstWhen({ startsAt: nextRsvp.startsAt }) : null,
             hint: nextRsvp?.title,
           },
-        ])}
+                ]);
+              })}
+            />
+          </Suspense>
+        }
         actions={
           <form action="/members/logout" method="post">
             <button
@@ -150,37 +163,9 @@ export async function LockerContent({ discordUserId }: { discordUserId: string }
         )}
       </section>
 
-      {rsvps && rsvps.length > 0 && (
-        <section aria-labelledby="upcoming-title" className="ds-container pt-[clamp(64px,8vw,104px)]">
-          <h2 id="upcoming-title" className={H2}>
-            Coming up.
-          </h2>
-          <ul className="m-0 mt-8 list-none border-t border-ds-line p-0">
-            {rsvps.map((e) => (
-              <li key={e.id} className="flex flex-wrap items-center justify-between gap-4 border-b border-ds-line py-5">
-                <span>
-                  <span className="block font-heading text-[20px] font-semibold text-white">{e.title}</span>
-                  <span className="mt-1 block font-heading text-ds-ui text-ds-text-muted">
-                    {[formatKstWhen({ startsAt: e.startsAt }), e.location]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </span>
-                </span>
-                {e.cta && (
-                  <a
-                    href={e.cta.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="ds-link inline-flex min-h-11 items-center font-heading text-ds-ui font-semibold text-ds-text"
-                  >
-                    Open in Discord
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <Suspense fallback={null}>
+        <ComingUp rsvps={rsvpsPromise} />
+      </Suspense>
 
       {team && (
         <section aria-labelledby="team-title" className="ds-container pt-[clamp(64px,8vw,104px)]">
@@ -211,6 +196,43 @@ export async function LockerContent({ discordUserId }: { discordUserId: string }
         </section>
       )}
     </>
+  );
+}
+
+/** Upcoming Discord events the member marked Interested. */
+async function ComingUp({ rsvps }: { rsvps: Promise<CommunityEvent[] | null> }) {
+  const list = await rsvps;
+  if (!list || list.length === 0) return null;
+  return (
+    <section aria-labelledby="upcoming-title" className="ds-container pt-[clamp(64px,8vw,104px)]">
+      <h2 id="upcoming-title" className={H2}>
+        Coming up.
+      </h2>
+      <ul className="m-0 mt-8 list-none border-t border-ds-line p-0">
+        {list.map((e) => (
+          <li key={e.id} className="flex flex-wrap items-center justify-between gap-4 border-b border-ds-line py-5">
+            <span>
+              <span className="block font-heading text-[20px] font-semibold text-white">{e.title}</span>
+              <span className="mt-1 block font-heading text-ds-ui text-ds-text-muted">
+                {[formatKstWhen({ startsAt: e.startsAt }), e.location]
+                  .filter(Boolean)
+                  .join(", ")}
+              </span>
+            </span>
+            {e.cta && (
+              <a
+                href={e.cta.href}
+                target="_blank"
+                rel="noreferrer"
+                className="ds-link inline-flex min-h-11 items-center font-heading text-ds-ui font-semibold text-ds-text"
+              >
+                Open in Discord
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

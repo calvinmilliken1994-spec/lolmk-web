@@ -2,6 +2,9 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { PageHeader } from "@/components/ds/page-header";
+import { Suspense } from "react";
+import { AsyncStatStrip } from "@/components/ds/async-stat-strip";
+import { StatStripSkeleton } from "@/components/ds/skeleton";
 import { statCells } from "@/components/ds/stat-strip";
 import { cn } from "@/lib/utils";
 import { pageMetadata } from "@/lib/metadata";
@@ -39,11 +42,9 @@ const FORMATS = [
 const H2 = "m-0 font-display text-[clamp(40px,5vw,60px)] font-normal leading-[0.92] text-ds-text";
 
 export default async function AboutPage() {
-  const [discord, recurring, socials] = await Promise.all([
-    getDiscordStats(),
-    getRecurringSchedule(),
-    getSocials(),
-  ]);
+  // Discord streams into the stat strip behind Suspense.
+  const discordPromise = getDiscordStats();
+  const [recurring, socials] = await Promise.all([getRecurringSchedule(), getSocials()]);
 
   return (
     <>
@@ -51,12 +52,20 @@ export default async function AboutPage() {
         tag="About"
         title="Since 2014."
         deck="The largest English-speaking League of Legends community in Korea. Run by volunteers, partnered with Gen.G GGX."
-        stats={statCells([
-          { k: "Established", v: "2014" },
-          { k: "Members", v: discord ? numberFmt.format(discord.members) : null },
-          { k: "Partner venue", v: "Gen.G GGX" },
-          { k: "Based in", v: "Seoul" },
-        ])}
+        statsSlot={
+          <Suspense fallback={<StatStripSkeleton count={4} />}>
+            <AsyncStatStrip
+              cells={discordPromise.then((discord) =>
+                statCells([
+                  { k: "Established", v: "2014" },
+                  { k: "Members", v: discord ? numberFmt.format(discord.members) : null },
+                  { k: "Partner venue", v: "Gen.G GGX" },
+                  { k: "Based in", v: "Seoul" },
+                ]),
+              )}
+            />
+          </Suspense>
+        }
       />
 
       <section aria-labelledby="what-we-run" className="ds-container pt-[clamp(40px,6vw,72px)]">

@@ -154,8 +154,30 @@ const config: Config = {
       },
       transitionTimingFunction: {
         "out-soft": "cubic-bezier(0.22, 1, 0.36, 1)",
+        // Redesign motion (handover Phase 6): one curve for everything.
+        ds: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+      },
+      transitionDuration: {
+        fast: "150ms",
+        base: "250ms",
+        route: "350ms",
       },
       keyframes: {
+        // Route change: 200ms fade with an 8px rise on the main content.
+        "ds-rise": {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "none" },
+        },
+        // Broadcast wipe between top-level sections: an angled red sweep.
+        "ds-wipe": {
+          "0%": { clipPath: "polygon(0 0, 0 0, -14% 100%, -14% 100%)" },
+          "50%": { clipPath: "polygon(0 0, 114% 0, 100% 100%, -14% 100%)" },
+          "100%": { clipPath: "polygon(114% 0, 114% 0, 100% 100%, 100% 100%)" },
+        },
+        "ds-progress": {
+          "0%": { transform: "scaleX(0)" },
+          "100%": { transform: "scaleX(0.9)" },
+        },
         "pulse-dot": {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.4" },
@@ -203,6 +225,9 @@ const config: Config = {
       animation: {
         "pulse-dot": "pulse-dot 1.6s ease-in-out infinite",
         "ds-pulse": "ds-pulse 1.6s ease-out infinite",
+        "ds-rise": "ds-rise 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "ds-wipe": "ds-wipe 350ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "ds-progress": "ds-progress 8s cubic-bezier(0.2, 0.8, 0.2, 1) both",
         "marquee": "marquee 40s linear infinite",
         "time-flash": "time-flash 1.1s ease-in-out infinite",
       },

@@ -62,7 +62,8 @@ export async function getDiscordEvents(): Promise<CommunityEvent[] | null> {
           Authorization: `Bot ${token}`,
           "User-Agent": DISCORD_USER_AGENT,
         },
-        next: { revalidate: 600, tags: ["discord-events"] },
+        // Events: about five minutes (handover Phase 6).
+        next: { revalidate: 300, tags: ["discord-events"] },
       },
     );
     if (!res.ok) return null;

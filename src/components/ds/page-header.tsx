@@ -18,6 +18,8 @@ export interface PageHeaderProps {
   title: ReactNode;
   deck?: ReactNode;
   stats?: StatCell[];
+  /** Rendered in place of `stats` (a Suspense boundary or a loading skeleton). */
+  statsSlot?: ReactNode;
   /** Right-aligned beside the tag (e.g. "Edit profile"). */
   actions?: ReactNode;
   /** Sits to the left of the title (e.g. the Locker avatar). */
@@ -49,6 +51,7 @@ export function PageHeader({
   title,
   deck,
   stats,
+  statsSlot,
   actions,
   media,
   level = "h1",
@@ -85,7 +88,11 @@ export function PageHeader({
           {deck}
         </p>
       )}
-      {stats && stats.length > 0 && <StatStrip cells={stats} className="mt-9" countUp />}
+      {statsSlot ? (
+        <div className="mt-9">{statsSlot}</div>
+      ) : (
+        stats && stats.length > 0 && <StatStrip cells={stats} className="mt-9" countUp />
+      )}
     </>
   );
 

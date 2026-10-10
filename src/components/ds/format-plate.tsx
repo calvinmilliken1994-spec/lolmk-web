@@ -28,7 +28,7 @@ export interface FormatPlateProps {
 export function FormatPlate({ format, title, description, facts, chip, link }: FormatPlateProps) {
   const art = ART[format];
   return (
-    <article className="cut-plate flex min-w-0 flex-[1_1_340px] flex-col border border-ds-line bg-ds-surface transition-[transform,border-color] duration-[250ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:-translate-y-1 hover:border-ds-line-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+    <article className="cut-plate flex min-w-0 flex-[1_1_340px] flex-col border border-ds-line bg-ds-surface transition-[transform,border-color] duration-base ease-ds hover:-translate-y-1 hover:border-ds-line-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       <div className={cn("texture-art relative h-[210px] overflow-hidden", art.bg)}>
         <div
           aria-hidden

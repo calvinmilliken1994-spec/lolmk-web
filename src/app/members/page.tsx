@@ -4,6 +4,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { MemberCard, type MemberCardData } from "@/components/ds/member-card";
 import { PageHeader } from "@/components/ds/page-header";
+import { Suspense } from "react";
+import { AsyncStatStrip } from "@/components/ds/async-stat-strip";
+import { StatStripSkeleton } from "@/components/ds/skeleton";
 import { statCells } from "@/components/ds/stat-strip";
 import { cn } from "@/lib/utils";
 import { getDirectoryEntries } from "@/lib/member-db";
@@ -42,10 +45,10 @@ export default async function MembersPage({
   searchParams: Promise<{ authError?: string }>;
 }) {
   const params = await searchParams;
-  const [{ admins, coordinators, members }, discord] = await Promise.all([
-    getDirectoryEntries(),
-    getDiscordStats(),
-  ]);
+  // Discord is the slow call: it streams into the stat strip behind Suspense
+  // while the directory (Postgres) renders straight away.
+  const discordPromise = getDiscordStats();
+  const { admins, coordinators, members } = await getDirectoryEntries();
   const authErrorMessage = params.authError
     ? AUTH_ERROR_MESSAGES[params.authError] ?? AUTH_ERROR_MESSAGES.discord_error
     : null;
@@ -77,16 +80,24 @@ export default async function MembersPage({
         tag="Members"
         title="Meet the regulars."
         deck="Admins, game coordinators, and members who've opted in to be shown. Sign in with Discord to add your own card."
-        stats={statCells([
-          { k: "In the Discord", v: discord ? numberFmt.format(discord.members) : null },
-          { k: "Online now", v: discord ? numberFmt.format(discord.online) : null, dot: "online" },
-          // Counts of the people listed below. The Discord role totals would
-          // need the guild member list (a privileged intent); see
-          // OPEN_QUESTIONS.md. Zero is omitted rather than shown, since it
-          // would read as "LoLMK has no coordinators".
-          { k: "Admins", v: admins.length > 0 ? String(admins.length) : null },
-          { k: "Game coordinators", v: coordinators.length > 0 ? String(coordinators.length) : null },
-        ])}
+        statsSlot={
+          <Suspense fallback={<StatStripSkeleton count={4} />}>
+            <AsyncStatStrip
+              cells={discordPromise.then((discord) =>
+                statCells([
+                  { k: "In the Discord", v: discord ? numberFmt.format(discord.members) : null },
+                  { k: "Online now", v: discord ? numberFmt.format(discord.online) : null, dot: "online" },
+                  // Counts of the people listed below. The Discord role totals
+                  // would need the guild member list (a privileged intent); see
+                  // OPEN_QUESTIONS.md. Zero is omitted rather than shown, since
+                  // it would read as "LoLMK has no coordinators".
+                  { k: "Admins", v: admins.length > 0 ? String(admins.length) : null },
+                  { k: "Game coordinators", v: coordinators.length > 0 ? String(coordinators.length) : null },
+                ]),
+              )}
+            />
+          </Suspense>
+        }
         actions={
           <a href={loginHref} className={cn(buttonVariants({ variant: "discord", size: "md" }))}>
             <DiscordIcon className="h-5 w-5" />

@@ -158,7 +158,7 @@ function TournamentCard({
     window ? { k: "When", v: window } : null,
   ].filter((f): f is { k: string; v: string } => f !== null);
   return (
-    <li className="cut-plate flex flex-col border border-ds-line bg-ds-surface transition-[transform,border-color] duration-[250ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:-translate-y-1 hover:border-ds-line-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+    <li className="cut-plate flex flex-col border border-ds-line bg-ds-surface transition-[transform,border-color] duration-base ease-ds hover:-translate-y-1 hover:border-ds-line-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       <div className="flex flex-col gap-3 px-7 pt-6">
         <span
           className={cn(
