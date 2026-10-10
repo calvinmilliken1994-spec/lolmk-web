@@ -39,8 +39,8 @@ import { DEFAULT_RB_CONFIG, RB_PUBLIC_STATUSES } from "../types/riftbound";
  *
  * Differences from sr-db.ts that are deliberate:
  *   - Records are retained (appeals, >= 3 months): every foreign key is
- *     RESTRICT, nothing cascades, so deleting a tournament that has history
- *     fails loudly. Archive instead.
+ *     RESTRICT, nothing cascades. Archive is the normal lifecycle; the
+ *     explicit admin Delete action clears test data transactionally in FK order.
  *   - writeAudit() requires an actor; the audit table has NOT NULL actor
  *     columns.
  *   - The whole schema is created under one advisory lock so concurrent cold
@@ -559,11 +559,12 @@ export async function listAudit(tournamentId: string, limit?: number): Promise<R
 // Admin reads
 // ---------------------------------------------------------------------------
 
-/** Every non-archived tournament, newest first. */
-export async function listTournaments(): Promise<RbTournament[]> {
+/** Non-archived tournaments by default; admin lists can also expose archived records for cleanup. */
+export async function listTournaments(includeArchived = false): Promise<RbTournament[]> {
   await ensureSchema();
   const { rows } = await sql.query(
-    `SELECT * FROM rb_tournaments WHERE status <> 'archived' ORDER BY created_at DESC`,
+    `SELECT * FROM rb_tournaments WHERE $1::boolean OR status <> 'archived' ORDER BY created_at DESC`,
+    [includeArchived],
   );
   return rows.map(rowToTournament);
 }

@@ -196,6 +196,8 @@ export interface MayhemMatch {
 
 export interface MayhemEvent {
   id: string;
+  archived_at?: string | null;
+  published?: boolean;
   title: string;
   stage: MayhemStage;
   scene: MayhemScene;
@@ -323,6 +325,7 @@ export interface MayhemPublicMatch {
 }
 
 export interface MayhemPublic {
+  id?: string;
   title: string;
   stage: MayhemStage;
   /** How teams are formed this event — drives which signup UI the public page shows. */

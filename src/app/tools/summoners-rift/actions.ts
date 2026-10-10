@@ -350,30 +350,23 @@ export async function archiveTournament(tournamentId: string): Promise<void> {
  * For cleaning up test runs, not for tournaments that deserve history.
  *
  * Every child table (sr_teams, sr_matches, sr_audit_log, ...) cascades off
- * sr_tournaments, but sr_tournaments.champion_team_id is a FK *back to*
- * sr_teams(id) — the row delete would cascade its own champion team away and
- * leave a dangling self-reference. Nulling champion_team_id first breaks that
- * self-loop, then the cascades tear down everything else.
+ * sr_tournaments, but champion_team_id points back to sr_teams. Clear it
+ * while moving out of completed status in the SAME update: a completed
+ * tournament without a champion violates the database CHECK constraint.
  */
 export async function deleteTournament(tournamentId: string): Promise<void> {
   await requireAdmin();
   const slug = await withTransaction(async (client) => {
     const { rows } = await client.sql`
-      UPDATE sr_tournaments SET champion_team_id = NULL
-      WHERE id = ${tournamentId} AND champion_team_id IS NOT NULL
+      UPDATE sr_tournaments SET status = 'archived', champion_team_id = NULL
+      WHERE id = ${tournamentId}
       RETURNING slug
     `;
-    if (rows.length === 0) {
-      // Either unknown id or nothing to unlink — confirm existence either way.
-      const { rows: exists } = await client.sql`
-        SELECT slug FROM sr_tournaments WHERE id = ${tournamentId}
-      `;
-      if (exists.length === 0) throw new Error("Tournament not found.");
-    }
+    if (rows.length === 0) throw new Error("Tournament not found.");
     await client.sql`
       DELETE FROM sr_tournaments WHERE id = ${tournamentId}
     `;
-    return rows[0]?.slug;
+    return rows[0].slug as string;
   });
   // Audit rows cascade away with the tournament, so there is no audit entry
   // possible here — the delete is the audit trail's own deletion.

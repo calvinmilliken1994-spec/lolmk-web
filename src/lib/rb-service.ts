@@ -132,6 +132,8 @@ export interface RbStore {
 
   insertTournament(t: RbTournament): Promise<void>;
   updateTournament(tournamentId: string, patch: RbTournamentPatch): Promise<void>;
+  /** Explicit hard deletion while the caller holds the tournament/state locks. */
+  deleteTournament(tournamentId: string): Promise<void>;
   insertPlayer(p: RbPlayer): Promise<void>;
   updatePlayer(tournamentId: string, playerId: string, patch: RbPlayerPatch): Promise<void>;
   deletePlayer(tournamentId: string, playerId: string): Promise<void>;
@@ -1335,6 +1337,12 @@ export async function completeEvent(ctx: RbContext, input: { tournamentId: strin
   await audit(ctx, t, "tournament.complete", { championId });
   await followPhase(ctx, t, "champion");
   return { championId };
+}
+
+/** Permanent cleanup of test events. No audit can survive its own event deletion. */
+export async function deleteEvent(ctx: RbContext, input: { tournamentId: string }): Promise<void> {
+  const { t } = await lockState(ctx, input.tournamentId);
+  await ctx.store.deleteTournament(t.id);
 }
 
 export async function archiveEvent(ctx: RbContext, input: { tournamentId: string }): Promise<void> {

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { isToolsSession } from "@/lib/tools-auth";
+import { notFound } from "next/navigation";
 import { getMayhemVenueState } from "@/lib/mayhem-db";
 import { MayhemLiveScreen } from "@/components/mayhem/mayhem-live-screen";
 import { mayhemParseScene } from "@/components/mayhem/mayhem-deck-model";
@@ -10,7 +12,7 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 
-type Query = { scene?: string; preview?: string };
+type Query = { t?: string; scene?: string; preview?: string };
 
 /**
  * `?scene=<id>&preview=1` renders that scene over the live data instead of
@@ -21,6 +23,9 @@ type Query = { scene?: string; preview?: string };
 export default async function MayhemLivePage({ searchParams }: { searchParams: Promise<Query> }) {
   const q = await searchParams;
   const sceneOverride = q.preview === "1" ? mayhemParseScene(q.scene) : null;
-  const data = await getMayhemVenueState();
-  return <MayhemLiveScreen initial={data} sceneOverride={sceneOverride} />;
+  const preview = q.preview === "1";
+  if (preview && !await isToolsSession()) notFound();
+  const data = await getMayhemVenueState(q.t, preview).catch(() => null);
+  if (!data) return <p className="container-wide py-20 text-ink-muted">No public tournament is available.</p>;
+  return <MayhemLiveScreen key={data.event.id} initial={data} sceneOverride={sceneOverride} preview={preview} />;
 }

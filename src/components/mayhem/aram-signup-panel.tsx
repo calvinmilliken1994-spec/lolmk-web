@@ -5,6 +5,7 @@ import { Check, Crown, Loader2, Mail, Search, Shield, UserPlus, Users, X } from 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import type { MayhemSelection } from "@/lib/mayhem-operation";
 import type { MayhemTeamFormat } from "@/types/mayhem";
 import {
   joinMayhemAsMember,
@@ -42,15 +43,17 @@ type ActionResult = { ok: true } | { ok: false; reason: string } | { ok: true; a
  * nicety, not a security boundary.
  */
 export function AramSignupPanel({
+  selection,
   teamFormat,
   registrationOpen,
   member,
 }: {
+  selection: MayhemSelection;
   teamFormat: MayhemTeamFormat;
   registrationOpen: boolean;
   member: MemberIdentity | null;
 }) {
-  const [generation, setGeneration] = useState<number | null>(null);
+  const generation = selection.generation;
   const [soloStatus, setSoloStatus] = useState<"loading" | "none" | "joined">("loading");
   const [application, setApplication] = useState<ApplicationData>(null);
   const [pending, startTransition] = useTransition();
@@ -69,18 +72,17 @@ export function AramSignupPanel({
     }
     (async () => {
       const [solo, app] = await Promise.all([
-        getMySoloSignupStatus().catch(() => null),
-        getMyPremadeApplication().catch(() => null),
+        getMySoloSignupStatus(selection).catch(() => null),
+        getMyPremadeApplication(selection).catch(() => null),
       ]);
       if (cancelled) return;
-      setGeneration(solo?.registrationGeneration ?? app?.registrationGeneration ?? null);
       setSoloStatus(solo?.joined ? "joined" : "none");
       setApplication(app);
     })();
     return () => {
       cancelled = true;
     };
-  }, [member, refreshTick]);
+  }, [member, refreshTick, selection]);
 
   function run(fn: () => Promise<ActionResult>) {
     setError(null);
@@ -116,7 +118,7 @@ export function AramSignupPanel({
           </p>
         </div>
         <a
-          href={`/api/auth/member/login?next=${encodeURIComponent("/tournaments/aram")}`}
+          href={`/api/auth/member/login?next=${encodeURIComponent(`/tournaments/aram?t=${encodeURIComponent(selection.eventId)}`)}`}
           className="inline-flex items-center gap-2 border border-line-strong px-5 py-2.5 text-body-sm font-semibold text-ink hover:border-brand-red"
         >
           Sign in with Discord
@@ -152,7 +154,7 @@ export function AramSignupPanel({
                 <span className="inline-flex items-center gap-1.5 text-body-sm text-success">
                   <Check className="h-4 w-4" /> You&apos;re signed up
                 </span>
-                <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => leaveMayhemAsMember())}>
+                <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => leaveMayhemAsMember(selection))}>
                   Leave
                 </Button>
               </div>
@@ -160,7 +162,7 @@ export function AramSignupPanel({
               <Button
                 size="sm"
                 disabled={pending || generation === null || Boolean(application)}
-                onClick={() => generation !== null && run(() => joinMayhemAsMember(generation))}
+                onClick={() => generation !== null && run(() => joinMayhemAsMember(selection, generation))}
               >
                 Sign up solo
               </Button>
@@ -170,6 +172,7 @@ export function AramSignupPanel({
 
         {acceptsPremade && (
           <PremadeSignup
+            selection={selection}
             application={application}
             generation={generation}
             pending={pending}
@@ -183,12 +186,14 @@ export function AramSignupPanel({
 }
 
 function PremadeSignup({
+  selection,
   application,
   generation,
   pending,
   run,
   hasSoloSignup,
 }: {
+  selection: MayhemSelection;
   application: ApplicationData;
   generation: number | null;
   pending: boolean;
@@ -220,13 +225,13 @@ function PremadeSignup({
           <Button
             size="sm"
             disabled={pending || generation === null || !teamName.trim() || hasSoloSignup}
-            onClick={() => generation !== null && run(() => createPremadeApplication(teamName.trim(), generation))}
+            onClick={() => generation !== null && run(() => createPremadeApplication(selection, teamName.trim(), generation))}
           >
             Create team
           </Button>
         </div>
       ) : (
-        <ApplicationCard application={application} pending={pending} run={run} />
+        <ApplicationCard selection={selection} application={application} pending={pending} run={run} />
       )}
       {hasSoloSignup && !application && (
         <p className="text-caption text-ink-muted">Leave your solo signup first to start a premade team.</p>
@@ -236,10 +241,12 @@ function PremadeSignup({
 }
 
 function ApplicationCard({
+  selection,
   application,
   pending,
   run,
 }: {
+  selection: MayhemSelection;
   application: NonNullable<ApplicationData>;
   pending: boolean;
   run: (fn: () => Promise<ActionResult>) => void;
@@ -259,7 +266,7 @@ function ApplicationCard({
 
   function handleSend() {
     run(async () => {
-      const result = await sendApplicationInvites(application.id);
+      const result = await sendApplicationInvites(selection, application.id);
       if (!result.ok) return result;
       const links: Record<string, { displayName: string; url: string }> = {};
       for (const r of result.results) {
@@ -272,7 +279,7 @@ function ApplicationCard({
 
   function handleRetry(slotId: string) {
     run(async () => {
-      const result = await retryInviteDelivery(application.id, slotId);
+      const result = await retryInviteDelivery(selection, application.id, slotId);
       if (!result.ok) return result;
       if (result.manualLink) {
         setManualLinks((prev) => ({
@@ -291,7 +298,7 @@ function ApplicationCard({
   }
 
   function handleAdd(discordUserId: string) {
-    run(() => addDraftMember(application.id, discordUserId));
+    run(() => addDraftMember(selection, application.id, discordUserId));
   }
 
   return (
@@ -321,7 +328,7 @@ function ApplicationCard({
                   <button
                     aria-label="Remove from roster"
                     disabled={pending}
-                    onClick={() => run(() => withdrawApplicationSlot(application.id, slot.id))}
+                    onClick={() => run(() => withdrawApplicationSlot(selection, application.id, slot.id))}
                     className="text-ink-muted hover:text-danger"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -372,7 +379,7 @@ function ApplicationCard({
         </Button>
       )}
 
-      <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => withdrawApplication(application.id))}>
+      <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => withdrawApplication(selection, application.id))}>
         Withdraw team
       </Button>
     </div>

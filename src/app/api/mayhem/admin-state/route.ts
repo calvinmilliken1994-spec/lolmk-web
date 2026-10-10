@@ -14,10 +14,14 @@ export const dynamic = "force-dynamic";
  * Never cached (no-store) since it reflects live
  * roster/team state the admin is actively acting on.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const signedIn = await isToolsSession();
   if (!signedIn) return NextResponse.json({ error: "Not authorized." }, { status: 401 });
-  const [full, audit] = await Promise.all([getMayhemFull(), listMayhemAudit()]);
+  const t = new URL(request.url).searchParams.get("t");
+  if (!t) return NextResponse.json({ error: "Select a tournament." }, { status: 400 });
+  const full = await getMayhemFull(t).catch(() => null);
+  if (!full) return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
+  const audit = await listMayhemAudit(t);
   const data: MayhemAdminState = { ...full, audit };
   return NextResponse.json(data, { headers: { "Cache-Control": "no-store" } });
 }

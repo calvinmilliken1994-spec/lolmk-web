@@ -3,10 +3,10 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Archive, ArrowLeft, ArrowRight, Loader2, Plus, Trophy } from "lucide-react";
+import { Archive, ArrowLeft, ArrowRight, Loader2, Plus, Trash2, Trophy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { archiveEvent, createTournament } from "@/app/tools/riftbound/actions";
+import { archiveEvent, createTournament, deleteEvent } from "@/app/tools/riftbound/actions";
 import { ErrorBanner, Field, inputClass } from "@/components/sr/sr-shared";
 import type { RbTournament, RbTournamentStatus } from "@/types/riftbound";
 import { rbFormatDate } from "./rb-setup-model";
@@ -36,15 +36,16 @@ function RbStatusBadge({ status }: { status: RbTournamentStatus }) {
 }
 
 /**
- * /tools/riftbound: the list of Riftbound events plus Create. Follows
- * SrAdminList (src/components/sr/sr-admin-list.tsx); there is no Delete,
- * because records are kept for appeals (see rb-db.ts), only Archive.
+ * /tools/riftbound: create, archive for retained history, or explicitly
+ * delete a test event and all its records after a permanent-delete warning.
  */
 export function RbAdminList({ tournaments }: { tournaments: RbTournament[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const visible = tournaments.filter((t) => showArchived || t.status !== "archived");
 
   const run = (fn: () => Promise<{ ok: true; data: unknown } | { ok: false; error: string }>, onDone?: () => void) => {
     setError(null);
@@ -80,6 +81,10 @@ export function RbAdminList({ tournaments }: { tournaments: RbTournament[] }) {
 
       <main className="container-wide space-y-6 py-8">
         <ErrorBanner error={error} onDismiss={() => setError(null)} />
+        <label className="inline-flex items-center gap-2 text-body-sm text-ink-muted">
+          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+          Show archived tournaments
+        </label>
 
         {creating && (
           <CreateForm
@@ -100,17 +105,17 @@ export function RbAdminList({ tournaments }: { tournaments: RbTournament[] }) {
           />
         )}
 
-        {tournaments.length === 0 ? (
+        {visible.length === 0 ? (
           <div className="flex flex-col items-center gap-3 border border-dashed border-line-strong bg-surface p-12 text-center">
             <Trophy strokeWidth={1} className="h-12 w-12 text-ink-muted opacity-40" />
-            <p className="font-heading text-heading-lg text-ink">No Riftbound events yet.</p>
+            <p className="font-heading text-heading-lg text-ink">No {showArchived ? "Riftbound" : "active Riftbound"} events.</p>
             <p className="max-w-md text-body-sm text-ink-secondary">
               Create one to set up the format, add players and open check-in. Nothing is public until check-in opens.
             </p>
           </div>
         ) : (
           <ul className="divide-y divide-line-subtle border border-line bg-surface">
-            {tournaments.map((t) => (
+            {visible.map((t) => (
               <li key={t.id} className="flex flex-wrap items-center gap-4 px-5 py-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-3">
@@ -129,6 +134,18 @@ export function RbAdminList({ tournaments }: { tournaments: RbTournament[] }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => {
+                      if (!confirm(`DELETE "${t.name}" permanently?\n\nThis removes every player, round, match, audit entry and Hall of Champions record. This cannot be undone. Archive instead to retain the tournament history.`)) return;
+                      run(() => deleteEvent(t.id), () => router.refresh());
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-sm border border-line px-3 py-1.5 text-body-sm text-ink-muted hover:border-brand-red hover:text-brand-red disabled:opacity-40"
+                  >
+                    <Trash2 strokeWidth={1.75} className="h-4 w-4" />
+                    Delete
+                  </button>
                   {(t.status === "completed" || t.status === "draft") && (
                     <button
                       type="button"

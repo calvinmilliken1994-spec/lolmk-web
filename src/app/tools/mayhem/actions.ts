@@ -1,10 +1,11 @@
 "use server";
 
-import { sql, type VercelPoolClient } from "@vercel/postgres";
+import { sql as pool, type VercelPoolClient } from "@vercel/postgres";
+import { mayhemSql as sql, selectedMayhemId, selectedMayhemSelection, runMayhemSelection, withMayhemLock as withEventLock, MayhemSelectionError, type MayhemSelection } from "@/lib/mayhem-operation";
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "node:crypto";
 import { getCurrentAdmin, isToolsSession } from "@/lib/tools-auth";
-import { ensureSchema, getMayhemFull, newId, SINGLETON_EVENT_ID, writeMayhemAudit } from "@/lib/mayhem-db";
+import { ensureSchema, getMayhemFull, newId, writeMayhemAudit } from "@/lib/mayhem-db";
 import { isRevealStarted, REVEAL_LOCKED_MESSAGE } from "@/lib/mayhem-reveal";
 import { pickTeamIdentities, shuffle } from "@/lib/mayhem-icons";
 import { buildKnockoutBracket } from "@/lib/mayhem-bracket";
@@ -15,7 +16,7 @@ import {
 } from "@/lib/bracket-engine";
 import { buildGroupRoundRobin, computeGroupStandings } from "@/lib/mayhem-groups";
 import type { MayhemActor, MayhemFormatConfig, MayhemScene, MayhemTeamFormat } from "@/types/mayhem";
-import { PREMADE_ROSTER_SIZE } from "@/types/mayhem";
+import { DEFAULT_FORMAT_CONFIG, PREMADE_ROSTER_SIZE } from "@/types/mayhem";
 
 /**
  * Every admin action starts here: a tools session, and the acting admin
@@ -31,12 +32,13 @@ async function requireAdmin(): Promise<MayhemActor> {
 }
 
 function touch() {
-  return sql`UPDATE mayhem_events SET updated_at = now() WHERE id = ${SINGLETON_EVENT_ID}`;
+  return sql`UPDATE mayhem_events SET updated_at = now() WHERE id = ${selectedMayhemId()}`;
 }
 
 function refresh() {
   revalidatePath("/tools/mayhem");
   revalidatePath("/mayhemlive");
+  revalidatePath("/tournaments/aram");
 }
 
 async function persistMayhemBracket(matches: BracketMatch[]): Promise<void> {
@@ -53,31 +55,9 @@ async function persistMayhemBracket(matches: BracketMatch[]): Promise<void> {
         match.team_b_score,
         match.winner_id,
         match.status,
-        SINGLETON_EVENT_ID,
+        selectedMayhemId(),
       ],
     );
-  }
-}
-
-async function withEventLock<T>(fn: (client: VercelPoolClient) => Promise<T>): Promise<T> {
-  const client = await sql.connect();
-  try {
-    await client.query("BEGIN");
-    // Serializes every mutation that touches this event's roster/teams —
-    // bulk import, single add, self-join, team create/join, randomize,
-    // reset, and registration open/close all take this same row lock, so
-    // two concurrent requests (e.g. two admins pasting a list at once, or
-    // a 20th and 21st self-join landing together) can't both read a
-    // stale MAX(entry_order)/player-count and then both insert.
-    await client.query(`SELECT id FROM mayhem_events WHERE id = $1 FOR UPDATE`, [SINGLETON_EVENT_ID]);
-    const result = await fn(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (e) {
-    await client.query("ROLLBACK").catch(() => {});
-    throw e;
-  } finally {
-    client.release();
   }
 }
 
@@ -85,28 +65,28 @@ async function withEventLock<T>(fn: (client: VercelPoolClient) => Promise<T>): P
 // Players
 // ---------------------------------------------------------------------------
 
-export async function addPlayer(displayName: string) {
+async function addPlayerImpl(displayName: string) {
   const actor = await requireAdmin();
   const name = displayName.trim();
   if (!name) return;
   await withEventLock(async (client) => {
     const { rows: modeRows } = await client.query(
       `SELECT team_format FROM mayhem_events WHERE id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     if (modeRows[0]?.team_format === "premade") {
       throw new Error("This event uses premade team signups — add players through a team, not solo.");
     }
     const { rows } = await client.query(
       `SELECT COALESCE(MAX(entry_order), -1) + 1 AS next FROM mayhem_players WHERE event_id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     await client.query(
       `INSERT INTO mayhem_players (id, event_id, display_name, entry_order, team_id, member_discord_id)
        VALUES ($1, $2, $3, $4, NULL, NULL)`,
-      [newId("player"), SINGLETON_EVENT_ID, name, rows[0].next],
+      [newId("player"), selectedMayhemId(), name, rows[0].next],
     );
-    await writeMayhemAudit(actor, "player.add", { name }, client);
+    await writeMayhemAudit(selectedMayhemId(), actor, "player.add", { name }, client);
   });
   await touch();
   refresh();
@@ -135,7 +115,7 @@ export interface BulkAddResult {
  * one atomic batch: either every non-duplicate name lands, or (on an
  * unexpected failure) none of it does.
  */
-export async function bulkAddPlayers(rawText: string): Promise<BulkAddResult> {
+async function bulkAddPlayersImpl(rawText: string): Promise<BulkAddResult> {
   const actor = await requireAdmin();
   if (typeof rawText !== "string") throw new Error("Invalid input.");
   if (rawText.length > MAX_BULK_TEXT_LENGTH) {
@@ -150,7 +130,7 @@ export async function bulkAddPlayers(rawText: string): Promise<BulkAddResult> {
   return withEventLock(async (client) => {
     const { rows: modeRows } = await client.query(
       `SELECT team_format FROM mayhem_events WHERE id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     if (modeRows[0]?.team_format === "premade") {
       throw new Error("This event uses premade team signups — bulk-add doesn't apply.");
@@ -158,12 +138,12 @@ export async function bulkAddPlayers(rawText: string): Promise<BulkAddResult> {
 
     const { rows: existingRows } = await client.query(
       `SELECT display_name FROM mayhem_players WHERE event_id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     const existingLower = new Set(existingRows.map((r) => (r.display_name as string).toLowerCase()));
     const { rows: startRows } = await client.query(
       `SELECT COALESCE(MAX(entry_order), -1) + 1 AS next FROM mayhem_players WHERE event_id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     let nextOrder = startRows[0].next as number;
 
@@ -188,14 +168,14 @@ export async function bulkAddPlayers(rawText: string): Promise<BulkAddResult> {
       await client.query(
         `INSERT INTO mayhem_players (id, event_id, display_name, entry_order, team_id, member_discord_id)
          VALUES ($1, $2, $3, $4, NULL, NULL)`,
-        [newId("player"), SINGLETON_EVENT_ID, line, nextOrder++],
+        [newId("player"), selectedMayhemId(), line, nextOrder++],
       );
       result.added++;
     }
 
     if (result.added > 0) {
-      await client.query(`UPDATE mayhem_events SET updated_at = now() WHERE id = $1`, [SINGLETON_EVENT_ID]);
-      await writeMayhemAudit(
+      await client.query(`UPDATE mayhem_events SET updated_at = now() WHERE id = $1`, [selectedMayhemId()]);
+      await writeMayhemAudit(selectedMayhemId(),
         actor,
         "player.bulk_add",
         { added: result.added, skippedDuplicate: result.skippedDuplicate, skippedTooLong: result.skippedTooLong },
@@ -210,26 +190,26 @@ export async function bulkAddPlayers(rawText: string): Promise<BulkAddResult> {
   });
 }
 
-export async function removePlayer(playerId: string) {
+async function removePlayerImpl(playerId: string) {
   const actor = await requireAdmin();
   const { rows } = await sql`
-    DELETE FROM mayhem_players WHERE id = ${playerId} AND event_id = ${SINGLETON_EVENT_ID}
+    DELETE FROM mayhem_players WHERE id = ${playerId} AND event_id = ${selectedMayhemId()}
     RETURNING display_name
   `;
-  if (rows.length > 0) await writeMayhemAudit(actor, "player.remove", { playerId, name: rows[0].display_name });
+  if (rows.length > 0) await writeMayhemAudit(selectedMayhemId(), actor, "player.remove", { playerId, name: rows[0].display_name });
   await touch();
   refresh();
 }
 
-export async function renamePlayer(playerId: string, displayName: string) {
+async function renamePlayerImpl(playerId: string, displayName: string) {
   const actor = await requireAdmin();
   const name = displayName.trim();
   if (!name) return;
   await sql`
     UPDATE mayhem_players SET display_name = ${name}
-    WHERE id = ${playerId} AND event_id = ${SINGLETON_EVENT_ID}
+    WHERE id = ${playerId} AND event_id = ${selectedMayhemId()}
   `;
-  await writeMayhemAudit(actor, "player.rename", { playerId, name });
+  await writeMayhemAudit(selectedMayhemId(), actor, "player.rename", { playerId, name });
   await touch();
   refresh();
 }
@@ -244,9 +224,9 @@ export async function renamePlayer(playerId: string, displayName: string) {
  * server-picked default at creation; overwriting either here would stomp a
  * real team identity, not fix a generic placeholder.
  */
-export async function refreshTeamIdentities() {
+async function refreshTeamIdentitiesImpl() {
   const actor = await requireAdmin();
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   if (
     isRevealStarted({
       stage: full.event.stage,
@@ -269,23 +249,23 @@ export async function refreshTeamIdentities() {
       WHERE id = ${orderedTeams[i].id}
     `;
   }
-  await writeMayhemAudit(actor, "teams.refresh_identities", { teams: orderedTeams.length });
+  await writeMayhemAudit(selectedMayhemId(), actor, "teams.refresh_identities", { teams: orderedTeams.length });
   await touch();
   refresh();
 }
 
-export async function clearAllPlayers() {
+async function clearAllPlayersImpl() {
   const actor = await requireAdmin();
   await withEventLock(async (client) => {
-    await client.query(`DELETE FROM mayhem_matches WHERE event_id = $1`, [SINGLETON_EVENT_ID]);
-    await client.query(`DELETE FROM mayhem_teams WHERE event_id = $1`, [SINGLETON_EVENT_ID]);
-    await client.query(`DELETE FROM mayhem_groups WHERE event_id = $1`, [SINGLETON_EVENT_ID]);
-    await client.query(`DELETE FROM mayhem_players WHERE event_id = $1`, [SINGLETON_EVENT_ID]);
+    await client.query(`DELETE FROM mayhem_matches WHERE event_id = $1`, [selectedMayhemId()]);
+    await client.query(`DELETE FROM mayhem_teams WHERE event_id = $1`, [selectedMayhemId()]);
+    await client.query(`DELETE FROM mayhem_groups WHERE event_id = $1`, [selectedMayhemId()]);
+    await client.query(`DELETE FROM mayhem_players WHERE event_id = $1`, [selectedMayhemId()]);
     // Pending applications/invites are scoped to a registration_generation —
     // a reset must not leave them reachable against the fresh generation.
     await client.query(
       `DELETE FROM mayhem_team_applications WHERE event_id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     // Bumping registration_generation invalidates any invite link/session
     // holding the old generation number — see joinTeam()/createPremadeTeam()
@@ -300,9 +280,9 @@ export async function clearAllPlayers() {
            active_match_id = NULL, champion_team_id = NULL, countdown_ends_at = NULL,
            registration_open = false, registration_generation = registration_generation + 1
        WHERE id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
-    await writeMayhemAudit(actor, "event.reset", {}, client);
+    await writeMayhemAudit(selectedMayhemId(), actor, "event.reset", {}, client);
   });
   refresh();
 }
@@ -317,7 +297,7 @@ export async function clearAllPlayers() {
  * decision, changing formats mid-signup must go through Reset everything
  * first, never a silent format-preserving wipe of just the roster.
  */
-export async function setTeamFormat(format: MayhemTeamFormat) {
+async function setTeamFormatImpl(format: MayhemTeamFormat) {
   const actor = await requireAdmin();
   await withEventLock(async (client) => {
     const { rows: countRows } = await client.query(
@@ -325,7 +305,7 @@ export async function setTeamFormat(format: MayhemTeamFormat) {
          (SELECT count(*) FROM mayhem_players WHERE event_id = $1) AS players,
          (SELECT count(*) FROM mayhem_teams WHERE event_id = $1) AS teams,
          (SELECT count(*) FROM mayhem_team_applications WHERE event_id = $1) AS applications`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     const players = Number(countRows[0].players);
     const teams = Number(countRows[0].teams);
@@ -333,8 +313,8 @@ export async function setTeamFormat(format: MayhemTeamFormat) {
     if (players > 0 || teams > 0 || applications > 0) {
       throw new Error("Can't change team format with players, teams, or pending applications already registered. Reset everything first.");
     }
-    await client.query(`UPDATE mayhem_events SET team_format = $1 WHERE id = $2`, [format, SINGLETON_EVENT_ID]);
-    await writeMayhemAudit(actor, "event.team_format", { format }, client);
+    await client.query(`UPDATE mayhem_events SET team_format = $1 WHERE id = $2`, [format, selectedMayhemId()]);
+    await writeMayhemAudit(selectedMayhemId(), actor, "event.team_format", { format }, client);
   });
   refresh();
 }
@@ -346,17 +326,17 @@ export async function setTeamFormat(format: MayhemTeamFormat) {
  * while still collecting entrants; closing is always allowed (e.g. to cut
  * off signups right before randomizing, even mid-stage).
  */
-export async function setRegistrationOpen(open: boolean) {
+async function setRegistrationOpenImpl(open: boolean) {
   const actor = await requireAdmin();
   await withEventLock(async (client) => {
     if (open) {
-      const { rows } = await client.query(`SELECT stage FROM mayhem_events WHERE id = $1`, [SINGLETON_EVENT_ID]);
+      const { rows } = await client.query(`SELECT stage FROM mayhem_events WHERE id = $1`, [selectedMayhemId()]);
       if (rows[0]?.stage !== "collecting") {
         throw new Error("Registration can only be opened while still collecting entrants.");
       }
     }
-    await client.query(`UPDATE mayhem_events SET registration_open = $1 WHERE id = $2`, [open, SINGLETON_EVENT_ID]);
-    await writeMayhemAudit(actor, open ? "registration.open" : "registration.close", {}, client);
+    await client.query(`UPDATE mayhem_events SET registration_open = $1 WHERE id = $2`, [open, selectedMayhemId()]);
+    await writeMayhemAudit(selectedMayhemId(), actor, open ? "registration.open" : "registration.close", {}, client);
   });
   refresh();
 }
@@ -381,7 +361,7 @@ export async function setRegistrationOpen(open: boolean) {
  *     both tables so nobody double-registers via the two different paths
  *     "mixed" mode exposes at once).
  */
-export async function joinMayhemAsMember(
+async function joinMayhemAsMemberImpl(
   expectedGeneration: number,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const { getMemberSession } = await import("@/lib/discord-auth");
@@ -393,7 +373,7 @@ export async function joinMayhemAsMember(
     return await withEventLock(async (client) => {
       const { rows: eventRows } = await client.query(
         `SELECT team_format, registration_open, stage, registration_generation FROM mayhem_events WHERE id = $1`,
-        [SINGLETON_EVENT_ID],
+        [selectedMayhemId()],
       );
       const ev = eventRows[0];
       if (!ev) return { ok: false, reason: "No tournament is set up right now." };
@@ -409,7 +389,7 @@ export async function joinMayhemAsMember(
 
       const { rows: existing } = await client.query(
         `SELECT id FROM mayhem_players WHERE event_id = $1 AND member_discord_id = $2`,
-        [SINGLETON_EVENT_ID, member.discordUserId],
+        [selectedMayhemId(), member.discordUserId],
       );
       if (existing.length > 0) return { ok: false, reason: "You're already signed up." };
 
@@ -417,7 +397,7 @@ export async function joinMayhemAsMember(
         `SELECT s.id FROM mayhem_team_application_slots s
          JOIN mayhem_team_applications a ON a.id = s.application_id
          WHERE a.event_id = $1 AND s.member_discord_id = $2 AND s.status IN ('pending','confirmed')`,
-        [SINGLETON_EVENT_ID, member.discordUserId],
+        [selectedMayhemId(), member.discordUserId],
       );
       if (applied.length > 0) {
         return { ok: false, reason: "You already have a pending or confirmed premade team application." };
@@ -425,12 +405,12 @@ export async function joinMayhemAsMember(
 
       const { rows: orderRows } = await client.query(
         `SELECT COALESCE(MAX(entry_order), -1) + 1 AS next FROM mayhem_players WHERE event_id = $1`,
-        [SINGLETON_EVENT_ID],
+        [selectedMayhemId()],
       );
       await client.query(
         `INSERT INTO mayhem_players (id, event_id, display_name, entry_order, team_id, member_discord_id)
          VALUES ($1, $2, $3, $4, NULL, $5)`,
-        [newId("player"), SINGLETON_EVENT_ID, member.displayName, orderRows[0].next, member.discordUserId],
+        [newId("player"), selectedMayhemId(), member.displayName, orderRows[0].next, member.discordUserId],
       );
       return { ok: true };
     });
@@ -440,7 +420,7 @@ export async function joinMayhemAsMember(
 }
 
 /** Lets a verified member withdraw their own self-joined entry (not admin-added/guest rows, not teammates'). */
-export async function leaveMayhemAsMember(): Promise<{ ok: true } | { ok: false; reason: string }> {
+async function leaveMayhemAsMemberImpl(): Promise<{ ok: true } | { ok: false; reason: string }> {
   const { getMemberSession } = await import("@/lib/discord-auth");
   const member = await getMemberSession();
   if (!member) return { ok: false, reason: "You need to sign in with a verified Discord account first." };
@@ -450,7 +430,7 @@ export async function leaveMayhemAsMember(): Promise<{ ok: true } | { ok: false;
     return await withEventLock(async (client) => {
       const { rows } = await client.query(
         `SELECT id, team_id FROM mayhem_players WHERE event_id = $1 AND member_discord_id = $2`,
-        [SINGLETON_EVENT_ID, member.discordUserId],
+        [selectedMayhemId(), member.discordUserId],
       );
       if (rows.length === 0) return { ok: false, reason: "You're not signed up." };
       if (rows[0].team_id) {
@@ -465,21 +445,21 @@ export async function leaveMayhemAsMember(): Promise<{ ok: true } | { ok: false;
 }
 
 /** Read-only: has the signed-in member self-joined a solo slot (not a premade roster) for this event? A promoted premade teammate also has a mayhem_players row (team_id set) — that's a different registration state, not a "solo" signup, so it's excluded here explicitly rather than conflating the two. */
-export async function getMySoloSignupStatus(): Promise<{ joined: boolean; registrationGeneration: number } | null> {
+async function getMySoloSignupStatusImpl(): Promise<{ joined: boolean; registrationGeneration: number } | null> {
   const { getMemberSession } = await import("@/lib/discord-auth");
   const member = await getMemberSession();
   if (!member) return null;
   await ensureSchema();
-  const { rows: eventRows } = await sql`SELECT registration_generation FROM mayhem_events WHERE id = ${SINGLETON_EVENT_ID}`;
+  const { rows: eventRows } = await sql`SELECT registration_generation FROM mayhem_events WHERE id = ${selectedMayhemId()}`;
   const { rows } = await sql`
     SELECT id FROM mayhem_players
-    WHERE event_id = ${SINGLETON_EVENT_ID} AND member_discord_id = ${member.discordUserId} AND team_id IS NULL
+    WHERE event_id = ${selectedMayhemId()} AND member_discord_id = ${member.discordUserId} AND team_id IS NULL
   `;
   return { joined: rows.length > 0, registrationGeneration: eventRows[0]?.registration_generation ?? 0 };
 }
 
 /** Read-only: the signed-in member's own in-progress premade application (as captain) — a slot, not a team, so no roster leaks to anyone but the captain and (elsewhere) each invited member's own slot. */
-export async function getMyPremadeApplication(): Promise<
+async function getMyPremadeApplicationImpl(): Promise<
   { id: string; teamName: string; registrationGeneration: number; slots: PremadeApplicationSlotView[] } | null
 > {
   const { getMemberSession } = await import("@/lib/discord-auth");
@@ -488,7 +468,7 @@ export async function getMyPremadeApplication(): Promise<
   await ensureSchema();
   const { rows: appRows } = await sql`
     SELECT id, team_name, registration_generation FROM mayhem_team_applications
-    WHERE event_id = ${SINGLETON_EVENT_ID} AND captain_discord_id = ${member.discordUserId}
+    WHERE event_id = ${selectedMayhemId()} AND captain_discord_id = ${member.discordUserId}
   `;
   if (appRows.length === 0) return null;
   const app = appRows[0];
@@ -555,7 +535,7 @@ async function isDiscordIdReserved(
 ): Promise<boolean> {
   const { rows: playerRows } = await client.query(
     `SELECT id FROM mayhem_players WHERE event_id = $1 AND member_discord_id = $2`,
-    [SINGLETON_EVENT_ID, discordUserId],
+    [selectedMayhemId(), discordUserId],
   );
   if (playerRows.length > 0) return true;
   // Expired pending invites must not reserve a person forever — an
@@ -573,7 +553,7 @@ async function isDiscordIdReserved(
          OR (s.status = 'pending' AND (s.confirm_token_expires_at IS NULL OR s.confirm_token_expires_at > now()))
        )
        AND ($3::text IS NULL OR s.id != $3)`,
-    [SINGLETON_EVENT_ID, discordUserId, excludeSlotId ?? null],
+    [selectedMayhemId(), discordUserId, excludeSlotId ?? null],
   );
   return slotRows.length > 0;
 }
@@ -603,7 +583,7 @@ export interface PremadeApplicationView {
  * an application is not a team until every slot confirms (see
  * confirmApplicationSlot()'s promotion logic).
  */
-export async function createPremadeApplication(
+async function createPremadeApplicationImpl(
   teamName: string,
   expectedGeneration: number,
 ): Promise<{ ok: true; applicationId: string } | { ok: false; reason: string }> {
@@ -619,7 +599,7 @@ export async function createPremadeApplication(
     return await withEventLock(async (client) => {
       const { rows: eventRows } = await client.query(
         `SELECT team_format, registration_open, stage, registration_generation FROM mayhem_events WHERE id = $1`,
-        [SINGLETON_EVENT_ID],
+        [selectedMayhemId()],
       );
       const ev = eventRows[0];
       if (!ev) return { ok: false, reason: "No tournament is set up right now." };
@@ -638,7 +618,7 @@ export async function createPremadeApplication(
       }
       const { rows: existingApp } = await client.query(
         `SELECT id FROM mayhem_team_applications WHERE event_id = $1 AND captain_discord_id = $2`,
-        [SINGLETON_EVENT_ID, member.discordUserId],
+        [selectedMayhemId(), member.discordUserId],
       );
       if (existingApp.length > 0) {
         return { ok: false, reason: "You already have an application in progress. Withdraw it first to start a new one." };
@@ -646,7 +626,7 @@ export async function createPremadeApplication(
       const { rows: existingTeamName } = await client.query(
         `SELECT id FROM mayhem_teams WHERE event_id = $1 AND lower(name) = lower($2)
          UNION SELECT id FROM mayhem_team_applications WHERE event_id = $1 AND lower(team_name) = lower($2)`,
-        [SINGLETON_EVENT_ID, name],
+        [selectedMayhemId(), name],
       );
       if (existingTeamName.length > 0) {
         return { ok: false, reason: "That team name is already taken for this event." };
@@ -656,7 +636,7 @@ export async function createPremadeApplication(
       await client.query(
         `INSERT INTO mayhem_team_applications (id, event_id, team_name, captain_discord_id, registration_generation)
          VALUES ($1, $2, $3, $4, $5)`,
-        [applicationId, SINGLETON_EVENT_ID, name, member.discordUserId, expectedGeneration],
+        [applicationId, selectedMayhemId(), name, member.discordUserId, expectedGeneration],
       );
       await client.query(
         `INSERT INTO mayhem_team_application_slots
@@ -691,7 +671,7 @@ function buildInviteMessage(teamName: string, captainName: string, url: string):
  * isDiscordIdReserved's doc comment) — only once sendApplicationInvites()
  * actually issues a token does the slot become 'pending' and reserving.
  */
-export async function addDraftMember(
+async function addDraftMemberImpl(
   applicationId: string,
   inviteeDiscordId: string,
 ): Promise<{ ok: true; slotId: string; displayName: string } | { ok: false; reason: string }> {
@@ -712,7 +692,7 @@ export async function addDraftMember(
         `SELECT a.id, a.captain_discord_id, a.send_in_progress, e.registration_open, e.stage
          FROM mayhem_team_applications a JOIN mayhem_events e ON e.id = a.event_id
          WHERE a.id = $1 AND a.event_id = $2`,
-        [applicationId, SINGLETON_EVENT_ID],
+        [applicationId, selectedMayhemId()],
       );
       if (appRows.length === 0) return { ok: false, reason: "Application not found." };
       if (appRows[0].captain_discord_id !== member.discordUserId) {
@@ -780,7 +760,7 @@ interface SendInviteResult {
  * individually as each DM resolves, so a partial failure (2 of 4 sent)
  * is never lost on refresh — the failed two show a Retry action.
  */
-export async function sendApplicationInvites(applicationId: string): Promise<
+async function sendApplicationInvitesImpl(applicationId: string): Promise<
   { ok: true; results: SendInviteResult[] } | { ok: false; reason: string }
 > {
   const { getMemberSession } = await import("@/lib/discord-auth");
@@ -797,7 +777,7 @@ export async function sendApplicationInvites(applicationId: string): Promise<
         `SELECT a.team_name, a.captain_discord_id, a.send_in_progress, e.registration_open, e.stage
          FROM mayhem_team_applications a JOIN mayhem_events e ON e.id = a.event_id
          WHERE a.id = $1 AND a.event_id = $2`,
-        [applicationId, SINGLETON_EVENT_ID],
+        [applicationId, selectedMayhemId()],
       );
       if (appRows.length === 0) return { ok: false, reason: "Application not found." };
       if (appRows[0].captain_discord_id !== member.discordUserId) {
@@ -874,7 +854,7 @@ export async function sendApplicationInvites(applicationId: string): Promise<
 
   const results: SendInviteResult[] = [];
   for (const item of prep.items) {
-    const url = `${trustedOrigin()}/tournaments/aram/confirm?slot=${item.slotId}&token=${encodeURIComponent(item.token)}`;
+    const url = `${trustedOrigin()}/tournaments/aram/confirm?t=${encodeURIComponent(selectedMayhemId())}&g=${selectedMayhemSelection().generation}&slot=${item.slotId}&token=${encodeURIComponent(item.token)}`;
     const content = buildInviteMessage(prep.teamName, member.displayName, url);
     const dm = await sendDirectMessage(item.discordUserId, content);
 
@@ -914,7 +894,7 @@ export async function sendApplicationInvites(applicationId: string): Promise<
  * and is rejected outright, no separate event lock needed since nothing
  * about roster shape/counts changes, only this slot's own delivery state.
  */
-export async function retryInviteDelivery(
+async function retryInviteDeliveryImpl(
   applicationId: string,
   slotId: string,
 ): Promise<{ ok: true; delivered: boolean; error?: string; manualLink?: string } | { ok: false; reason: string }> {
@@ -926,7 +906,7 @@ export async function retryInviteDelivery(
   const { rows: appRows } = await sql`
     SELECT a.captain_discord_id, a.team_name, e.registration_open, e.stage
     FROM mayhem_team_applications a JOIN mayhem_events e ON e.id = a.event_id
-    WHERE a.id = ${applicationId} AND a.event_id = ${SINGLETON_EVENT_ID}
+    WHERE a.id = ${applicationId} AND a.event_id = ${selectedMayhemId()}
   `;
   if (appRows.length === 0) return { ok: false, reason: "Application not found." };
   if (appRows[0].captain_discord_id !== member.discordUserId) {
@@ -952,7 +932,7 @@ export async function retryInviteDelivery(
 
   const { sendDirectMessage } = await import("@/lib/discord-bot");
   const { trustedOrigin } = await import("@/lib/discord-auth");
-  const url = `${trustedOrigin()}/tournaments/aram/confirm?slot=${slotId}&token=${encodeURIComponent(token)}`;
+  const url = `${trustedOrigin()}/tournaments/aram/confirm?t=${encodeURIComponent(selectedMayhemId())}&g=${selectedMayhemSelection().generation}&slot=${slotId}&token=${encodeURIComponent(token)}`;
   const content = buildInviteMessage(appRows[0].team_name, member.displayName, url);
   const dm = await sendDirectMessage(claimed[0].member_discord_id, content);
 
@@ -973,7 +953,7 @@ export async function retryInviteDelivery(
 }
 
 /** Captain removes an invite before it's been accepted. Confirmed slots (including the captain's own) can never be removed here — captain leaving/dissolving the team is a separate flow (leavePremadeTeam). */
-export async function withdrawApplicationSlot(
+async function withdrawApplicationSlotImpl(
   applicationId: string,
   slotId: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
@@ -988,7 +968,7 @@ export async function withdrawApplicationSlot(
         `SELECT a.captain_discord_id, e.registration_open, e.stage
          FROM mayhem_team_applications a JOIN mayhem_events e ON e.id = a.event_id
          WHERE a.id = $1 AND a.event_id = $2`,
-        [applicationId, SINGLETON_EVENT_ID],
+        [applicationId, selectedMayhemId()],
       );
       if (appRows.length === 0) return { ok: false, reason: "Application not found." };
       if (appRows[0].captain_discord_id !== member.discordUserId) {
@@ -1023,7 +1003,7 @@ export async function withdrawApplicationSlot(
  * application is either fully pending or fully promoted, never a
  * half-migrated state visible to any other query.
  */
-export async function confirmApplicationSlot(
+async function confirmApplicationSlotImpl(
   slotId: string,
   rawToken: string,
 ): Promise<{ ok: true; promoted: boolean } | { ok: false; reason: string }> {
@@ -1044,7 +1024,7 @@ export async function confirmApplicationSlot(
       );
       if (slotRows.length === 0) return { ok: false, reason: "Invite not found." };
       const slot = slotRows[0];
-      if (slot.event_id !== SINGLETON_EVENT_ID) return { ok: false, reason: "Invite not found." };
+      if (slot.event_id !== selectedMayhemId()) return { ok: false, reason: "Invite not found." };
       if (slot.member_discord_id !== member.discordUserId) {
         return { ok: false, reason: "This invite isn't addressed to your account." };
       }
@@ -1083,25 +1063,25 @@ export async function confirmApplicationSlot(
       );
       const { rows: teamCountRows } = await client.query(
         `SELECT count(*)::int AS c FROM mayhem_teams WHERE event_id = $1`,
-        [SINGLETON_EVENT_ID],
+        [selectedMayhemId()],
       );
       const teamId = newId("team");
       const defaultIcon = pickTeamIdentities(1)[0].iconUrl;
       await client.query(
         `INSERT INTO mayhem_teams (id, event_id, name, icon_url, seed, reveal_order, group_id, is_ready, captain_discord_id)
          VALUES ($1, $2, $3, $4, NULL, $5, NULL, true, $6)`,
-        [teamId, SINGLETON_EVENT_ID, slot.team_name, defaultIcon, teamCountRows[0].c, slot.captain_discord_id],
+        [teamId, selectedMayhemId(), slot.team_name, defaultIcon, teamCountRows[0].c, slot.captain_discord_id],
       );
       const { rows: orderRows } = await client.query(
         `SELECT COALESCE(MAX(entry_order), -1) + 1 AS next FROM mayhem_players WHERE event_id = $1`,
-        [SINGLETON_EVENT_ID],
+        [selectedMayhemId()],
       );
       let nextOrder = orderRows[0].next as number;
       for (const m of memberRows) {
         await client.query(
           `INSERT INTO mayhem_players (id, event_id, display_name, entry_order, team_id, member_discord_id)
            VALUES ($1, $2, $3, $4, $5, $6)`,
-          [newId("player"), SINGLETON_EVENT_ID, m.display_name, nextOrder++, teamId, m.member_discord_id],
+          [newId("player"), selectedMayhemId(), m.display_name, nextOrder++, teamId, m.member_discord_id],
         );
       }
       await client.query(`DELETE FROM mayhem_team_applications WHERE id = $1`, [slot.application_id]);
@@ -1113,7 +1093,7 @@ export async function confirmApplicationSlot(
 }
 
 /** Invited member declines. Frees their reservation immediately so the captain can invite someone else into that slot. Requires the invite's own recipient to be signed in — the token alone (which the captain also holds, since they generate the invite link) is not sufficient authorization to act on someone else's slot. */
-export async function declineApplicationSlot(
+async function declineApplicationSlotImpl(
   slotId: string,
   rawToken: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
@@ -1124,8 +1104,10 @@ export async function declineApplicationSlot(
   await ensureSchema();
   return withEventLock(async (client): Promise<{ ok: true } | { ok: false; reason: string }> => {
     const { rows } = await client.query(
-      `SELECT confirm_token_hash, confirm_token_expires_at, status, member_discord_id FROM mayhem_team_application_slots WHERE id = $1`,
-      [slotId],
+      `SELECT s.confirm_token_hash, s.confirm_token_expires_at, s.status, s.member_discord_id
+       FROM mayhem_team_application_slots s JOIN mayhem_team_applications a ON a.id = s.application_id
+       WHERE s.id = $1 AND a.event_id = $2`,
+      [slotId, selectedMayhemId()],
     );
     if (rows.length === 0) return { ok: false, reason: "Invite not found." };
     if (rows[0].member_discord_id !== member.discordUserId) {
@@ -1145,7 +1127,7 @@ export async function declineApplicationSlot(
 }
 
 /** Captain (or admin) withdraws the whole application, freeing every reserved slot. */
-export async function withdrawApplication(applicationId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+async function withdrawApplicationImpl(applicationId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   const { getMemberSession } = await import("@/lib/discord-auth");
   const member = await getMemberSession();
   if (!member) return { ok: false, reason: "You need to sign in with a verified Discord account first." };
@@ -1154,7 +1136,7 @@ export async function withdrawApplication(applicationId: string): Promise<{ ok: 
   return withEventLock(async (client): Promise<{ ok: true } | { ok: false; reason: string }> => {
     const { rows } = await client.query(
       `SELECT captain_discord_id FROM mayhem_team_applications WHERE id = $1 AND event_id = $2`,
-      [applicationId, SINGLETON_EVENT_ID],
+      [applicationId, selectedMayhemId()],
     );
     if (rows.length === 0) return { ok: false, reason: "Application not found." };
     if (rows[0].captain_discord_id !== member.discordUserId) {
@@ -1176,7 +1158,7 @@ export async function withdrawApplication(applicationId: string): Promise<{ ok: 
  * and unable to join another team (same check). Deleting the row on
  * dissolution is what lets a dissolved team's members re-register cleanly.
  */
-export async function leavePremadeTeam(): Promise<{ ok: true } | { ok: false; reason: string }> {
+async function leavePremadeTeamImpl(): Promise<{ ok: true } | { ok: false; reason: string }> {
   const { getMemberSession } = await import("@/lib/discord-auth");
   const member = await getMemberSession();
   if (!member) return { ok: false, reason: "You need to sign in with a verified Discord account first." };
@@ -1184,14 +1166,14 @@ export async function leavePremadeTeam(): Promise<{ ok: true } | { ok: false; re
   await ensureSchema();
   try {
     return await withEventLock(async (client) => {
-      const { rows: stageRows } = await client.query(`SELECT stage FROM mayhem_events WHERE id = $1`, [SINGLETON_EVENT_ID]);
+      const { rows: stageRows } = await client.query(`SELECT stage FROM mayhem_events WHERE id = $1`, [selectedMayhemId()]);
       if (stageRows[0]?.stage !== "collecting") {
         return { ok: false, reason: "Teams have already been finalized — ask an admin to make changes." };
       }
 
       const { rows: playerRows } = await client.query(
         `SELECT id, team_id FROM mayhem_players WHERE event_id = $1 AND member_discord_id = $2`,
-        [SINGLETON_EVENT_ID, member.discordUserId],
+        [selectedMayhemId(), member.discordUserId],
       );
       if (playerRows.length === 0 || !playerRows[0].team_id) {
         return { ok: false, reason: "You're not on a team." };
@@ -1239,13 +1221,13 @@ export async function leavePremadeTeam(): Promise<{ ok: true } | { ok: false; re
  * shuffled. Runs entirely inside withEventLock so a concurrent
  * signup/reset can't interleave with the read-then-write here.
  */
-export async function randomizeTeams() {
+async function randomizeTeamsImpl() {
   const actor = await requireAdmin();
 
   await withEventLock(async (client) => {
     const { rows: modeRows } = await client.query(
       `SELECT team_format, stage, reveal_index, auto_reveal, reveal_started_at FROM mayhem_events WHERE id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     const ev = modeRows[0];
     const teamFormat = ev?.team_format;
@@ -1271,13 +1253,13 @@ export async function randomizeTeams() {
     // (team_id IS NULL) get shuffled into new teams.
     const { rows: premadeTeamRows } = await client.query(
       `SELECT id FROM mayhem_teams WHERE event_id = $1 AND captain_discord_id IS NOT NULL`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     const premadeTeamCount = premadeTeamRows.length;
 
     const { rows: playerRows } = await client.query(
       `SELECT id, display_name FROM mayhem_players WHERE event_id = $1 AND team_id IS NULL ORDER BY entry_order ASC`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     const soloCount = playerRows.length;
     if (soloCount === 0 && premadeTeamCount === 0) {
@@ -1294,11 +1276,11 @@ export async function randomizeTeams() {
 
     // Wipe only prior RANDOMIZED-team match/group state (a reroll case) —
     // never touch premade teams or their rosters.
-    await client.query(`DELETE FROM mayhem_matches WHERE event_id = $1`, [SINGLETON_EVENT_ID]);
-    await client.query(`DELETE FROM mayhem_groups WHERE event_id = $1`, [SINGLETON_EVENT_ID]);
+    await client.query(`DELETE FROM mayhem_matches WHERE event_id = $1`, [selectedMayhemId()]);
+    await client.query(`DELETE FROM mayhem_groups WHERE event_id = $1`, [selectedMayhemId()]);
     await client.query(
       `DELETE FROM mayhem_teams WHERE event_id = $1 AND captain_discord_id IS NULL`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
 
     for (let t = 0; t < soloTeamCount; t++) {
@@ -1307,7 +1289,7 @@ export async function randomizeTeams() {
       await client.query(
         `INSERT INTO mayhem_teams (id, event_id, name, icon_url, seed, reveal_order, group_id, is_ready, captain_discord_id)
          VALUES ($1, $2, $3, $4, $5, $6, NULL, true, NULL)`,
-        [teamId, SINGLETON_EVENT_ID, identity.name, identity.iconUrl, premadeTeamCount + t + 1, premadeTeamCount + t],
+        [teamId, selectedMayhemId(), identity.name, identity.iconUrl, premadeTeamCount + t + 1, premadeTeamCount + t],
       );
       const roster = shuffledPlayers.slice(t * 5, t * 5 + 5);
       for (const p of roster) {
@@ -1327,7 +1309,7 @@ export async function randomizeTeams() {
       // shuffled order across all of them.
       const { rows: allTeams } = await client.query(
         `SELECT id FROM mayhem_teams WHERE event_id = $1`,
-        [SINGLETON_EVENT_ID],
+        [selectedMayhemId()],
       );
       const shuffledAll = shuffle(allTeams.map((r) => r.id as string));
       for (let i = 0; i < shuffledAll.length; i++) {
@@ -1344,12 +1326,12 @@ export async function randomizeTeams() {
        SET stage = 'randomized', scene = 'reveal', reveal_index = 0, registration_open = false,
            -- A fresh team set starts unrevealed. Without clearing these, a
            -- reveal_started_at left over from an earlier auto-reveal makes
-           -- getMayhemFull() derive every new team as already revealed.
+           -- getMayhemFull(selectedMayhemId()) derive every new team as already revealed.
            auto_reveal = false, reveal_started_at = NULL, reveal_start_on_countdown = false
        WHERE id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
-    await writeMayhemAudit(
+    await writeMayhemAudit(selectedMayhemId(),
       actor,
       "teams.randomize",
       { teams: soloTeamCount + premadeTeamCount, reroll: ev?.stage !== "collecting" },
@@ -1388,13 +1370,13 @@ export async function randomizeTeams() {
  * touched it, and finalize is the one place a stale flag would do real
  * damage (locking in a short-handed team).
  */
-export async function finalizePremadeTeams() {
+async function finalizePremadeTeamsImpl() {
   const actor = await requireAdmin();
 
   await withEventLock(async (client) => {
     const { rows: modeRows } = await client.query(
       `SELECT team_format FROM mayhem_events WHERE id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     if (modeRows[0]?.team_format !== "premade") {
       throw new Error('This event isn\'t in pure premade mode — use "Randomize teams" instead, which also preserves existing premade teams.');
@@ -1404,7 +1386,7 @@ export async function finalizePremadeTeams() {
       `SELECT t.id, count(p.id)::int AS roster_size
        FROM mayhem_teams t LEFT JOIN mayhem_players p ON p.team_id = t.id
        WHERE t.event_id = $1 GROUP BY t.id`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
     if (teamRows.length === 0) throw new Error("No teams have been created yet.");
     const notReady = teamRows.filter((t) => t.roster_size !== PREMADE_ROSTER_SIZE);
@@ -1416,7 +1398,7 @@ export async function finalizePremadeTeams() {
     // through leavePremadeTeam()'s own is_ready update.
     await client.query(
       `UPDATE mayhem_teams SET is_ready = true WHERE event_id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
 
     // Assign reveal order now — teams were created in signup order, not a
@@ -1435,12 +1417,12 @@ export async function finalizePremadeTeams() {
        SET stage = 'randomized', scene = 'reveal', reveal_index = 0, registration_open = false,
            -- A fresh team set starts unrevealed. Without clearing these, a
            -- reveal_started_at left over from an earlier auto-reveal makes
-           -- getMayhemFull() derive every new team as already revealed.
+           -- getMayhemFull(selectedMayhemId()) derive every new team as already revealed.
            auto_reveal = false, reveal_started_at = NULL, reveal_start_on_countdown = false
        WHERE id = $1`,
-      [SINGLETON_EVENT_ID],
+      [selectedMayhemId()],
     );
-    await writeMayhemAudit(actor, "teams.finalize_premade", { teams: teamRows.length }, client);
+    await writeMayhemAudit(selectedMayhemId(), actor, "teams.finalize_premade", { teams: teamRows.length }, client);
   });
   refresh();
 }
@@ -1449,14 +1431,14 @@ export async function finalizePremadeTeams() {
 // Presentation / scene control
 // ---------------------------------------------------------------------------
 
-export async function setScene(scene: MayhemScene) {
+async function setSceneImpl(scene: MayhemScene) {
   const actor = await requireAdmin();
-  await sql`UPDATE mayhem_events SET scene = ${scene} WHERE id = ${SINGLETON_EVENT_ID}`;
-  await writeMayhemAudit(actor, "scene.set", { scene });
+  await sql`UPDATE mayhem_events SET scene = ${scene} WHERE id = ${selectedMayhemId()}`;
+  await writeMayhemAudit(selectedMayhemId(), actor, "scene.set", { scene });
   refresh();
 }
 
-export async function startCountdown(seconds: number) {
+async function startCountdownImpl(seconds: number) {
   const actor = await requireAdmin();
   if (!Number.isInteger(seconds) || seconds < 1 || seconds > 3600) {
     throw new Error("Countdown must be between 1 and 3600 seconds.");
@@ -1465,23 +1447,23 @@ export async function startCountdown(seconds: number) {
   await sql`
     UPDATE mayhem_events
     SET scene = 'starting_soon', countdown_ends_at = ${endsAt}
-    WHERE id = ${SINGLETON_EVENT_ID}
+    WHERE id = ${selectedMayhemId()}
   `;
-  await writeMayhemAudit(actor, "countdown.start", { seconds });
+  await writeMayhemAudit(selectedMayhemId(), actor, "countdown.start", { seconds });
   refresh();
 }
 
 /** Manual single-step reveal advance. Only meaningful when auto_reveal is off — turns it off explicitly so a stray manual click can't fight a running auto-reveal timer. */
-export async function advanceReveal() {
+async function advanceRevealImpl() {
   const actor = await requireAdmin();
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   const next = Math.min(full.event.reveal_index + 1, full.teams.length);
   const scene = next >= full.teams.length ? "teams" : "reveal";
   await sql`
     UPDATE mayhem_events SET reveal_index = ${next}, scene = ${scene}, auto_reveal = false
-    WHERE id = ${SINGLETON_EVENT_ID}
+    WHERE id = ${selectedMayhemId()}
   `;
-  await writeMayhemAudit(actor, "reveal.advance", { shown: next, of: full.teams.length });
+  await writeMayhemAudit(selectedMayhemId(), actor, "reveal.advance", { shown: next, of: full.teams.length });
   refresh();
 }
 
@@ -1497,12 +1479,12 @@ const MAX_REVEAL_INTERVAL_S = 60;
  * the actual start to countdown_ends_at (requires an active countdown);
  * otherwise it starts immediately.
  */
-export async function startAutoReveal(intervalSeconds: number, startOnCountdownEnd: boolean) {
+async function startAutoRevealImpl(intervalSeconds: number, startOnCountdownEnd: boolean) {
   const actor = await requireAdmin();
   if (!Number.isInteger(intervalSeconds) || intervalSeconds < MIN_REVEAL_INTERVAL_S || intervalSeconds > MAX_REVEAL_INTERVAL_S) {
     throw new Error(`Reveal interval must be between ${MIN_REVEAL_INTERVAL_S} and ${MAX_REVEAL_INTERVAL_S} seconds.`);
   }
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   if (full.teams.length === 0) throw new Error("No teams to reveal yet.");
   if (startOnCountdownEnd && !full.event.countdown_ends_at) {
     throw new Error("Start a countdown first, or start the reveal immediately instead.");
@@ -1516,22 +1498,22 @@ export async function startAutoReveal(intervalSeconds: number, startOnCountdownE
         reveal_started_at = ${startOnCountdownEnd ? null : new Date().toISOString()},
         reveal_index = 0,
         scene = ${startOnCountdownEnd ? "starting_soon" : "reveal"}
-    WHERE id = ${SINGLETON_EVENT_ID}
+    WHERE id = ${selectedMayhemId()}
   `;
-  await writeMayhemAudit(actor, "reveal.auto_start", { intervalSeconds, startOnCountdownEnd });
+  await writeMayhemAudit(selectedMayhemId(), actor, "reveal.auto_start", { intervalSeconds, startOnCountdownEnd });
   refresh();
 }
 
 /** Freezes auto-reveal at its current derived count and hands control back to manual advanceReveal(). */
-export async function pauseAutoReveal() {
+async function pauseAutoRevealImpl() {
   const actor = await requireAdmin();
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   await sql`
     UPDATE mayhem_events
     SET auto_reveal = false, reveal_index = ${full.event.reveal_index}
-    WHERE id = ${SINGLETON_EVENT_ID}
+    WHERE id = ${selectedMayhemId()}
   `;
-  await writeMayhemAudit(actor, "reveal.auto_pause", { shown: full.event.reveal_index, of: full.teams.length });
+  await writeMayhemAudit(selectedMayhemId(), actor, "reveal.auto_pause", { shown: full.event.reveal_index, of: full.teams.length });
   refresh();
 }
 
@@ -1540,18 +1522,18 @@ export async function pauseAutoReveal() {
  * first, freezing it at the count it had reached, so the timer can't put the
  * team straight back.
  */
-export async function hideLastReveal() {
+async function hideLastRevealImpl() {
   const actor = await requireAdmin();
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   if (full.teams.length === 0) throw new Error("No teams to reveal yet.");
   if (full.event.reveal_index === 0) throw new Error("No team is on screen yet.");
   const next = full.event.reveal_index - 1;
   await sql`
     UPDATE mayhem_events
     SET reveal_index = ${next}, auto_reveal = false, scene = 'reveal'
-    WHERE id = ${SINGLETON_EVENT_ID}
+    WHERE id = ${selectedMayhemId()}
   `;
-  await writeMayhemAudit(actor, "reveal.hide_last", { shown: next, of: full.teams.length });
+  await writeMayhemAudit(selectedMayhemId(), actor, "reveal.hide_last", { shown: next, of: full.teams.length });
   refresh();
 }
 
@@ -1560,17 +1542,17 @@ export async function hideLastReveal() {
  * time cleared. This is what unlocks re-roll and name refresh again (see
  * isRevealStarted); the desk asks for confirmation first.
  */
-export async function restartReveal() {
+async function restartRevealImpl() {
   const actor = await requireAdmin();
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   if (full.teams.length === 0) throw new Error("No teams to reveal yet.");
   await sql`
     UPDATE mayhem_events
     SET reveal_index = 0, auto_reveal = false, reveal_started_at = NULL,
         reveal_start_on_countdown = false, scene = 'reveal'
-    WHERE id = ${SINGLETON_EVENT_ID}
+    WHERE id = ${selectedMayhemId()}
   `;
-  await writeMayhemAudit(actor, "reveal.restart", { wasShown: full.event.reveal_index, of: full.teams.length });
+  await writeMayhemAudit(selectedMayhemId(), actor, "reveal.restart", { wasShown: full.event.reveal_index, of: full.teams.length });
   refresh();
 }
 
@@ -1578,20 +1560,20 @@ export async function restartReveal() {
 // Format config
 // ---------------------------------------------------------------------------
 
-export async function updateFormat(format: MayhemFormatConfig) {
+async function updateFormatImpl(format: MayhemFormatConfig) {
   const actor = await requireAdmin();
   if (format.knockout.doubleElimination && format.knockout.thirdPlaceMatch) {
     throw new Error("Third-place matches are not supported for double elimination.");
   }
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   if (full.matches.some((match) => match.bracket !== "group")) {
     throw new Error("Knockout settings can't be changed after the bracket is generated.");
   }
   await sql`
     UPDATE mayhem_events SET format = ${JSON.stringify(format)}::jsonb
-    WHERE id = ${SINGLETON_EVENT_ID}
+    WHERE id = ${selectedMayhemId()}
   `;
-  await writeMayhemAudit(actor, "format.update", { format });
+  await writeMayhemAudit(selectedMayhemId(), actor, "format.update", { format });
   refresh();
 }
 
@@ -1599,17 +1581,17 @@ export async function updateFormat(format: MayhemFormatConfig) {
 // Group stage
 // ---------------------------------------------------------------------------
 
-export async function generateGroups() {
+async function generateGroupsImpl() {
   const actor = await requireAdmin();
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   const { groupCount, seeding, seriesLength, advancePerGroup } = full.event.format.groupStage;
   if (full.teams.length < groupCount * 2) {
     throw new Error("Not enough teams for that many groups.");
   }
 
-  await sql`DELETE FROM mayhem_matches WHERE event_id = ${SINGLETON_EVENT_ID}`;
-  await sql`DELETE FROM mayhem_groups WHERE event_id = ${SINGLETON_EVENT_ID}`;
-  await sql`UPDATE mayhem_teams SET group_id = NULL WHERE event_id = ${SINGLETON_EVENT_ID}`;
+  await sql`DELETE FROM mayhem_matches WHERE event_id = ${selectedMayhemId()}`;
+  await sql`DELETE FROM mayhem_groups WHERE event_id = ${selectedMayhemId()}`;
+  await sql`UPDATE mayhem_teams SET group_id = NULL WHERE event_id = ${selectedMayhemId()}`;
 
   const orderedTeams =
     seeding === "random" ? shuffle(full.teams) : [...full.teams].sort((a, b) => (a.seed ?? 0) - (b.seed ?? 0));
@@ -1621,7 +1603,7 @@ export async function generateGroups() {
     const label = `Group ${String.fromCharCode(65 + g)}`;
     await sql`
       INSERT INTO mayhem_groups (id, event_id, label, advance_count)
-      VALUES (${groupId}, ${SINGLETON_EVENT_ID}, ${label}, ${advancePerGroup})
+      VALUES (${groupId}, ${selectedMayhemId()}, ${label}, ${advancePerGroup})
     `;
   }
 
@@ -1650,7 +1632,7 @@ export async function generateGroups() {
           team_a_id, team_b_id, team_a_score, team_b_score, winner_id, status,
           advances_to_match_id, advances_to_slot, drops_to_match_id, drops_to_slot
         ) VALUES (
-          ${m.id}, ${SINGLETON_EVENT_ID}, ${m.bracket}, ${m.group_id}, ${m.round_number}, ${m.match_number}, ${m.best_of},
+          ${m.id}, ${selectedMayhemId()}, ${m.bracket}, ${m.group_id}, ${m.round_number}, ${m.match_number}, ${m.best_of},
           ${m.team_a_id}, ${m.team_b_id}, ${m.team_a_score}, ${m.team_b_score}, ${m.winner_id}, ${m.status},
           ${m.advances_to_match_id}, ${m.advances_to_slot}, ${m.drops_to_match_id}, ${m.drops_to_slot}
         )
@@ -1658,15 +1640,15 @@ export async function generateGroups() {
     }
   }
 
-  await sql`UPDATE mayhem_events SET stage = 'group_stage', scene = 'groups' WHERE id = ${SINGLETON_EVENT_ID}`;
-  await writeMayhemAudit(actor, "groups.generate", { groups: groupCount, regenerated: full.groups.length > 0 });
+  await sql`UPDATE mayhem_events SET stage = 'group_stage', scene = 'groups' WHERE id = ${selectedMayhemId()}`;
+  await writeMayhemAudit(selectedMayhemId(), actor, "groups.generate", { groups: groupCount, regenerated: full.groups.length > 0 });
   refresh();
 }
 
 /** Take group standings, seed qualifiers into the knockout bracket. */
-export async function generateKnockoutFromGroups() {
+async function generateKnockoutFromGroupsImpl() {
   const actor = await requireAdmin();
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   const qualifiers: string[] = [];
 
   for (const group of full.groups) {
@@ -1680,22 +1662,22 @@ export async function generateKnockoutFromGroups() {
 }
 
 /** Generate a knockout bracket directly (no group stage) from all teams, seeded by `seed`. */
-export async function generateKnockoutFromAllTeams() {
+async function generateKnockoutFromAllTeamsImpl() {
   const actor = await requireAdmin();
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   const seeded = [...full.teams].sort((a, b) => (a.seed ?? 0) - (b.seed ?? 0)).map((t) => t.id);
   await generateKnockoutBracket(seeded, actor, "all_teams");
 }
 
 async function generateKnockoutBracket(teamIdsBySeed: string[], actor: MayhemActor, source: "groups" | "all_teams") {
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   const { knockout } = full.event.format;
 
   // Only clear knockout-stage matches (upper/lower/grand_final/third_place),
   // preserve group-stage match history.
   await sql`
     DELETE FROM mayhem_matches
-    WHERE event_id = ${SINGLETON_EVENT_ID} AND bracket != 'group'
+    WHERE event_id = ${selectedMayhemId()} AND bracket != 'group'
   `;
 
   const startNumber =
@@ -1717,15 +1699,15 @@ async function generateKnockoutBracket(teamIdsBySeed: string[], actor: MayhemAct
         team_a_id, team_b_id, team_a_score, team_b_score, winner_id, status,
         advances_to_match_id, advances_to_slot, drops_to_match_id, drops_to_slot
       ) VALUES (
-        ${m.id}, ${SINGLETON_EVENT_ID}, ${m.bracket}, ${m.group_id}, ${m.round_number}, ${m.match_number}, ${m.best_of},
+        ${m.id}, ${selectedMayhemId()}, ${m.bracket}, ${m.group_id}, ${m.round_number}, ${m.match_number}, ${m.best_of},
         ${m.team_a_id}, ${m.team_b_id}, ${m.team_a_score}, ${m.team_b_score}, ${m.winner_id}, ${m.status},
         ${m.advances_to_match_id}, ${m.advances_to_slot}, ${m.drops_to_match_id}, ${m.drops_to_slot}
       )
     `;
   }
 
-  await sql`UPDATE mayhem_events SET stage = 'knockout', scene = 'bracket' WHERE id = ${SINGLETON_EVENT_ID}`;
-  await writeMayhemAudit(actor, "knockout.generate", { source, teams: teamIdsBySeed.length, matches: matches.length });
+  await sql`UPDATE mayhem_events SET stage = 'knockout', scene = 'bracket' WHERE id = ${selectedMayhemId()}`;
+  await writeMayhemAudit(selectedMayhemId(), actor, "knockout.generate", { source, teams: teamIdsBySeed.length, matches: matches.length });
   refresh();
 }
 
@@ -1733,24 +1715,28 @@ async function generateKnockoutBracket(teamIdsBySeed: string[], actor: MayhemAct
 // Live match control
 // ---------------------------------------------------------------------------
 
-export async function setActiveMatch(matchId: string | null) {
+async function setActiveMatchImpl(matchId: string | null) {
   const actor = await requireAdmin();
+  if (matchId) {
+    const { rows } = await sql.query("SELECT id FROM mayhem_matches WHERE id = $1 AND event_id = $2", [matchId, selectedMayhemId()]);
+    if (!rows.length) throw new Error("Match not found in this tournament.");
+  }
   await sql`
     UPDATE mayhem_events SET active_match_id = ${matchId}, scene = ${matchId ? "match" : "bracket"}
-    WHERE id = ${SINGLETON_EVENT_ID}
+    WHERE id = ${selectedMayhemId()}
   `;
-  await writeMayhemAudit(actor, matchId ? "match.set_active" : "match.clear_active", { matchId });
+  await writeMayhemAudit(selectedMayhemId(), actor, matchId ? "match.set_active" : "match.clear_active", { matchId });
   refresh();
 }
 
 /** Record a clinching result and persist all advancement/reset/bye effects. */
-export async function recordMatchResult(matchId: string, teamAScore: number, teamBScore: number) {
+async function recordMatchResultImpl(matchId: string, teamAScore: number, teamBScore: number) {
   const actor = await requireAdmin();
   if (!Number.isInteger(teamAScore) || !Number.isInteger(teamBScore) || teamAScore < 0 || teamBScore < 0) {
     throw new Error("Scores must be non-negative whole numbers.");
   }
   if (teamAScore === teamBScore) throw new Error("Match can't end in a tie.");
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   const match = full.matches.find((m) => m.id === matchId);
   if (!match) throw new Error("Match not found.");
   if (!match.team_a_id || !match.team_b_id) throw new Error("Both teams must be set before reporting a result.");
@@ -1767,12 +1753,12 @@ export async function recordMatchResult(matchId: string, teamAScore: number, tea
     await sql`
       UPDATE mayhem_events
       SET champion_team_id = ${result.championId}, scene = 'champion', active_match_id = NULL, stage = 'completed'
-      WHERE id = ${SINGLETON_EVENT_ID}
+      WHERE id = ${selectedMayhemId()}
     `;
   } else if (full.event.stage !== "completed") {
-    await sql`UPDATE mayhem_events SET active_match_id = NULL, scene = 'bracket' WHERE id = ${SINGLETON_EVENT_ID}`;
+    await sql`UPDATE mayhem_events SET active_match_id = NULL, scene = 'bracket' WHERE id = ${selectedMayhemId()}`;
   }
-  await writeMayhemAudit(actor, "match.report", {
+  await writeMayhemAudit(selectedMayhemId(), actor, "match.report", {
     matchId,
     matchNumber: match.match_number,
     teamAScore,
@@ -1790,9 +1776,9 @@ export async function recordMatchResult(matchId: string, teamAScore: number, tea
  * actually means, and rejects outright on anything but a true single-game
  * series so it can never be reached for a Bo3/Bo5 UI by mistake.
  */
-export async function reportBo1Winner(matchId: string, winnerTeamId: string) {
+async function reportBo1WinnerImpl(matchId: string, winnerTeamId: string) {
   await requireAdmin();
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   const match = full.matches.find((m) => m.id === matchId);
   if (!match) throw new Error("Match not found.");
   if (match.best_of !== 1) throw new Error("This match isn't a Bo1 — report a score instead.");
@@ -1801,13 +1787,13 @@ export async function reportBo1Winner(matchId: string, winnerTeamId: string) {
   }
   const teamAScore = winnerTeamId === match.team_a_id ? 1 : 0;
   const teamBScore = winnerTeamId === match.team_b_id ? 1 : 0;
-  await recordMatchResult(matchId, teamAScore, teamBScore);
+  await recordMatchResultImpl(matchId, teamAScore, teamBScore);
 }
 
 /** Undo a result and retract dependent auto-resolved byes transitively. */
-export async function undoMatchResult(matchId: string) {
+async function undoMatchResultImpl(matchId: string) {
   const actor = await requireAdmin();
-  const full = await getMayhemFull();
+  const full = await getMayhemFull(selectedMayhemId());
   const graph = full.matches as unknown as BracketMatch[];
   const match = graph.find((candidate) => candidate.id === matchId);
   const previousWinner = match?.winner_id ?? null;
@@ -1818,9 +1804,228 @@ export async function undoMatchResult(matchId: string) {
     await sql`
       UPDATE mayhem_events SET champion_team_id = NULL, stage = 'knockout',
         scene = 'bracket', active_match_id = NULL
-      WHERE id = ${SINGLETON_EVENT_ID}
+      WHERE id = ${selectedMayhemId()}
     `;
   }
-  if (match) await writeMayhemAudit(actor, "match.undo", { matchId, matchNumber: match.match_number });
+  if (match) await writeMayhemAudit(selectedMayhemId(), actor, "match.undo", { matchId, matchNumber: match.match_number });
   refresh();
+}
+
+// Explicit event pins on every Server Action, including read-only member state.
+export async function addPlayer(selection: MayhemSelection, ...args: Parameters<typeof addPlayerImpl>): Promise<Awaited<ReturnType<typeof addPlayerImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => addPlayerImpl(...args), {});
+}
+export async function bulkAddPlayers(selection: MayhemSelection, ...args: Parameters<typeof bulkAddPlayersImpl>): Promise<Awaited<ReturnType<typeof bulkAddPlayersImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => bulkAddPlayersImpl(...args), {});
+}
+export async function removePlayer(selection: MayhemSelection, ...args: Parameters<typeof removePlayerImpl>): Promise<Awaited<ReturnType<typeof removePlayerImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => removePlayerImpl(...args), {});
+}
+export async function renamePlayer(selection: MayhemSelection, ...args: Parameters<typeof renamePlayerImpl>): Promise<Awaited<ReturnType<typeof renamePlayerImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => renamePlayerImpl(...args), {});
+}
+export async function refreshTeamIdentities(selection: MayhemSelection, ...args: Parameters<typeof refreshTeamIdentitiesImpl>): Promise<Awaited<ReturnType<typeof refreshTeamIdentitiesImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => refreshTeamIdentitiesImpl(...args), {});
+}
+export async function clearAllPlayers(selection: MayhemSelection, ...args: Parameters<typeof clearAllPlayersImpl>): Promise<Awaited<ReturnType<typeof clearAllPlayersImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => clearAllPlayersImpl(...args), {});
+}
+export async function setTeamFormat(selection: MayhemSelection, ...args: Parameters<typeof setTeamFormatImpl>): Promise<Awaited<ReturnType<typeof setTeamFormatImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => setTeamFormatImpl(...args), {});
+}
+export async function setRegistrationOpen(selection: MayhemSelection, ...args: Parameters<typeof setRegistrationOpenImpl>): Promise<Awaited<ReturnType<typeof setRegistrationOpenImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => setRegistrationOpenImpl(...args), {});
+}
+export async function joinMayhemAsMember(selection: MayhemSelection, ...args: Parameters<typeof joinMayhemAsMemberImpl>): Promise<Awaited<ReturnType<typeof joinMayhemAsMemberImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => joinMayhemAsMemberImpl(...args), { public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return { ok: false, reason: error.message }; throw error; }
+}
+export async function leaveMayhemAsMember(selection: MayhemSelection, ...args: Parameters<typeof leaveMayhemAsMemberImpl>): Promise<Awaited<ReturnType<typeof leaveMayhemAsMemberImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => leaveMayhemAsMemberImpl(...args), { public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return { ok: false, reason: error.message }; throw error; }
+}
+export async function getMySoloSignupStatus(selection: MayhemSelection, ...args: Parameters<typeof getMySoloSignupStatusImpl>): Promise<Awaited<ReturnType<typeof getMySoloSignupStatusImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => getMySoloSignupStatusImpl(...args), { readonly: true, public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return null; throw error; }
+}
+export async function getMyPremadeApplication(selection: MayhemSelection, ...args: Parameters<typeof getMyPremadeApplicationImpl>): Promise<Awaited<ReturnType<typeof getMyPremadeApplicationImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => getMyPremadeApplicationImpl(...args), { readonly: true, public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return null; throw error; }
+}
+export async function createPremadeApplication(selection: MayhemSelection, ...args: Parameters<typeof createPremadeApplicationImpl>): Promise<Awaited<ReturnType<typeof createPremadeApplicationImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => createPremadeApplicationImpl(...args), { public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return { ok: false, reason: error.message }; throw error; }
+}
+export async function addDraftMember(selection: MayhemSelection, ...args: Parameters<typeof addDraftMemberImpl>): Promise<Awaited<ReturnType<typeof addDraftMemberImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => addDraftMemberImpl(...args), { public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return { ok: false, reason: error.message }; throw error; }
+}
+export async function sendApplicationInvites(selection: MayhemSelection, ...args: Parameters<typeof sendApplicationInvitesImpl>): Promise<Awaited<ReturnType<typeof sendApplicationInvitesImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => sendApplicationInvitesImpl(...args), { network: true, public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return { ok: false, reason: error.message }; throw error; }
+}
+export async function retryInviteDelivery(selection: MayhemSelection, ...args: Parameters<typeof retryInviteDeliveryImpl>): Promise<Awaited<ReturnType<typeof retryInviteDeliveryImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => retryInviteDeliveryImpl(...args), { network: true, public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return { ok: false, reason: error.message }; throw error; }
+}
+export async function withdrawApplicationSlot(selection: MayhemSelection, ...args: Parameters<typeof withdrawApplicationSlotImpl>): Promise<Awaited<ReturnType<typeof withdrawApplicationSlotImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => withdrawApplicationSlotImpl(...args), { public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return { ok: false, reason: error.message }; throw error; }
+}
+export async function confirmApplicationSlot(selection: MayhemSelection, ...args: Parameters<typeof confirmApplicationSlotImpl>): Promise<Awaited<ReturnType<typeof confirmApplicationSlotImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => confirmApplicationSlotImpl(...args), { public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return { ok: false, reason: error.message }; throw error; }
+}
+export async function declineApplicationSlot(selection: MayhemSelection, ...args: Parameters<typeof declineApplicationSlotImpl>): Promise<Awaited<ReturnType<typeof declineApplicationSlotImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => declineApplicationSlotImpl(...args), { public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return { ok: false, reason: error.message }; throw error; }
+}
+export async function withdrawApplication(selection: MayhemSelection, ...args: Parameters<typeof withdrawApplicationImpl>): Promise<Awaited<ReturnType<typeof withdrawApplicationImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => withdrawApplicationImpl(...args), { public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return { ok: false, reason: error.message }; throw error; }
+}
+export async function leavePremadeTeam(selection: MayhemSelection, ...args: Parameters<typeof leavePremadeTeamImpl>): Promise<Awaited<ReturnType<typeof leavePremadeTeamImpl>>> {
+  await ensureSchema();
+  try { return await runMayhemSelection(selection, () => leavePremadeTeamImpl(...args), { public: true }); }
+  catch (error) { if (error instanceof MayhemSelectionError) return { ok: false, reason: error.message }; throw error; }
+}
+export async function randomizeTeams(selection: MayhemSelection, ...args: Parameters<typeof randomizeTeamsImpl>): Promise<Awaited<ReturnType<typeof randomizeTeamsImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => randomizeTeamsImpl(...args), {});
+}
+export async function finalizePremadeTeams(selection: MayhemSelection, ...args: Parameters<typeof finalizePremadeTeamsImpl>): Promise<Awaited<ReturnType<typeof finalizePremadeTeamsImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => finalizePremadeTeamsImpl(...args), {});
+}
+export async function setScene(selection: MayhemSelection, ...args: Parameters<typeof setSceneImpl>): Promise<Awaited<ReturnType<typeof setSceneImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => setSceneImpl(...args), {});
+}
+export async function startCountdown(selection: MayhemSelection, ...args: Parameters<typeof startCountdownImpl>): Promise<Awaited<ReturnType<typeof startCountdownImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => startCountdownImpl(...args), {});
+}
+export async function advanceReveal(selection: MayhemSelection, ...args: Parameters<typeof advanceRevealImpl>): Promise<Awaited<ReturnType<typeof advanceRevealImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => advanceRevealImpl(...args), {});
+}
+export async function startAutoReveal(selection: MayhemSelection, ...args: Parameters<typeof startAutoRevealImpl>): Promise<Awaited<ReturnType<typeof startAutoRevealImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => startAutoRevealImpl(...args), {});
+}
+export async function pauseAutoReveal(selection: MayhemSelection, ...args: Parameters<typeof pauseAutoRevealImpl>): Promise<Awaited<ReturnType<typeof pauseAutoRevealImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => pauseAutoRevealImpl(...args), {});
+}
+export async function hideLastReveal(selection: MayhemSelection, ...args: Parameters<typeof hideLastRevealImpl>): Promise<Awaited<ReturnType<typeof hideLastRevealImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => hideLastRevealImpl(...args), {});
+}
+export async function restartReveal(selection: MayhemSelection, ...args: Parameters<typeof restartRevealImpl>): Promise<Awaited<ReturnType<typeof restartRevealImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => restartRevealImpl(...args), {});
+}
+export async function updateFormat(selection: MayhemSelection, ...args: Parameters<typeof updateFormatImpl>): Promise<Awaited<ReturnType<typeof updateFormatImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => updateFormatImpl(...args), {});
+}
+export async function generateGroups(selection: MayhemSelection, ...args: Parameters<typeof generateGroupsImpl>): Promise<Awaited<ReturnType<typeof generateGroupsImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => generateGroupsImpl(...args), {});
+}
+export async function generateKnockoutFromGroups(selection: MayhemSelection, ...args: Parameters<typeof generateKnockoutFromGroupsImpl>): Promise<Awaited<ReturnType<typeof generateKnockoutFromGroupsImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => generateKnockoutFromGroupsImpl(...args), {});
+}
+export async function generateKnockoutFromAllTeams(selection: MayhemSelection, ...args: Parameters<typeof generateKnockoutFromAllTeamsImpl>): Promise<Awaited<ReturnType<typeof generateKnockoutFromAllTeamsImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => generateKnockoutFromAllTeamsImpl(...args), {});
+}
+export async function setActiveMatch(selection: MayhemSelection, ...args: Parameters<typeof setActiveMatchImpl>): Promise<Awaited<ReturnType<typeof setActiveMatchImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => setActiveMatchImpl(...args), {});
+}
+export async function recordMatchResult(selection: MayhemSelection, ...args: Parameters<typeof recordMatchResultImpl>): Promise<Awaited<ReturnType<typeof recordMatchResultImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => recordMatchResultImpl(...args), {});
+}
+export async function reportBo1Winner(selection: MayhemSelection, ...args: Parameters<typeof reportBo1WinnerImpl>): Promise<Awaited<ReturnType<typeof reportBo1WinnerImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => reportBo1WinnerImpl(...args), {});
+}
+export async function undoMatchResult(selection: MayhemSelection, ...args: Parameters<typeof undoMatchResultImpl>): Promise<Awaited<ReturnType<typeof undoMatchResultImpl>>> {
+  await requireAdmin();
+  return runMayhemSelection(selection, () => undoMatchResultImpl(...args), {});
+}
+
+export async function createMayhemEvent(title: string): Promise<{ ok: true; eventId: string } | { ok: false; reason: string }> {
+  try {
+    const actor = await requireAdmin();
+    if (typeof title !== "string" || !title.trim() || title.trim().length > 120) return { ok: false, reason: "Enter a tournament name (1 to 120 characters)." };
+    const eventId = newId("mayhem");
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("INSERT INTO mayhem_events (id, title, format) VALUES ($1, $2, $3::jsonb)", [eventId, title.trim(), JSON.stringify(DEFAULT_FORMAT_CONFIG)]);
+      await writeMayhemAudit(eventId, actor, "event.create", { title: title.trim() }, client);
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK").catch(() => {}); throw error; }
+    finally { client.release(); }
+    refresh();
+    return { ok: true, eventId };
+  } catch (error) { return { ok: false, reason: error instanceof Error ? error.message : "Could not create tournament." }; }
+}
+export async function archiveMayhemEvent(selection: MayhemSelection): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    const actor = await requireAdmin();
+    await runMayhemSelection(selection, async () => {
+      const full = await getMayhemFull(selection.eventId);
+      await sql.query("UPDATE mayhem_events SET auto_reveal = false, reveal_index = $1 WHERE id = $2", [full.event.reveal_index, selection.eventId]);
+      await writeMayhemAudit(selectedMayhemId(), actor, "event.archive", {});
+      await sql.query(`UPDATE mayhem_events SET archived_at = now(), registration_open = false,
+        registration_generation = registration_generation + 1, updated_at = now() WHERE id = $1`, [selection.eventId]);
+    });
+    refresh(); return { ok: true };
+  } catch (error) { return { ok: false, reason: error instanceof Error ? error.message : "Could not archive tournament." }; }
+}
+export async function deleteMayhemEvent(selection: MayhemSelection): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    await requireAdmin();
+    await runMayhemSelection(selection, async () => {
+      // All children, including application slots and audit history, cascade.
+      await sql.query("DELETE FROM mayhem_events WHERE id = $1", [selection.eventId]);
+    }, { allowArchived: true });
+    refresh(); return { ok: true };
+  } catch (error) { return { ok: false, reason: error instanceof Error ? error.message : "Could not delete tournament." }; }
+}
+export async function setMayhemPublished(selection: MayhemSelection, published: boolean): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    const actor = await requireAdmin();
+    if (typeof published !== "boolean") return { ok: false, reason: "Invalid publication setting." };
+    await runMayhemSelection(selection, async () => {
+      await sql.query("UPDATE mayhem_events SET published = $1, updated_at = now() WHERE id = $2", [published, selection.eventId]);
+      await writeMayhemAudit(selection.eventId, actor, published ? "event.publish" : "event.unpublish");
+    });
+    refresh(); return { ok: true };
+  } catch (error) { return { ok: false, reason: error instanceof Error ? error.message : "Could not update publication." }; }
 }

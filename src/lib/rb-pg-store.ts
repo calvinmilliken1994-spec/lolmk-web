@@ -149,6 +149,21 @@ export function createPgStore(client: VercelPoolClient): RbStore {
       ]);
     },
 
+    async deleteTournament(tournamentId) {
+      // Keep RESTRICT FKs for ordinary writes. Explicit cleanup removes the
+      // dependent rows in order instead of weakening retention constraints.
+      // status and champion must change together to satisfy the completed CHECK.
+      await client.query(
+        `UPDATE rb_tournaments SET status = 'archived', champion_player_id = NULL WHERE id = $1`,
+        [tournamentId],
+      );
+      await client.query(`DELETE FROM rb_matches WHERE tournament_id = $1`, [tournamentId]);
+      await client.query(`DELETE FROM rb_rounds WHERE tournament_id = $1`, [tournamentId]);
+      await client.query(`DELETE FROM rb_players WHERE tournament_id = $1`, [tournamentId]);
+      await client.query(`DELETE FROM rb_audit_log WHERE tournament_id = $1`, [tournamentId]);
+      await client.query(`DELETE FROM rb_tournaments WHERE id = $1`, [tournamentId]);
+    },
+
     async insertPlayer(p: RbPlayer) {
       await client.query(
         `INSERT INTO rb_players

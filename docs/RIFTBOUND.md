@@ -71,7 +71,8 @@
 - `rb_rounds`: number, stage (`swiss | top_cut`), status, clock fields, pairing_seed.
 - `rb_matches`: round_id, table_number, player_a, player_b (null = bye), games_a, games_b, games_drawn, decided_on_time, extension_ms, status, reported_by_id, reported_by_name, reported_at, idempotency_key (unique), flags jsonb.
 - `rb_audit_log`: tournament_id, action, detail jsonb, actor_discord_id, actor_name, created_at.
-- Keep all records for at least 3 months (appeals). Provide a CSV/JSON export of games and matches.
+- Keep real-event records for at least 3 months (appeals). Provide a CSV/JSON export of games and matches.
+- Admins can explicitly hard-delete test tournaments after a permanent-delete confirmation. This removes players, rounds, matches, audit entries and the champion history in one transaction. Archive remains the normal history-preserving option; archived records can be shown in the admin list for review or cleanup.
 
 ## Routes
 
