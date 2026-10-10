@@ -79,6 +79,45 @@
   .container-wide {
     @apply mx-auto w-full max-w-wide px-4 md:px-8 lg:px-12;
   }
+  /* -------------------------------------------------------------------
+   * Redesign shapes (handover Phase 1). One cut corner is the signature.
+   * No border-radius anywhere in redesigned UI except status dots.
+   * ------------------------------------------------------------------- */
+  /* Plates and panels: top-right cut, 28px. */
+  .cut-plate {
+    clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 0 100%);
+  }
+  /* Primary buttons: bottom-right cut, 10px. */
+  .cut-btn {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+  }
+  /* Status bar: bottom-right cut, 20px. */
+  .cut-bar {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+  }
+  /* Page tag: slanted right edge. */
+  .cut-tag {
+    clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  }
+  /* Avatars: chamfered top-right, the plate cut at avatar scale. */
+  .cut-avatar {
+    clip-path: polygon(0 0, calc(100% - 22%) 0, 100% 22%, 100% 100%, 0 100%);
+  }
+  /* Art-zone texture for plates and splash areas. */
+  .texture-art {
+    background-image: repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.03) 0 2px,
+      transparent 2px 14px
+    );
+  }
+  /* A clipped element can't show a CSS border on its cut edge, so bordered
+     plates are a 1px "frame" wrapper on the border colour with the cut, and
+     an inner element on the fill colour with the same cut inset by 1px. */
+  .cut-frame {
+    padding: 1px;
+  }
+
   .grain {
     background-image: radial-gradient(circle at 20% 10%, rgba(186, 38, 60, 0.08), transparent 40%),
       radial-gradient(circle at 85% 30%, rgba(40, 61, 116, 0.12), transparent 45%);

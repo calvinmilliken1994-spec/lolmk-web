@@ -1,5 +1,13 @@
 # Components
 
+> **2026 redesign (wins for public subpages).** See `docs/redesign-handover.md` and the rules block in `CLAUDE.md`.
+>
+> - **Shapes:** one cut corner is the signature. Plates and panels `cut-plate` (top-right 28px), primary buttons `cut-btn` (bottom-right 10px), status bar `cut-bar` (bottom-right 20px), page tag `cut-tag` (slanted right edge), avatars `cut-avatar`. Art zones use `texture-art`. No border-radius except status dots.
+> - **Copy and layout:** no identical icon + title + blurb + "Read more" card grids, no `▸` bullets, no `→` appended to link text, no gradient blobs, glassmorphism or soft drop shadows.
+> - **Data:** every number shown is real; unknown values are omitted, never "TBA". Empty states show the last result or the next event, plus one action.
+> - **Access:** body contrast at least 4.5:1, visible keyboard focus, touch targets at least 44px.
+> - **Shared components** (Phase 2): `PageHeader`, `StatStrip`, `StatusBar`, `FormatPlate`, `ChampionSplit`, `ResultsTable` in `src/components/ds/`.
+
 Conventions for building UI components on LoLMK. These rules keep the site visually consistent regardless of who (or what) writes the code.
 
 ## Spacing scale
@@ -44,7 +52,7 @@ Used for the most important action on a page or section. **One per visual area.*
 - Background: `brand-red` (`#BA263C`)
 - Text: `text-primary` (`#F5F5F7`)
 - Padding: `space-3` vertical, `space-6` horizontal
-- Radius: `radius-md` (4px)
+- Radius: `radius-md` (4px) on older pages. Redesigned pages: no radius, bottom-right 10px cut (`cut-btn`), min height 44px (52px in bands), Space Grotesk 600.
 - Font: `body-md`, weight 600
 - Hover: background → `brand-red-hover`, no scale, no shadow
 - Active: background → `brand-red-muted`
@@ -231,7 +239,8 @@ Each component:
 
 ## Things to never do
 
-- Never use `border-radius` higher than `4px` outside of pills/avatars
+- Never use `border-radius` higher than `4px` outside of pills/avatars (redesigned pages: no radius at all except status dots)
+- Never use Discord blurple (`#5865F2`); Discord buttons are brand red with the Discord mark
 - Never use drop shadows on dark backgrounds
 - Never use animated gradients
 - Never use stock photography or AI-generated imagery

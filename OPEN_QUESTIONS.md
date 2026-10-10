@@ -53,4 +53,14 @@ They no longer appear in public listings, on public detail pages or in the Hall 
 
 Commit `3fc138c` removed root-level markdown from git ("kept locally, gitignored"), and `.gitignore` ignores `/*.md`. Neither file exists in this checkout, so they were read from `3fc138c^`. `OPEN_QUESTIONS.md` is whitelisted in `.gitignore` so it can be committed.
 
+In Phase 1, `CLAUDE.md` was restored locally from `3fc138c^` and the redesign rules were appended. It stays gitignored, so the same rules are also in `assets/brand/colors.md`, `assets/brand/typography.md` and `assets/ui/components.md`, which are committed.
+
 **Needs:** decide whether `CLAUDE.md` should be tracked again.
+
+## Design system
+
+### 7. Redesign tokens are namespaced, not replacements (Phase 1)
+
+The handover's token names (`surface`, `line`, `text`, …) collide with existing Tailwind tokens used by the homepage and `/tools` with different values (`surface` `#10162A`, `line` `#1F2937`). Overwriting them would change the homepage, which must stay as it is. The new tokens live under `ds` (`bg-ds-surface`, `border-ds-line`, …). The handover's `ground` `#0B1021` is within a shade of the existing `#0A0E1A`, so the existing value is kept, as the handover allows.
+
+**Needs:** when the homepage is redesigned, fold the old tokens into `ds` and drop the namespace.
