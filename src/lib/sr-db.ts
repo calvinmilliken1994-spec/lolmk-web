@@ -312,6 +312,13 @@ export function ensureSchema(): Promise<void> {
         ALTER TABLE sr_tournaments ADD COLUMN IF NOT EXISTS signups_open boolean NOT NULL DEFAULT false
       `;
 
+      // Rehearsal/test tournaments. Excluded from every public listing, the
+      // public detail page and the Hall of Champions. The venue screen
+      // (/srlive) still serves them by direct slug so admins can rehearse.
+      await sql`
+        ALTER TABLE sr_tournaments ADD COLUMN IF NOT EXISTS is_test boolean NOT NULL DEFAULT false
+      `;
+
       // The Discord user id of the captain who owns this team. NULL means an
       // admin created the team directly (the task-1 flow) and no captain can
       // edit it. This column is the ONLY thing that scopes captain ownership
@@ -934,7 +941,7 @@ export async function listPublicTournaments(): Promise<SrPublicTournament[]> {
   // needs to bind a text[] for the ANY(...) filter.
   const { rows } = await sql.query(
     `SELECT * FROM sr_tournaments
-     WHERE status = ANY($1::text[])
+     WHERE status = ANY($1::text[]) AND is_test = false
      ORDER BY
        CASE status
          WHEN 'in_progress' THEN 0
@@ -960,11 +967,16 @@ export async function listPublicTournaments(): Promise<SrPublicTournament[]> {
  */
 export async function getPublicTournamentBySlug(
   slug: string,
+  opts: { includeTest?: boolean } = {},
 ): Promise<SrPublicTournamentFull | null> {
   await ensureSchema();
+  // Test tournaments 404 on public pages. Only the venue screen and its
+  // state endpoint pass includeTest, so rehearsals still render there.
+  const includeTest = opts.includeTest === true;
   const { rows } = await sql`
     SELECT id FROM sr_tournaments
     WHERE lower(slug) = lower(${slug})
+      AND (${includeTest} OR is_test = false)
       AND (
         status IN ('seeding','bracket_published','in_progress','completed')
         OR (status = 'archived' AND champion_team_id IS NOT NULL)
@@ -1057,13 +1069,31 @@ export async function getRunnerUpTeams(
   return out;
 }
 
+/**
+ * Approved-team count keyed by slug, for public listings. Test tournaments
+ * are excluded like everywhere else on the public side.
+ */
+export async function getTeamCountsBySlug(slugs: string[]): Promise<Map<string, number>> {
+  if (slugs.length === 0) return new Map();
+  await ensureSchema();
+  const { rows } = await sql.query(
+    `SELECT tr.slug, count(t.id)::int AS c
+     FROM sr_tournaments tr
+     JOIN sr_teams t ON t.tournament_id = tr.id AND t.status = 'approved'
+     WHERE tr.slug = ANY($1::text[]) AND tr.is_test = false
+     GROUP BY tr.slug`,
+    [slugs],
+  );
+  return new Map(rows.map((r) => [r.slug as string, r.c as number]));
+}
+
 /** Team count per tournament — the "field size" line in Hall of Fame. */
 export async function getTeamCounts(tournamentIds: string[]): Promise<Map<string, number>> {
   if (tournamentIds.length === 0) return new Map();
   await ensureSchema();
   const { rows } = await sql.query(
     `SELECT tournament_id, count(*)::int AS c FROM sr_teams
-     WHERE tournament_id = ANY($1::text[])
+     WHERE tournament_id = ANY($1::text[]) AND status = 'approved'
      GROUP BY tournament_id`,
     [tournamentIds],
   );
@@ -1092,7 +1122,7 @@ export async function listSignupOpenTournaments(): Promise<SrTournament[]> {
   await ensureSchema();
   const { rows } = await sql`
     SELECT * FROM sr_tournaments
-    WHERE signups_open = true AND status = 'draft'
+    WHERE signups_open = true AND status = 'draft' AND is_test = false
     ORDER BY start_at ASC NULLS LAST, created_at DESC
   `;
   return rows.map(rowToTournament);

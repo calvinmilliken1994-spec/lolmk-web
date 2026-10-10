@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import Image from "next/image";
 import { AlertTriangle, ShieldCheck, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getDirectoryEntries } from "@/lib/member-db";
+import { discordAvatarUrl } from "@/lib/member-display";
 import type { MemberDirectoryEntry } from "@/types/member-profile";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Members",
-  description: "Admins and Game Coordinators in the LoLMK Discord.",
-};
+  description:
+    "Admins, game coordinators, and members of the LoLMK Discord who've opted in to be shown.",
+  path: "/members",
+});
 
 export const dynamic = "force-dynamic";
 
@@ -81,12 +84,12 @@ export default async function MembersPage({
       <div className="border-t border-line-subtle pt-8">
         <p className="text-body-sm text-ink-muted">
           Verified member?{" "}
-          <Link
-            href="/members/profile"
+          <a
+            href={`/api/auth/member/login?next=${encodeURIComponent("/members")}`}
             className="text-brand-blue-bright hover:text-ink underline underline-offset-4"
           >
             Sign in with Discord
-          </Link>{" "}
+          </a>{" "}
           to set up your profile.
         </p>
       </div>
@@ -115,10 +118,11 @@ function DirectorySection({
             <div className="aspect-square bg-elevated border border-line-subtle overflow-hidden flex items-center justify-center">
               {m.avatarUrl ? (
                 <Image
-                  src={m.avatarUrl}
+                  src={discordAvatarUrl(m.avatarUrl, 512) ?? m.avatarUrl}
                   alt=""
-                  width={200}
-                  height={200}
+                  width={512}
+                  height={512}
+                  sizes="(min-width: 1024px) 280px, (min-width: 768px) 30vw, 45vw"
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -129,6 +133,7 @@ function DirectorySection({
             </div>
             <div>
               <p className="font-heading text-heading-md text-ink leading-tight">{m.displayName}</p>
+              {m.riotId && <p className="mt-0.5 text-body-sm text-ink-muted">{m.riotId}</p>}
               {m.preferredRoles.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {m.preferredRoles.map((r) => (

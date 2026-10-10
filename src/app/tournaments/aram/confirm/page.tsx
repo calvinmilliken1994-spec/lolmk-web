@@ -2,13 +2,17 @@ import type { Metadata } from "next";
 import { getMayhemInviteSelection } from "@/lib/mayhem-db";
 import { getMemberSession } from "@/lib/discord-auth";
 import { ConfirmInviteClient } from "@/components/mayhem/confirm-invite-client";
+import { pageMetadata } from "@/lib/metadata";
 
 // Invite confirmation links are single-use and identity-bound — never
 // worth indexing, and never worth leaking via a referrer header to
 // whatever site an invitee clicks away to next.
 export const metadata: Metadata = {
-  title: "Confirm invite — ARAM Mayhem",
-  robots: { index: false, follow: false },
+  ...pageMetadata({
+    title: "Confirm invite: ARAM Mayhem",
+    description: "Confirm your slot on an ARAM Mayhem team.",
+    noindex: true,
+  }),
   referrer: "no-referrer",
 };
 

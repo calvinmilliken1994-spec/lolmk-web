@@ -7,6 +7,7 @@ import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
 import {
   getApplicationsForCaptain,
+  getTeamCountsBySlug,
   getTeamsForCaptain,
   listPublicTournaments,
   listSignupOpenTournaments,
@@ -14,12 +15,14 @@ import {
 import { getCaptainSession } from "@/lib/discord-auth";
 import type { SrPublicTournament, SrTournament } from "@/types/sr-tournament";
 import { SrPublicSignupGate, SrSignupSection } from "@/components/sr/sr-public-signup";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Summoner's Rift tournaments",
   description:
     "LoLMK's 5v5 Summoner's Rift tournaments on the Korean server: live brackets, team lists and results.",
-};
+  path: "/tournaments/summoners-rift",
+});
 
 // Signup state and eligibility are per-captain (session/cookie driven), so
 // this route renders dynamically like the ARAM page — a cached render would
@@ -53,6 +56,7 @@ export default async function SummonersRiftPublicPage() {
     listPublicTournaments(),
     listSignupOpenTournaments(),
   ]);
+  const fieldBySlug = await getTeamCountsBySlug(tournaments.map((t) => t.slug));
 
   // Same eligibility rule as CaptainDashboard: open for signups, minus
   // tournaments this captain already has a team or a pending application in.
@@ -138,7 +142,7 @@ export default async function SummonersRiftPublicPage() {
           ) : (
             <ul className="grid gap-4 md:grid-cols-2">
               {live.map((t) => (
-                <TournamentCard key={t.slug} tournament={t} />
+                <TournamentCard key={t.slug} tournament={t} field={fieldBySlug.get(t.slug)} />
               ))}
             </ul>
           )}
@@ -149,7 +153,7 @@ export default async function SummonersRiftPublicPage() {
             <h2 className="font-heading text-display-sm text-ink">Finished</h2>
             <ul className="grid gap-4 md:grid-cols-2">
               {finished.map((t) => (
-                <TournamentCard key={t.slug} tournament={t} />
+                <TournamentCard key={t.slug} tournament={t} field={fieldBySlug.get(t.slug)} />
               ))}
             </ul>
           </div>
@@ -159,8 +163,16 @@ export default async function SummonersRiftPublicPage() {
   );
 }
 
-function TournamentCard({ tournament }: { tournament: SrPublicTournament }) {
+function TournamentCard({
+  tournament,
+  field,
+}: {
+  tournament: SrPublicTournament;
+  /** Approved teams in the field. Omitted from the card when unknown or zero. */
+  field: number | undefined;
+}) {
   const status = STATUS_COPY[tournament.status];
+  const window = formatWindow(tournament);
   return (
     <li>
       <Link
@@ -182,14 +194,18 @@ function TournamentCard({ tournament }: { tournament: SrPublicTournament }) {
             {" · "}
             Best of {tournament.best_of}
           </li>
-          <li className="inline-flex items-center gap-2">
-            <Users strokeWidth={1.5} className="h-4 w-4 text-ink-muted" />
-            {tournament.min_teams}–{tournament.max_teams} teams
-          </li>
-          <li className="inline-flex items-center gap-2">
-            <CalendarDays strokeWidth={1.5} className="h-4 w-4 text-ink-muted" />
-            {formatWindow(tournament)}
-          </li>
+          {field ? (
+            <li className="inline-flex items-center gap-2">
+              <Users strokeWidth={1.5} className="h-4 w-4 text-ink-muted" />
+              {field} {field === 1 ? "team" : "teams"}
+            </li>
+          ) : null}
+          {window && (
+            <li className="inline-flex items-center gap-2">
+              <CalendarDays strokeWidth={1.5} className="h-4 w-4 text-ink-muted" />
+              {window}
+            </li>
+          )}
         </ul>
         <span className="mt-auto inline-flex items-center gap-1.5 text-body-sm font-medium text-brand-red-bright">
           {tournament.status === "completed" ? "See the result" : "Open the bracket"}
@@ -200,9 +216,12 @@ function TournamentCard({ tournament }: { tournament: SrPublicTournament }) {
   );
 }
 
-function formatWindow(t: SrPublicTournament): string {
-  if (!t.start_at && !t.end_at) return "Dates to be announced";
-  const start = t.start_at ? DATE_FMT.format(new Date(t.start_at)) : "TBA";
-  const end = t.end_at ? DATE_FMT.format(new Date(t.end_at)) : "TBA";
-  return `${start} – ${end} KST`;
+/** Known dates only. Returns null when the record has neither, so the row is omitted. */
+function formatWindow(t: SrPublicTournament): string | null {
+  const start = t.start_at ? DATE_FMT.format(new Date(t.start_at)) : null;
+  const end = t.end_at ? DATE_FMT.format(new Date(t.end_at)) : null;
+  if (start && end) return start === end ? `${start} KST` : `${start} to ${end} KST`;
+  if (start) return `From ${start} KST`;
+  if (end) return `Until ${end} KST`;
+  return null;
 }

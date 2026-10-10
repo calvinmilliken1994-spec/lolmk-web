@@ -387,7 +387,10 @@ export function rbChampionRecord(full: RbTournamentFull, standings: SwissStandin
     id: `rb-${t.slug}`,
     tournament: t.name,
     game: "Riftbound",
-    date: t.updated_at,
+    formatKey: "rb",
+    // The event day when the admin set one; otherwise when the final was recorded.
+    date: t.config.date ?? t.updated_at,
+    venue: t.config.venue ?? undefined,
     format,
     teams: summary.players,
     champion: { name: summary.name },

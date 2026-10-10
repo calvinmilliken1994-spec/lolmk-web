@@ -13,10 +13,19 @@ function sortByStart(a: CommunityEvent, b: CommunityEvent) {
   return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
 }
 
+/**
+ * Discord scheduled events are the source of truth. The JSON file is only a
+ * fallback for when the bot token is missing or Discord is unreachable, and
+ * it is filtered to events that haven't happened yet: a stale sample row
+ * from a past month must never render as "upcoming".
+ */
 export async function getUpcomingEvents(): Promise<CommunityEvent[]> {
   const live = await getDiscordEvents();
   if (live && live.length > 0) return live;
-  return data.upcoming.slice().sort(sortByStart);
+  const now = Date.now();
+  return data.upcoming
+    .filter((e) => new Date(e.endsAt ?? e.startsAt).getTime() >= now)
+    .sort(sortByStart);
 }
 
 export async function getRecurringSchedule(): Promise<RecurringSchedule[]> {

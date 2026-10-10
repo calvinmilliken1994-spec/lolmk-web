@@ -6,12 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Make a KR League of Legends Account",
   description:
     "How to make a real, verified Korean server League of Legends account: what a Residence Card (ARC) does, why short-term visitors get stuck, and why buying an account isn't the answer.",
-};
+  path: "/how-tos/make-kr-account",
+});
 
 export default function MakeKrAccountPage() {
   return (

@@ -66,6 +66,7 @@ async function listChampionTournaments(): Promise<ChampionTournament[]> {
     SELECT id, slug, name, format, best_of, end_at, updated_at
     FROM sr_tournaments
     WHERE status IN ('completed', 'archived') AND champion_team_id IS NOT NULL
+      AND is_test = false
     ORDER BY end_at DESC NULLS LAST, updated_at DESC
   `;
   return rows.map((row) => ({
@@ -126,6 +127,7 @@ export async function getLiveChampions(
           id: `sr-${t.slug}`,
           tournament: t.name,
           game: "League of Legends",
+          formatKey: "sr",
           date: championDate(t),
           format: formatSummary(t),
           teams: teamCounts.get(t.id),

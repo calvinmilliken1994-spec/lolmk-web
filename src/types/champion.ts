@@ -27,6 +27,10 @@ export interface ChampionRecord {
   format?: string;
   /** Number of teams/players that entered. */
   teams?: number;
+  /** Which LoLMK format this result belongs to. */
+  formatKey?: "sr" | "aram" | "rb";
+  /** Where the final was played, when the record stores it. */
+  venue?: string;
   /** Bracket, VOD, recap links. */
   links?: { label: string; href: string }[];
   /** Marks seeded sample data so the UI can flag it until real results land. */

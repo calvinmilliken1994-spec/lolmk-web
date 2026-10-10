@@ -1,10 +1,12 @@
 import { ComingSoon } from "@/components/sections/coming-soon";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "About",
   description:
-    "LoLMK — the largest English-speaking League of Legends community in Korea.",
-};
+    "LoLMK is the largest English-speaking League of Legends community in Korea. Run by volunteers since 2014, partnered with Gen.G GGX.",
+  path: "/about",
+});
 
 export default function AboutPage() {
   return (

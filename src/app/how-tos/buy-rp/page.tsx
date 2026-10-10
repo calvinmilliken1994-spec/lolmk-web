@@ -5,12 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Buy RP in Korea",
   description:
     "Payment methods for topping up RP on the KR League of Legends server as a foreigner, and why most foreign cards fail at checkout.",
-};
+  path: "/how-tos/buy-rp",
+});
 
 export default function BuyRpPage() {
   return (

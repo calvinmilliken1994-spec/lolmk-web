@@ -90,6 +90,11 @@ export function ensureSchema(): Promise<void> {
         await client.query(
           `CREATE INDEX IF NOT EXISTS rb_tournaments_status_idx ON rb_tournaments (status)`,
         );
+        // Rehearsal/test events: hidden from public listings and the Hall of
+        // Champions. The venue screen (/rblive) still serves them by slug.
+        await client.query(
+          `ALTER TABLE rb_tournaments ADD COLUMN IF NOT EXISTS is_test boolean NOT NULL DEFAULT false`,
+        );
 
         await client.query(`
           CREATE TABLE IF NOT EXISTS rb_players (
@@ -610,6 +615,7 @@ export async function listChampionEvents(): Promise<RbTournamentFull[]> {
   const { rows } = await sql.query(
     `SELECT * FROM rb_tournaments
      WHERE status IN ('completed', 'archived') AND champion_player_id IS NOT NULL
+       AND is_test = false
      ORDER BY updated_at DESC`,
   );
   return Promise.all(rows.map((r) => loadFull(r)));
@@ -677,6 +683,52 @@ export function toPublicMatch(m: RbMatch): RbPublicMatch {
     started_at: m.started_at,
     status: m.status,
   };
+}
+
+/** One row per public, non-test Riftbound event, for listings and status chips. */
+export interface RbPublicEventSummary {
+  slug: string;
+  name: string;
+  status: RbTournament["status"];
+  /** KST calendar date, "YYYY-MM-DD", when the admin has set it. */
+  date: string | null;
+  venue: string | null;
+  bestOf: 1 | 3;
+  swissRounds: "auto" | number;
+  topCut: "auto" | 0 | 4 | 8;
+  /** Registered players, excluding drops and disqualifications. */
+  players: number;
+}
+
+/**
+ * Public, non-test events (registration, in progress, completed), soonest
+ * upcoming first. Read-only. Feeds the Riftbound plate and the status bar.
+ */
+export async function listPublicEvents(): Promise<RbPublicEventSummary[]> {
+  await ensureSchema();
+  const { rows } = await sql.query(
+    `SELECT t.slug, t.name, t.status, t.config,
+            (SELECT count(*)::int FROM rb_players p
+              WHERE p.tournament_id = t.id AND p.status NOT IN ('dropped','dq')) AS players
+     FROM rb_tournaments t
+     WHERE t.status = ANY($1::text[]) AND t.is_test = false
+     ORDER BY (t.config->>'date') ASC NULLS LAST, t.created_at DESC`,
+    [RB_PUBLIC_STATUSES],
+  );
+  return rows.map((r) => {
+    const config = parseConfig(r.config);
+    return {
+      slug: r.slug as string,
+      name: r.name as string,
+      status: r.status as RbTournament["status"],
+      date: config.date ?? null,
+      venue: config.venue ?? null,
+      bestOf: config.bestOf,
+      swissRounds: config.swissRounds,
+      topCut: config.topCut,
+      players: Number(r.players ?? 0),
+    };
+  });
 }
 
 /**

@@ -12,6 +12,7 @@ import type {
 import { MEMBER_PLAY_MODES, RIOT_PLATFORMS } from "@/types/member-profile";
 import { SR_PLAYER_ROLES } from "@/types/sr-tournament";
 import { resolveRiotAccount } from "@/lib/riot";
+import { splitDisplayName } from "@/lib/member-display";
 import { isKnownChampionId } from "@/lib/ddragon";
 
 /**
@@ -427,17 +428,27 @@ export async function getDirectoryEntries(): Promise<{
   coordinators: MemberDirectoryEntry[];
 }> {
   await ensureMemberProfileSchema();
+  // The primary linked Riot ID (if any) is joined in for the card's
+  // secondary line. Only game_name/tag_line leave this query, never the id.
   const { rows } = await sql`
-    SELECT display_name, avatar_url, directory_category, bio, preferred_roles, favorite_champion
-    FROM member_profiles
-    WHERE directory_opt_in = true AND directory_category IS NOT NULL
-    ORDER BY display_name ASC
+    SELECT p.display_name, p.avatar_url, p.directory_category, p.bio, p.preferred_roles,
+           p.favorite_champion, r.game_name AS riot_game_name, r.tag_line AS riot_tag_line
+    FROM member_profiles p
+    LEFT JOIN member_riot_ids r ON r.discord_user_id = p.discord_user_id AND r.is_primary
+    WHERE p.directory_opt_in = true AND p.directory_category IS NOT NULL
+    ORDER BY p.display_name ASC
   `;
   const admins: MemberDirectoryEntry[] = [];
   const coordinators: MemberDirectoryEntry[] = [];
   for (const row of rows) {
+    const split = splitDisplayName(row.display_name as string);
+    const linkedRiotId =
+      row.riot_game_name && row.riot_tag_line
+        ? `${row.riot_game_name as string}#${row.riot_tag_line as string}`
+        : null;
     const entry: MemberDirectoryEntry = {
-      displayName: row.display_name as string,
+      displayName: split.name,
+      riotId: linkedRiotId ?? split.riotId,
       avatarUrl: (row.avatar_url as string) ?? null,
       category: row.directory_category as "admin" | "coordinator",
       bio: (row.bio as string) ?? "",

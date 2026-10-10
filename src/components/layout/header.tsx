@@ -13,7 +13,6 @@ const NAV_LINKS = [
   { href: "/tournaments", label: "Tournaments" },
   { href: "/members", label: "Members" },
   { href: "/how-tos", label: "How-tos" },
-  { href: "/shop", label: "Shop" },
   { href: "/about", label: "About" },
 ];
 
@@ -27,7 +26,14 @@ export function Header({ member }: { member?: HeaderMemberState | null }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  const loginHref = `/api/auth/member/login?next=${encodeURIComponent(pathname || "/members")}`;
+  // One sign-in route everywhere, returning to the exact page (path, query
+  // and hash) the visitor started from. usePathname() drops the query, so the
+  // full location is read on the client after navigation.
+  const [returnTo, setReturnTo] = useState(pathname || "/");
+  useEffect(() => {
+    setReturnTo(`${window.location.pathname}${window.location.search}${window.location.hash}`);
+  }, [pathname]);
+  const loginHref = `/api/auth/member/login?next=${encodeURIComponent(returnTo)}`;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 4);
@@ -194,13 +200,11 @@ export function Header({ member }: { member?: HeaderMemberState | null }) {
               </>
             ) : (
               <a
-                href="https://discord.gg/lolmk"
-                target="_blank"
-                rel="noreferrer"
+                href={loginHref}
                 className={cn(buttonVariants({ variant: "discord", size: "lg" }), "mt-8 w-full")}
               >
                 <DiscordIcon className="h-6 w-6" />
-                Log in with Discord
+                Verified members login
                 <BadgeCheck strokeWidth={2} className="h-5 w-5 text-success" />
               </a>
             )}

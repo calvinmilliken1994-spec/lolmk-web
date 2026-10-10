@@ -45,6 +45,12 @@ export function SrPublicBracket({
   championTeamId: string | null;
 }) {
   const teamById = new Map(teams.map((t) => [t.id, t]));
+  // The trophy marks the champion once: on their row in the deciding grand
+  // final (the reset when one was played), not in every round they won.
+  const decidingFinalId =
+    matches
+      .filter((m) => m.bracket === "grand_final" && m.status === "completed")
+      .sort((a, b) => b.round_number - a.round_number)[0]?.id ?? null;
 
   // A fully-dead bye (both slots permanently unreachable, nothing played)
   // carries no information for a viewer — the engine emits these for
@@ -93,7 +99,7 @@ export function SrPublicBracket({
                         key={m.id}
                         match={m}
                         teamById={teamById}
-                        championTeamId={championTeamId}
+                        championTeamId={m.id === decidingFinalId ? championTeamId : null}
                       />
                     ))}
                   </div>

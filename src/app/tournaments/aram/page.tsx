@@ -9,12 +9,14 @@ import { getMayhemPublic, listMayhemEvents } from "@/lib/mayhem-db";
 import { getMemberSession } from "@/lib/discord-auth";
 import type { MayhemPublic, MayhemPublicTeam } from "@/types/mayhem";
 import { AramSignupPanel } from "@/components/mayhem/aram-signup-panel";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "ARAM Mayhem",
   description:
-    "LoLMK's ARAM meetup tournament: sign up solo or bring a full premade team, teams drawn live, bracket runs the same day.",
-};
+    "LoLMK's ARAM meetup tournament: turn up solo or bring a premade team, teams drawn live on the venue screen, and the bracket runs the same night.",
+  path: "/tournaments/aram",
+});
 
 // This route depends on a live singleton event. Rendering it dynamically keeps
 // a missing build-time database from turning the public ARAM route into a

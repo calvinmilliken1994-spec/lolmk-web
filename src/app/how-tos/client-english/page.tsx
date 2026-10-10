@@ -5,12 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Switch the League Client to English",
   description:
     "Set your Riot Client and League of Legends to English while playing on the KR server, without changing your account region.",
-};
+  path: "/how-tos/client-english",
+});
 
 export default function ClientEnglishPage() {
   return (

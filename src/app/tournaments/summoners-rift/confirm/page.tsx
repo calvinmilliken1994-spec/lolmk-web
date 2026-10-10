@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import { getMemberSession } from "@/lib/discord-auth";
 import { ConfirmInviteClient } from "@/components/sr/confirm-invite-client";
+import { pageMetadata } from "@/lib/metadata";
 
 // Invite confirmation links are single-use and identity-bound — never worth
 // indexing, and never worth leaking via a referrer header to whatever site an
 // invitee clicks away to next.
 export const metadata: Metadata = {
-  title: "Confirm invite — Summoner's Rift",
-  robots: { index: false, follow: false },
+  ...pageMetadata({
+    title: "Confirm invite: Summoner's Rift",
+    description: "Confirm your slot on a Summoner's Rift team.",
+    noindex: true,
+  }),
   referrer: "no-referrer",
 };
 

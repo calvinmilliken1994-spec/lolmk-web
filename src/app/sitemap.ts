@@ -19,7 +19,6 @@ const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[numb
   { path: "/how-tos/pc-bang", changeFrequency: "monthly", priority: 0.7 },
   { path: "/members", changeFrequency: "weekly", priority: 0.5 },
   { path: "/about", changeFrequency: "monthly", priority: 0.5 },
-  { path: "/shop", changeFrequency: "monthly", priority: 0.3 },
 ];
 
 /**

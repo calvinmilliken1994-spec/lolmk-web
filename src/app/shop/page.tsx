@@ -1,10 +1,12 @@
 import { ComingSoon } from "@/components/sections/coming-soon";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Shop",
-  description:
-    "LoLMK merch. Coming soon.",
-};
+  description: "LoLMK merch.",
+  path: "/shop",
+  noindex: true,
+});
 
 export default function ShopPage() {
   return (

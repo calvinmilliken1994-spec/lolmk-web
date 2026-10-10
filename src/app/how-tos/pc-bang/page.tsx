@@ -5,12 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "PC Bang Guide for Foreigners",
   description:
     "What to expect walking into a Korean PC bang as a foreigner: sign-in, payment, seat setup, and its limits as a workaround for account creation.",
-};
+  path: "/how-tos/pc-bang",
+});
 
 export default function PcBangPage() {
   return (

@@ -17,7 +17,6 @@ const COLUMNS: { title: string; links: { label: string; href: string; external?:
       { label: "Tournaments", href: "/tournaments" },
       { label: "Members", href: "/members" },
       { label: "How-tos", href: "/how-tos" },
-      { label: "Shop", href: "/shop" },
       { label: "About", href: "/about" },
     ],
   },

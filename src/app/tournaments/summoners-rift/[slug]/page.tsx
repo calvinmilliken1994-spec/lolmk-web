@@ -7,6 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
 import { getPublicTournamentBySlug } from "@/lib/sr-db";
+import { pageMetadata } from "@/lib/metadata";
 import { SrPublicBracket } from "@/components/sr/sr-public-bracket";
 import type { SrPublicTeam, SrPublicTournamentFull } from "@/types/sr-tournament";
 
@@ -26,11 +27,18 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const data = await getPublicTournamentBySlug(slug);
-  if (!data) return { title: "Tournament not found" };
-  return {
+  if (!data) {
+    return pageMetadata({
+      title: "Tournament not found",
+      description: "This tournament doesn't exist or isn't public.",
+      noindex: true,
+    });
+  }
+  return pageMetadata({
     title: data.tournament.name,
-    description: `${data.tournament.name} — LoLMK Summoner's Rift tournament on the KR server.`,
-  };
+    description: `${data.tournament.name}: a LoLMK Summoner's Rift tournament on the KR server. Bracket, field and results.`,
+    path: `/tournaments/summoners-rift/${data.tournament.slug}`,
+  });
 }
 
 /**

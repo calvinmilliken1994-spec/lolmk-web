@@ -2,12 +2,14 @@ import Link from "next/link";
 import { ArrowRight, BookOpen, IdCard, Languages, PcCase, Wallet } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "How-tos",
   description:
-    "Guides for playing on the Korean LoL server: making an account, buying RP, finding PC bangs, and more.",
-};
+    "Guides for playing on the Korean LoL server: making an account, switching the client to English, buying RP, and PC bangs.",
+  path: "/how-tos",
+});
 
 const GUIDES = [
   {

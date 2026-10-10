@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ComingSoon } from "@/components/sections/coming-soon";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Riftbound",
   description:
-    "Riftbound events at LoLMK — nothing scheduled yet. Interest is being gauged in the Discord.",
-};
+    "Riftbound at LoLMK: in-person cups at Gen.G GGX and a weekly online night anyone can join.",
+  path: "/tournaments/riftbound",
+});
 
 /**
  * Honest placeholder. There is no Riftbound tournament, no Riftbound data

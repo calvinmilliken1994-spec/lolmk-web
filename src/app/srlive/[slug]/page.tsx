@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import { SrLiveScreen } from "@/components/sr/sr-live-screen";
 import { getPublicTournamentBySlug } from "@/lib/sr-db";
 import { SR_SCENES, type SrMatchScene } from "@/types/sr-tournament";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Summoner's Rift — Live",
+export const metadata: Metadata = pageMetadata({
+  title: "Summoner's Rift live",
   description: "Live venue screen for LoLMK Summoner's Rift tournaments.",
-  robots: { index: false, follow: false },
-};
+  noindex: true,
+});
 export const dynamic = "force-dynamic";
 
 type Query = { muted?: string; scene?: string; preview?: string };
@@ -32,7 +33,7 @@ export default async function SrLivePage({
   const { slug } = await params;
   const q = await searchParams;
   const preview = q.preview === "1";
-  const data = await getPublicTournamentBySlug(slug);
+  const data = await getPublicTournamentBySlug(slug, { includeTest: true });
   return (
     <SrLiveScreen
       initial={data}

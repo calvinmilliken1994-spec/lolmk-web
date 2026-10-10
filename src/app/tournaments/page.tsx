@@ -4,12 +4,15 @@ import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { HallOfChampions } from "@/components/sections/hall-of-champions";
 import { getChampions } from "@/lib/champions";
+import { formatChip, getTournamentOverview, type FormatKey } from "@/lib/tournament-status";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Tournaments",
   description:
-    "Tournaments run by LoLMK on the Korean server: 5v5 Summoner's Rift, ARAM Mayhem, and Riftbound.",
-};
+    "Tournaments run by LoLMK on the Korean server: 5v5 Summoner's Rift, ARAM Mayhem and Riftbound. Live brackets, the field, and how to get in.",
+  path: "/tournaments",
+});
 
 // The Hall of Champions below is DB-backed (completed Summoner's Rift
 // tournaments merged with the legacy static file), so this page can't be
@@ -24,7 +27,8 @@ interface GameEntry {
   emblem: string;
   emblemAlt: string;
   emblemDims: { width: number; height: number };
-  status: { label: string; variant: "red" | "blue" | "outline" };
+  /** Status comes from tournament-status.ts, never from this list. */
+  format: FormatKey;
 }
 
 const GAMES: GameEntry[] = [
@@ -33,34 +37,34 @@ const GAMES: GameEntry[] = [
     href: "/tournaments/summoners-rift",
     kicker: "5v5 · Full draft",
     description:
-      "The main event. Fixed rosters, random seeding, single or double elimination played out over a week or a month on the KR server.",
+      "The main event. Fixed rosters and full draft, played out on the KR server over a week or a month.",
     emblem: "/images/formats/summoners-rift-badge-new.png",
     emblemAlt: "Summoner's Rift badge: rounded gold-framed navy crest",
     emblemDims: { width: 493, height: 488 },
-    status: { label: "Running", variant: "red" },
+    format: "sr",
   },
   {
     name: "ARAM Mayhem",
     href: "/tournaments/aram",
     kicker: "5v5 · Howling Abyss",
     description:
-      "The meetup tournament. Turn up solo, get randomised into a team on the venue screen, and play the whole bracket the same night.",
+      "The meetup tournament. Turn up solo, get drawn into a random team on the venue screen, and play the whole bracket that night.",
     emblem: "/images/formats/aram-badge-new.png",
     emblemAlt: "ARAM badge: elongated gold-framed navy gem crest matching the Summoner's Rift palette",
     emblemDims: { width: 469, height: 472 },
-    status: { label: "At meetups", variant: "blue" },
+    format: "aram",
   },
   {
     name: "Riftbound",
     href: "/tournaments/riftbound",
     kicker: "Card game",
     description:
-      "Nothing scheduled yet. If there's appetite for a Riftbound event, it starts as a conversation in the Discord.",
+      "The card game. In-person cups at GGX, plus a weekly online night anyone can join for free on tcg-arena.fr.",
     emblem: "/images/formats/riftbound-badge-new-cropped.png",
     emblemAlt:
       "Riftbound badge: fanned trading cards in gold-framed navy panels matching the other two badges",
     emblemDims: { width: 1077, height: 640 },
-    status: { label: "Not scheduled", variant: "outline" },
+    format: "rb",
   },
 ];
 
@@ -70,7 +74,8 @@ export default async function TournamentsPage() {
   // the top and be presented as the reigning champion. Real results only in
   // latest/past; the sample is passed separately and only surfaces (badged)
   // when there is nothing real to show.
-  const champions = await getChampions();
+  const [champions, overview] = await Promise.all([getChampions(), getTournamentOverview()]);
+  const now = new Date(overview.now);
   const real = champions.filter((r) => !r.placeholder);
   const samples = champions.filter((r) => r.placeholder);
   const latest = real[0] ?? null;
@@ -100,7 +105,9 @@ export default async function TournamentsPage() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
-          {GAMES.map((game) => (
+          {GAMES.map((game) => {
+            const chip = formatChip(overview.states[game.format], now);
+            return (
             <Link
               key={game.href}
               href={game.href}
@@ -116,7 +123,9 @@ export default async function TournamentsPage() {
                     className="h-20 w-auto"
                   />
                 </span>
-                <Badge variant={game.status.variant}>{game.status.label}</Badge>
+                <Badge variant={chip.tone === "red" ? "red" : "outline"} pulse={chip.pulse}>
+                  {chip.label}
+                </Badge>
               </div>
               <div className="mt-6 flex-1">
                 <p className="text-caption font-mono uppercase tracking-wider text-ink-muted">
@@ -134,7 +143,8 @@ export default async function TournamentsPage() {
                 <ArrowRight strokeWidth={2} className="h-4 w-4" />
               </span>
             </Link>
-          ))}
+            );
+          })}
         </div>
 
         <p className="mt-8 text-body-sm text-ink-muted">

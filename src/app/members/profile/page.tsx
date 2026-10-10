@@ -5,11 +5,13 @@ import { getProfile, listRiotIds } from "@/lib/member-db";
 import { isRiotConfigured } from "@/lib/riot";
 import { listChampions } from "@/lib/ddragon";
 import { MemberProfileEditor } from "@/components/members/member-profile-editor";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "My profile",
-  robots: { index: false, follow: false },
-};
+  description: "Edit your LoLMK member profile.",
+  noindex: true,
+});
 
 export const dynamic = "force-dynamic";
 

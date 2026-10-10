@@ -4,12 +4,13 @@ import { notFound } from "next/navigation";
 import { getMayhemVenueState } from "@/lib/mayhem-db";
 import { MayhemLiveScreen } from "@/components/mayhem/mayhem-live-screen";
 import { mayhemParseScene } from "@/components/mayhem/mayhem-deck-model";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "ARAM Mayhem — Live",
+export const metadata: Metadata = pageMetadata({
+  title: "ARAM Mayhem live",
   description: "Live venue screen for LoLMK ARAM Mayhem tournaments.",
-  robots: { index: false, follow: false },
-};
+  noindex: true,
+});
 export const dynamic = "force-dynamic";
 
 type Query = { t?: string; scene?: string; preview?: string };

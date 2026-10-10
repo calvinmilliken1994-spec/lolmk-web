@@ -9,12 +9,13 @@ import {
 import { isBlobConfigured } from "@/lib/team-logo";
 import { isRiotConfigured } from "@/lib/riot";
 import { CaptainDashboard } from "@/components/sr/captain-dashboard";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "My team",
   description: "Register a Summoner's Rift team and manage your roster.",
-  robots: { index: false, follow: false },
-};
+  noindex: true,
+});
 
 export const dynamic = "force-dynamic";
 
