@@ -1,39 +1,23 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight, Languages, MonitorCog } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Languages, MonitorCog } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
+import { pageMetadata } from "@/lib/metadata";
+import { GuideLayout } from "@/components/ds/guide-layout";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Switch the League Client to English",
   description:
     "Set your Riot Client and League of Legends to English while playing on the KR server, without changing your account region.",
-};
+  path: "/how-tos/client-english",
+});
 
 export default function ClientEnglishPage() {
   return (
-    <>
-      <section className="container-wide pt-16 pb-16 md:pt-20 border-b border-line-subtle">
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          <Link href="/how-tos" className="text-body-sm text-ink-muted hover:text-ink">
-            How-tos
-          </Link>
-          <span className="text-ink-muted">/</span>
-          <Badge variant="outline">Client to English</Badge>
-        </div>
-        <h1 className="font-heading text-display-md text-ink leading-tight max-w-3xl">
-          Switching the client to English.
-        </h1>
-        <p className="mt-6 text-body-lg text-ink-secondary max-w-[60ch]">
-          A KR account defaults to Korean. Language is a client setting, separate from your
-          account region, so switching it doesn&apos;t move your server or reset your rank.
-        </p>
-      </section>
-
-      <section className="container-wide py-16 border-b border-line-subtle">
-        <p className="text-label uppercase text-ink-muted mb-4">Method 1: recommended</p>
+    <GuideLayout slug="client-english">
+      <section id="riot-client" className="py-16 border-b border-line-subtle">
+        <p className="font-heading text-ds-label text-ds-text-dim mb-4">Method 1: recommended</p>
         <h2 className="font-heading text-display-sm text-ink mb-6">
           Change it from inside the Riot Client.
         </h2>
@@ -72,8 +56,8 @@ export default function ClientEnglishPage() {
         </ol>
       </section>
 
-      <section className="container-wide py-16 border-b border-line-subtle">
-        <p className="text-label uppercase text-ink-muted mb-4">Method 2: launch shortcut flag</p>
+      <section id="launch-flag" className="py-16 border-b border-line-subtle">
+        <p className="font-heading text-ds-label text-ds-text-dim mb-4">Method 2: launch shortcut flag</p>
         <h2 className="font-heading text-display-sm text-ink mb-6">
           If the settings menu won&apos;t stick.
         </h2>
@@ -107,7 +91,7 @@ export default function ClientEnglishPage() {
         </div>
       </section>
 
-      <section className="container-wide py-16">
+      <section className="py-16">
         <div className="grid gap-6 md:grid-cols-2 max-w-[70ch]">
           <div className="border border-line bg-surface p-6 space-y-3">
             <Languages strokeWidth={1.5} className="h-7 w-7 text-brand-red" />
@@ -144,10 +128,9 @@ export default function ClientEnglishPage() {
           >
             <DiscordIcon className="h-6 w-6" />
             Ask in Discord
-            <ArrowRight strokeWidth={2} className="h-5 w-5" />
           </a>
         </div>
       </section>
-    </>
+    </GuideLayout>
   );
 }

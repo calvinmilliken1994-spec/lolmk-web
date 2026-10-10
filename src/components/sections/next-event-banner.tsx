@@ -1,4 +1,3 @@
-import { ArrowRight } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatKstDateTime } from "@/lib/format";
@@ -98,7 +97,6 @@ export function NextEventBanner({
             className={cn(buttonVariants({ variant: "primary", size: "sm" }), "whitespace-nowrap")}
           >
             {ctaLabel}
-            <ArrowRight strokeWidth={2} className="h-4 w-4" />
           </a>
         </div>
       </div>

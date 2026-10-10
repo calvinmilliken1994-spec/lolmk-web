@@ -2,30 +2,38 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+// Redesign buttons (handover Phase 2): Space Grotesk 600, no radius, 44px
+// minimum touch target (52px at `lg`, used in bands). Primary and Discord
+// carry the bottom-right 10px cut. Discord buttons are brand red with the
+// Discord mark, never Discord blurple.
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 font-medium transition-colors duration-150 ease-out-soft disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-disabled disabled:border-transparent",
+  "inline-flex min-h-11 items-center justify-center gap-2 font-heading font-semibold transition-colors duration-150 ease-out-soft disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-disabled disabled:border-transparent",
   {
     variants: {
       variant: {
         primary:
-          "bg-brand-red text-ink hover:bg-brand-red-hover active:bg-brand-red-muted rounded-md font-semibold",
+          "cut-btn bg-ds-red text-white hover:bg-brand-red-hover active:bg-brand-red-muted",
+        // Outline on navy: 1px line-strong.
         secondary:
-          "border border-line-strong bg-transparent text-ink hover:border-brand-red rounded-md font-semibold",
+          "border border-ds-line-strong bg-transparent text-ds-text hover:border-ds-text",
+        outline:
+          "border border-ds-line-strong bg-transparent text-ds-text hover:border-ds-text",
+        // Outline on red or blue panels: 1px white.
+        "outline-light":
+          "border border-white bg-transparent text-white hover:bg-white/10",
         ghost:
-          "bg-transparent text-ink-secondary hover:text-ink rounded-md",
-        // Discord blurple. Hover shade matches Discord's own hover-on-button
-        // treatment from their marketing site.
+          "bg-transparent text-ds-text-muted hover:text-ds-text",
         discord:
-          "bg-[#5865F2] text-white hover:bg-[#4752C4] active:bg-[#3C45A5] rounded-md font-semibold",
+          "cut-btn bg-ds-red text-white hover:bg-brand-red-hover active:bg-brand-red-muted",
         // KakaoTalk corporate yellow (#FEE500) with their conventional black
         // text. Hover step matches their official press kit hover spec.
         kakao:
-          "bg-[#FEE500] text-[#181600] hover:bg-[#FDD835] active:bg-[#FBC02D] rounded-md font-semibold",
+          "bg-[#FEE500] text-[#181600] hover:bg-[#FDD835] active:bg-[#FBC02D]",
       },
       size: {
-        sm: "px-4 py-2 text-body-sm",
-        md: "px-6 py-3 text-body-md",
-        lg: "px-8 py-4 text-body-lg",
+        sm: "px-4 py-2 text-ds-ui",
+        md: "px-6 py-2 text-ds-ui",
+        lg: "min-h-[52px] px-8 py-2 text-body-md",
       },
     },
     defaultVariants: {

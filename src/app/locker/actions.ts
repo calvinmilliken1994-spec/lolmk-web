@@ -32,7 +32,7 @@ async function requireMember() {
 }
 
 function refresh() {
-  revalidatePath("/members/profile");
+  revalidatePath("/locker");
   revalidatePath("/members");
 }
 

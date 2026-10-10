@@ -1,5 +1,25 @@
 # Colors
 
+> **2026 redesign (wins over the older values below for public subpages).** Tokens from `docs/redesign-handover.md`, available in Tailwind under the `ds` namespace (`bg-ds-surface`, `text-ds-text-dim`, …). The homepage and `/tools` keep the older tokens below until they are redesigned.
+>
+> | Token | Hex | Use |
+> | --- | --- | --- |
+> | `ds-ground` | `#0A0E1A` | Page background (the existing base, within a shade of the handover's `#0B1021`, so kept) |
+> | `ds-surface` | `#121A33` | Panels, plates, table headers |
+> | `ds-surface-2` | `#172142` | Skeleton base |
+> | `ds-line` | `#23305A` | Panel borders, stat strip dividers |
+> | `ds-line-soft` | `#1E2A52` | Row dividers, nav border, neutral chips |
+> | `ds-line-strong` | `#3A4C85` | Outline buttons, hover borders |
+> | `ds-text` | `#EEF1F8` | Primary text |
+> | `ds-text-muted` | `#A3ACC6` | Decks, body on panels |
+> | `ds-text-dim` | `#8792B3` | Labels |
+> | `ds-red` | `#BA263C` | Primary buttons, page tags, live states |
+> | `ds-blue` | `#283D74` | Secondary tag (Locker), champion split, off-season |
+> | `ds-gold` | `#D9B25F` | Champions only |
+> | `ds-online` | `#3FB57A` | Online-now dot only |
+>
+> Rules: red text only at 24px and above (smaller red is a fill with white text); blue is only ever a fill; gold only marks champions; no Discord blurple (`#5865F2`) anywhere: Discord buttons are brand red with the Discord mark.
+
 LoLMK's color system. Dark-first, high-contrast, brand-derived from the logo (red shield + navy shield + Taegeuk colors). Use these tokens in Tailwind config and CSS variables — never hardcode hex values in components.
 
 ## Palette
@@ -124,7 +144,7 @@ theme: {
 - **Primary CTA**: `brand-red` background + `text-primary` text + `brand-red-hover` on hover
 - **Secondary CTA**: transparent background + 1px `border-strong` + `text-primary` text + border shifts to `brand-red` on hover
 - **Active nav state**: `text-primary` text + 2px `brand-red` underline (offset 4px)
-- **KR-specific badge**: `brand-blue-muted` background + `brand-blue-bright` text, `label` font (uppercase, tracked)
+- **KR-specific badge**: `brand-blue-muted` background + `brand-blue-bright` text, `label` font (sentence case on redesigned pages; see the 2026 redesign section)
 - **Live tournament badge**: `brand-red-muted` background + `brand-red-bright` text, with a pulsing dot
 - **Tournament W/L badge**: `success` (W) or `danger` (L) at 20% opacity background + full opacity text
 - **Hero accent gradient** (rare, intentional moments): linear gradient from `brand-red` to `brand-blue` at low opacity, behind hero text

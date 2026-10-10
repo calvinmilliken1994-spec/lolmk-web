@@ -93,9 +93,13 @@ export interface MemberRiotEnrichment {
 
 /** A directory entry as a visitor sees it — self-reported fields only, never the Discord id. */
 export interface MemberDirectoryEntry {
+  /** Display name with any "RiotName#TAG (Name)" nickname pattern stripped to the name. */
   displayName: string;
+  /** Primary linked Riot ID, else one parsed from the Discord nickname. Null when neither exists. */
+  riotId: string | null;
   avatarUrl: string | null;
-  category: "admin" | "coordinator";
+  /** "member" when the person has no staff category (opted-in members). */
+  category: "admin" | "coordinator" | "member";
   bio: string;
   preferredRoles: MemberPreferredRole[];
   favoriteChampion: string | null;

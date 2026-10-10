@@ -50,4 +50,5 @@ pnpm-workspace.yaml
 
 # Root-level markdown notes are kept local, not in the repo
 /*.md
+!/OPEN_QUESTIONS.md
 /.hermes.md

@@ -5,11 +5,13 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isCaptainAuthConfigured } from "@/lib/discord-auth";
 import { DiscordIcon } from "@/components/ui/brand-icons";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Captain sign in",
-  robots: { index: false, follow: false },
-};
+  description: "Sign in with Discord to manage your Summoner's Rift team.",
+  noindex: true,
+});
 
 export const dynamic = "force-dynamic";
 

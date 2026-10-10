@@ -1,43 +1,54 @@
-import type { Metadata } from "next";
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { ComingSoon } from "@/components/sections/coming-soon";
+import { buttonVariants } from "@/components/ui/button";
+import { DiscordIcon } from "@/components/ui/brand-icons";
+import { FormatStatus } from "@/components/ds/format-status";
+import { PageHeader } from "@/components/ds/page-header";
+import { statCells } from "@/components/ds/stat-strip";
+import { cn } from "@/lib/utils";
+import { pageMetadata } from "@/lib/metadata";
+import { getTournamentOverview } from "@/lib/tournament-status";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Riftbound",
   description:
-    "Riftbound events at LoLMK — nothing scheduled yet. Interest is being gauged in the Discord.",
-};
+    "Riftbound at LoLMK: in-person cups at Gen.G GGX and a weekly online night anyone can join.",
+  path: "/tournaments/riftbound",
+});
+
+export const revalidate = 300;
 
 /**
- * Honest placeholder. There is no Riftbound tournament, no Riftbound data
- * source and no Riftbound admin tool — this page says exactly that rather
- * than inventing a schedule or a fake bracket. It exists because
- * /tournaments links to it as one of the three games, and a link to nothing
- * is worse than a link to a straight answer.
+ * Riftbound format page. Cups are run through /tools/riftbound
+ * (rb_tournaments) and announced as Discord scheduled events; both feed the
+ * status bar. The weekly online night is fixed copy from the handover.
  */
-export default function RiftboundPage() {
+export default async function RiftboundPage() {
+  const overview = await getTournamentOverview();
+  const state = overview.states.rb;
+  const weekly = { k: "Weekly online night", v: "Wed 8:30 PM KST, tcg-arena.fr" };
+
   return (
     <>
-      <div className="container-wide pt-10">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link href="/tournaments" className="text-body-sm text-ink-muted hover:text-ink">
-            Tournaments
-          </Link>
-          <span className="text-ink-muted">/</span>
-          <Badge variant="outline">Riftbound</Badge>
-        </div>
-      </div>
-      <ComingSoon
-        kicker="Riftbound"
-        title="Nothing scheduled yet."
-        description="LoLMK hasn't run a Riftbound event. If enough people want one, that's where it starts — say so in the Discord and it'll get organised. When there is something real to show, it goes here."
-        bullets={[
-          "No Riftbound tournament has been announced or scheduled.",
-          "Interest is being gauged in the LoLMK Discord first.",
-          "This page will carry the format, signups and results once an event exists.",
-        ]}
+      <PageHeader
+        tag="Riftbound"
+        title="Riftbound."
+        deck="The card game. In-person cups at Gen.G GGX, plus a weekly online night anyone can join for free on tcg-arena.fr."
+        stats={statCells([
+          { k: "Where", v: "Gen.G GGX and online" },
+          { k: "Players at the last cup", v: state.lastResult?.teams ? String(state.lastResult.teams) : null },
+        ])}
+        actions={
+          <a
+            href="https://discord.gg/lolmk"
+            target="_blank"
+            rel="noreferrer"
+            className={cn(buttonVariants({ variant: "discord", size: "md" }))}
+          >
+            <DiscordIcon className="h-5 w-5" />
+            Join the Discord
+          </a>
+        }
       />
+      <FormatStatus overview={overview} format="rb" weekly={weekly} />
     </>
   );
 }

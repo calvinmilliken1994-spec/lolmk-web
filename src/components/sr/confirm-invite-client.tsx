@@ -56,32 +56,32 @@ export function ConfirmInviteClient({
   }
 
   return (
-    <section className="container-wide py-20 max-w-lg">
-      <div className="border border-line bg-surface p-8 text-center space-y-5">
+    <section className="ds-container pb-[clamp(64px,8vw,104px)]">
+      <div className="max-w-xl space-y-5 border border-ds-line bg-ds-surface p-8">
         {status === "confirmed" ? (
           <>
-            <Check className="h-10 w-10 mx-auto text-success" />
-            <p className="font-heading text-heading-md text-ink">{message}</p>
+            <Check className="h-10 w-10 text-success" />
+            <p className="font-heading text-ds-ui-lg font-semibold text-ds-text">{message}</p>
           </>
         ) : status === "declined" ? (
           <>
-            <X className="h-10 w-10 mx-auto text-ink-muted" />
-            <p className="font-heading text-heading-md text-ink">{message}</p>
+            <X className="h-10 w-10 text-ink-muted" />
+            <p className="font-heading text-ds-ui-lg font-semibold text-ds-text">{message}</p>
           </>
         ) : status === "error" ? (
           <>
-            <ShieldAlert className="h-10 w-10 mx-auto text-danger" />
-            <p className="font-heading text-heading-md text-ink">{message}</p>
+            <ShieldAlert className="h-10 w-10 text-danger" />
+            <p className="font-heading text-ds-ui-lg font-semibold text-ds-text">{message}</p>
           </>
         ) : (
           <>
-            <p className="text-caption uppercase text-ink-muted">Signed in as {viewerDisplayName}</p>
-            <p className="font-heading text-heading-md text-ink mb-1">Join this roster?</p>
-            <p className="text-body-sm text-ink-secondary">
+            <p className="font-heading text-ds-label text-ds-text-dim">Signed in as {viewerDisplayName}</p>
+            <p className="font-heading text-ds-ui-lg font-semibold text-ds-text mb-1">Join this roster?</p>
+            <p className="text-ds-body text-ds-text-muted">
               A captain invited you onto their Summoner&apos;s Rift team. The team is only registered
               once all five players confirm. Decline if this wasn&apos;t meant for you.
             </p>
-            <div className="flex justify-center gap-3 pt-2">
+            <div className="flex gap-3 pt-2">
               <Button onClick={accept} disabled={status === "pending"}>
                 {status === "pending" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm"}
               </Button>
@@ -93,7 +93,7 @@ export function ConfirmInviteClient({
         )}
         <Link
           href="/tournaments/summoners-rift"
-          className="block text-caption text-ink-muted hover:text-ink pt-2"
+          className="ds-link inline-flex min-h-11 items-center font-heading text-ds-ui text-ds-text-muted"
         >
           Back to Summoner&apos;s Rift
         </Link>

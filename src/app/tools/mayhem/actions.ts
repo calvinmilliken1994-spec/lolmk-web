@@ -39,6 +39,8 @@ function refresh() {
   revalidatePath("/tools/mayhem");
   revalidatePath("/mayhemlive");
   revalidatePath("/tournaments/aram");
+  // The hub's status bar and plate chips read the Mayhem event too.
+  revalidatePath("/tournaments");
 }
 
 async function persistMayhemBracket(matches: BracketMatch[]): Promise<void> {

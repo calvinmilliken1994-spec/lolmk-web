@@ -62,7 +62,8 @@ export async function getDiscordEvents(): Promise<CommunityEvent[] | null> {
           Authorization: `Bot ${token}`,
           "User-Agent": DISCORD_USER_AGENT,
         },
-        next: { revalidate: 600, tags: ["discord-events"] },
+        // Events: about five minutes (handover Phase 6).
+        next: { revalidate: 300, tags: ["discord-events"] },
       },
     );
     if (!res.ok) return null;
@@ -94,3 +95,44 @@ export async function getDiscordEvents(): Promise<CommunityEvent[] | null> {
     return null;
   }
 }
+
+/**
+ * Upcoming Discord scheduled events this member marked "Interested" (the
+ * Discord RSVP). Read-only: GET .../scheduled-events/{id}/users, paged 100
+ * at a time. Null when the bot token or guild is unavailable, so callers can
+ * omit RSVPs rather than claim there are none.
+ */
+export async function getMemberRsvps(discordUserId: string): Promise<CommunityEvent[] | null> {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token) return null;
+  const [events, guildId] = await Promise.all([getDiscordEvents(), getDiscordGuildId()]);
+  if (!events || !guildId) return null;
+
+  const headers = { Authorization: `Bot ${token}`, "User-Agent": DISCORD_USER_AGENT };
+  const interested = async (eventId: string): Promise<boolean> => {
+    let after: string | null = null;
+    for (let page = 0; page < 10; page++) {
+      const url =
+        `${DISCORD_API_BASE}/guilds/${guildId}/scheduled-events/${eventId}/users?limit=100` +
+        (after ? `&after=${after}` : "");
+      const res = await fetch(url, { headers, next: { revalidate: 300, tags: ["discord-events"] } });
+      if (!res.ok) throw new Error(`Discord ${res.status}`);
+      const users = (await res.json()) as { user_id?: string; user?: { id: string } }[];
+      if (!Array.isArray(users) || users.length === 0) return false;
+      if (users.some((u) => (u.user_id ?? u.user?.id) === discordUserId)) return true;
+      if (users.length < 100) return false;
+      after = users[users.length - 1].user_id ?? users[users.length - 1].user?.id ?? null;
+      if (!after) return false;
+    }
+    return false;
+  };
+
+  try {
+    const upcoming = events.slice(0, 10);
+    const flags = await Promise.all(upcoming.map((e) => interested(e.id)));
+    return upcoming.filter((_, i) => flags[i]);
+  } catch {
+    return null;
+  }
+}
+

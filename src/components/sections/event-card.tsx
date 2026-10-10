@@ -115,10 +115,9 @@ export function EventCard({ event }: { event: CommunityEvent }) {
                 <button
                   type="button"
                   onClick={() => setOpen(true)}
-                  className="mt-2 text-body-sm font-medium text-brand-blue-bright hover:text-ink inline-flex items-center gap-1"
+                  className="mt-2 inline-flex min-h-11 items-center gap-1 text-body-sm font-medium text-ds-text underline decoration-ds-line-strong underline-offset-4 hover:decoration-ds-text"
                 >
                   More details
-                  <span aria-hidden>→</span>
                 </button>
               )}
             </div>
@@ -196,7 +195,7 @@ export function EventCard({ event }: { event: CommunityEvent }) {
                       href={part.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-brand-blue-bright underline underline-offset-4 hover:text-ink break-all"
+                      className="text-ds-text underline decoration-ds-line-strong underline-offset-4 hover:decoration-ds-text break-all"
                     >
                       {part.url}
                     </a>

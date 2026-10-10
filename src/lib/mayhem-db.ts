@@ -55,6 +55,8 @@ export function ensureSchema(): Promise<void> {
       await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS team_format text NOT NULL DEFAULT 'randomized';`;
       await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS registration_open boolean NOT NULL DEFAULT false;`;
       await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS registration_generation integer NOT NULL DEFAULT 0;`;
+      // Rehearsal/test events never appear in the public event list.
+      await schemaSql`ALTER TABLE mayhem_events ADD COLUMN IF NOT EXISTS is_test boolean NOT NULL DEFAULT false;`;
       // Auto-reveal: a persisted start timestamp is the single source of
       // truth for "how many teams are visible" — every reader (admin,
       // venue screen, public page) derives the count from elapsed time via
@@ -556,7 +558,7 @@ export interface MayhemEventSummary {
 export async function listMayhemEvents(publicOnly = false): Promise<MayhemEventSummary[]> {
   await ensureSchema();
   const { rows } = await sql.query(`SELECT id, title, stage, archived_at, published, registration_generation, updated_at
-    FROM mayhem_events ${publicOnly ? "WHERE published = true AND archived_at IS NULL" : ""}
+    FROM mayhem_events ${publicOnly ? "WHERE published = true AND archived_at IS NULL AND is_test = false" : ""}
     ORDER BY created_at DESC, id ASC`);
   return rows.map(row => ({ ...row, archived_at: row.archived_at ? new Date(row.archived_at).toISOString() : null,
     updated_at: new Date(row.updated_at).toISOString() })) as MayhemEventSummary[];

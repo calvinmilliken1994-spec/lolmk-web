@@ -10,6 +10,7 @@ import type {
   SrPublicTeam,
   SrPublicTournamentFull,
 } from "@/types/sr-tournament";
+import { computeBracketGraph } from "@/lib/bracket-layout";
 
 const BRACKET_LABEL: Record<SrPublicMatch["bracket"], string> = {
   upper: "Upper bracket",
@@ -319,19 +320,6 @@ const HEADER_GAP = 14;
 // proportional share of the (now much taller) card height.
 const BAND_GAP_ROWS = 0.6;
 
-interface PositionedMatch {
-  match: SrPublicMatch;
-  col: number;
-  row: number;
-}
-
-interface HeaderSpec {
-  key: string;
-  col: number;
-  band: "upper" | "lower";
-  label: string;
-}
-
 interface ConnectorSpec {
   key: string;
   fromCol: number;
@@ -342,173 +330,31 @@ interface ConnectorSpec {
   active: boolean;
 }
 
-interface BracketLayout {
-  positioned: PositionedMatch[];
-  connectors: ConnectorSpec[];
-  headers: HeaderSpec[];
-  columnCount: number;
-  rowCount: number;
-  upperBandRows: number;
-}
-
-type Half = "upper" | "lower" | "final";
-
-function halfOf(m: SrPublicMatch): Half {
-  if (m.bracket === "grand_final") return "final";
-  return m.bracket === "lower" || m.bracket === "third_place" ? "lower" : "upper";
-}
-
-function computeBracketLayout(matches: SrPublicMatch[]): BracketLayout {
-  if (matches.length === 0) {
-    return { positioned: [], connectors: [], headers: [], columnCount: 1, rowCount: 1, upperBandRows: 0 };
-  }
-  const byId = new Map(matches.map((m) => [m.id, m]));
-
-  // Per-half depth: distance from THIS match to its half's terminal match
-  // (the one whose advances_to target is grand_final, or has no target).
-  // Walking only advances_to_match_id (never drops_to) keeps this strictly
-  // within one half's progression chain.
-  const halfDepthCache = new Map<string, number>();
-  function halfDepthOf(m: SrPublicMatch): number {
-    const cached = halfDepthCache.get(m.id);
-    if (cached !== undefined) return cached;
-    halfDepthCache.set(m.id, 0); // cycle guard
-    let depth = 0;
-    if (m.advances_to_match_id) {
-      const target = byId.get(m.advances_to_match_id);
-      if (target && halfOf(target) === halfOf(m)) {
-        depth = halfDepthOf(target) + 1;
-      }
-    }
-    halfDepthCache.set(m.id, depth);
-    return depth;
-  }
-  for (const m of matches) halfDepthOf(m);
-
-  const upperMatches = matches.filter((m) => halfOf(m) === "upper");
-  const lowerMatches = matches.filter((m) => halfOf(m) === "lower");
-  const finalMatches = matches.filter((m) => halfOf(m) === "final").sort((a, b) => a.round_number - b.round_number);
-
-  const upperMaxDepth = upperMatches.length > 0 ? Math.max(...upperMatches.map(halfDepthOf)) : -1;
-  const lowerMaxDepth = lowerMatches.length > 0 ? Math.max(...lowerMatches.map(halfDepthOf)) : -1;
-  const gfCol = Math.max(upperMaxDepth, lowerMaxDepth) + 1;
-
-  const colOf = new Map<string, number>();
-  for (const m of upperMatches) colOf.set(m.id, upperMaxDepth - halfDepthOf(m));
-  for (const m of lowerMatches) colOf.set(m.id, lowerMaxDepth - halfDepthOf(m));
-  finalMatches.forEach((m, i) => colOf.set(m.id, gfCol + i));
-
-  // Row assignment per half: earliest round gets one row per match in
-  // match_number order; each later round centers on the average row of its
-  // feeders (matches whose advances_to/drops_to targets it).
-  const feedersOf = (m: SrPublicMatch) => matches.filter((f) => f.advances_to_match_id === m.id || f.drops_to_match_id === m.id);
-  function assignRows(half: Half): Map<string, number> {
-    const rowOf = new Map<string, number>();
-    const inHalf = matches.filter((m) => halfOf(m) === half);
-    if (inHalf.length === 0) return rowOf;
-    const maxCol = Math.max(...inHalf.map((m) => colOf.get(m.id) ?? 0));
-    for (let col = 0; col <= maxCol; col++) {
-      const inCol = inHalf.filter((m) => colOf.get(m.id) === col).sort((a, b) => a.match_number - b.match_number);
-      if (col === 0) {
-        inCol.forEach((m, i) => rowOf.set(m.id, i));
-        continue;
-      }
-      inCol.forEach((m) => {
-        const feeders = feedersOf(m).filter((f) => rowOf.has(f.id));
-        rowOf.set(m.id, feeders.length > 0 ? feeders.reduce((s, f) => s + (rowOf.get(f.id) ?? 0), 0) / feeders.length : 0);
-      });
-      const sorted = inCol.slice().sort((a, b) => (rowOf.get(a.id) ?? 0) - (rowOf.get(b.id) ?? 0));
-      for (let i = 1; i < sorted.length; i++) {
-        const prev = rowOf.get(sorted[i - 1].id) ?? 0;
-        const cur = rowOf.get(sorted[i].id) ?? 0;
-        if (cur - prev < 1) rowOf.set(sorted[i].id, prev + 1);
-      }
-    }
-    return rowOf;
-  }
-
-  const upperRowOf = assignRows("upper");
-  const lowerRowOf = assignRows("lower");
-
-  const upperBandRows = upperRowOf.size > 0 ? Math.max(...Array.from(upperRowOf.values())) + 1 : 0;
-  const rowOf = new Map<string, number>();
-  for (const [id, r] of upperRowOf) rowOf.set(id, r);
-  for (const [id, r] of lowerRowOf) rowOf.set(id, r + upperBandRows + BAND_GAP_ROWS);
-
-  // Grand final: centered vertically across the combined upper+lower span.
-  const nonFinalRows = matches.filter((m) => halfOf(m) !== "final").map((m) => rowOf.get(m.id) ?? 0);
-  const centerRow = nonFinalRows.length > 0 ? (Math.min(...nonFinalRows) + Math.max(...nonFinalRows)) / 2 : 0;
-  finalMatches.forEach((m, i) => rowOf.set(m.id, centerRow + (i - (finalMatches.length - 1) / 2) * 1.3));
-
-  const positioned: PositionedMatch[] = matches.map((m) => ({
-    match: m,
-    col: colOf.get(m.id) ?? 0,
-    row: rowOf.get(m.id) ?? 0,
+/**
+ * The graph (columns, rows, headers, edges) comes from the shared
+ * computeBracketGraph in @/lib/bracket-layout, which the public tournament
+ * page also uses. This screen only bakes row pixels (ROW_H/CARD_H) into the
+ * connector endpoints; column pixels stay fluid (see useBracketFit).
+ */
+function computeBracketLayout(matches: SrPublicMatch[]) {
+  const graph = computeBracketGraph(matches, { bandGapRows: BAND_GAP_ROWS });
+  const connectors: ConnectorSpec[] = graph.edges.map((e) => ({
+    key: e.key,
+    fromCol: e.fromCol,
+    y1: e.fromRow * ROW_H + CARD_H / 2,
+    toCol: e.toCol,
+    y2: e.toRow * ROW_H + CARD_H / 2,
+    dashed: e.dashed,
+    active: e.active,
   }));
-
-  const columnCount = gfCol + finalMatches.length;
-  // +1 row of margin below the lowest card — generous given rows can land on
-  // a fractional value (grand final centering) but never more than ~0.65
-  // past the last integer row.
-  const rowCount = Math.max(1, ...positioned.map((p) => p.row)) + 1;
-
-  // Headers: one label per (band, column) pair, taken from the first match
-  // seen in that band/column, using round_number to keep upper vs lower
-  // headers independent even when they land on the same column index.
-  const headers: HeaderSpec[] = [];
-  const seen = new Set<string>();
-  for (const half of ["upper", "lower"] as const) {
-    const inHalf = matches.filter((m) => halfOf(m) === half).sort((a, b) => (colOf.get(a.id) ?? 0) - (colOf.get(b.id) ?? 0));
-    const rounds = Array.from(new Set(inHalf.map((m) => m.round_number))).sort((a, b) => a - b);
-    for (const m of inHalf) {
-      const key = `${half}:${colOf.get(m.id)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const idx = rounds.indexOf(m.round_number);
-      const last = rounds.length - 1;
-      let label: string;
-      if (half === "upper") {
-        label = idx === last ? "Upper final" : last >= 2 && idx === last - 1 ? "Upper semis" : `Upper R${idx + 1}`;
-      } else {
-        label = idx === last ? "Lower final" : `Lower R${idx + 1}`;
-      }
-      headers.push({ key, col: colOf.get(m.id) ?? 0, band: half, label });
-    }
-  }
-  if (finalMatches.length > 0) {
-    headers.push({ key: "final:gf", col: gfCol, band: "upper", label: "Grand final" });
-  }
-
-  const posById = new Map(positioned.map((p) => [p.match.id, p]));
-  const connectors: ConnectorSpec[] = [];
-  for (const m of matches) {
-    const from = posById.get(m.id);
-    if (!from) continue;
-    for (const [targetId, dashed] of [
-      [m.advances_to_match_id, false],
-      [m.drops_to_match_id, true],
-    ] as const) {
-      if (!targetId) continue;
-      const to = posById.get(targetId);
-      if (!to) continue;
-      // `from` is the earlier round (smaller col); `to` is the later round
-      // it feeds (larger col) — draw strictly left to right. Column index
-      // only; pixel x is resolved at render time against the fluid column
-      // width (see useBracketFit) so widening the bracket to fill the
-      // viewport never requires recomputing this graph.
-      connectors.push({
-        key: `${m.id}-${targetId}-${dashed}`,
-        fromCol: from.col,
-        y1: from.row * ROW_H + CARD_H / 2,
-        toCol: to.col,
-        y2: to.row * ROW_H + CARD_H / 2,
-        dashed,
-        active: m.status === "completed",
-      });
-    }
-  }
-
-  return { positioned, connectors, headers, columnCount, rowCount, upperBandRows };
+  return {
+    positioned: graph.positioned,
+    connectors,
+    headers: graph.headers,
+    columnCount: graph.columnCount,
+    rowCount: graph.rowCount,
+    upperBandRows: graph.upperBandRows,
+  };
 }
 
 function BracketConnector({ conn, colW }: { conn: ConnectorSpec; colW: number }) {

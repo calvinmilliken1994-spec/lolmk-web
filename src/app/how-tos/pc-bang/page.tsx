@@ -1,39 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Gamepad2, Landmark, MapPin } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, Gamepad2, Landmark, MapPin } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
+import { pageMetadata } from "@/lib/metadata";
+import { GuideLayout } from "@/components/ds/guide-layout";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "PC Bang Guide for Foreigners",
   description:
     "What to expect walking into a Korean PC bang as a foreigner: sign-in, payment, seat setup, and its limits as a workaround for account creation.",
-};
+  path: "/how-tos/pc-bang",
+});
 
 export default function PcBangPage() {
   return (
-    <>
-      <section className="container-wide pt-16 pb-16 md:pt-20 border-b border-line-subtle">
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          <Link href="/how-tos" className="text-body-sm text-ink-muted hover:text-ink">
-            How-tos
-          </Link>
-          <span className="text-ink-muted">/</span>
-          <Badge variant="outline">PC bang guide</Badge>
-        </div>
-        <h1 className="font-heading text-display-md text-ink leading-tight max-w-3xl">
-          PC bangs, for foreigners.
-        </h1>
-        <p className="mt-6 text-body-lg text-ink-secondary max-w-[60ch]">
-          PC bangs (PC방, internet cafes built around gaming) are everywhere in Korea and
-          genuinely worth trying. Here&apos;s how sign-in actually works and where it does and
-          doesn&apos;t help you.
-        </p>
-      </section>
-
-      <section className="container-wide py-16 border-b border-line-subtle">
+    <GuideLayout slug="pc-bang">
+      <section className="py-16 border-b border-line-subtle">
         <div className="border border-warning/40 bg-warning/10 p-6 md:p-8 flex gap-5">
           <AlertTriangle strokeWidth={1.5} className="h-7 w-7 shrink-0 text-warning" />
           <p className="text-body-md text-ink-secondary max-w-[65ch]">
@@ -47,8 +31,8 @@ export default function PcBangPage() {
         </div>
       </section>
 
-      <section className="container-wide py-16 border-b border-line-subtle">
-        <p className="text-label uppercase text-ink-muted mb-4">Walking in</p>
+      <section id="sign-in" className="py-16 border-b border-line-subtle">
+        <p className="font-heading text-ds-label text-ds-text-dim mb-4">Walking in</p>
         <h2 className="font-heading text-display-sm text-ink mb-6">What sign-in actually looks like.</h2>
         <ol className="max-w-[70ch] space-y-6 text-body-md text-ink-secondary">
           <li className="flex gap-4">
@@ -91,8 +75,8 @@ export default function PcBangPage() {
         </ol>
       </section>
 
-      <section className="container-wide py-16 border-b border-line-subtle">
-        <p className="text-label uppercase text-ink-muted mb-4">What to actually expect</p>
+      <section id="what-to-expect" className="py-16 border-b border-line-subtle">
+        <p className="font-heading text-ds-label text-ds-text-dim mb-4">What to actually expect</p>
         <div className="grid gap-6 md:grid-cols-3">
           <div className="border border-line bg-surface p-6 space-y-3">
             <Gamepad2 strokeWidth={1.5} className="h-7 w-7 text-brand-red" />
@@ -124,7 +108,7 @@ export default function PcBangPage() {
         </div>
       </section>
 
-      <section className="container-wide py-16">
+      <section className="py-16">
         <div className="border border-line-subtle bg-surface p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 justify-between">
           <div>
             <p className="font-heading text-heading-lg text-ink">Know a PC bang that&apos;s good with foreigners?</p>
@@ -140,10 +124,9 @@ export default function PcBangPage() {
           >
             <DiscordIcon className="h-6 w-6" />
             Tell us in Discord
-            <ArrowRight strokeWidth={2} className="h-5 w-5" />
           </a>
         </div>
       </section>
-    </>
+    </GuideLayout>
   );
 }

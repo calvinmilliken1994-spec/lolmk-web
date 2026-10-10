@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { ArrowLeft, Check, Loader2, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
+import { Check, Loader2, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
 import { ErrorBanner, Field, inputClass, useRunner } from "@/components/sr/sr-shared";
+import { cn } from "@/lib/utils";
 import { SR_PLAYER_ROLES } from "@/types/sr-tournament";
 import { MEMBER_PLAY_MODES, RIOT_PLATFORMS, RIOT_PLATFORM_LABELS } from "@/types/member-profile";
 import type { MemberProfile, MemberRiotId } from "@/types/member-profile";
@@ -15,7 +15,7 @@ import {
   resolveMyRiotId,
   setMyPrimaryRiotId,
   updateMyProfile,
-} from "@/app/members/profile/actions";
+} from "@/app/locker/actions";
 
 const PLAY_MODE_LABELS: Record<string, string> = {
   RANKED: "Ranked",
@@ -27,10 +27,23 @@ const PLAY_MODE_LABELS: Record<string, string> = {
  * Verified-member self-service profile editor. Same pattern as
  * CaptainDashboard: props come straight from the server component and are
  * NOT copied into useState for the read side — every write action calls
- * revalidatePath("/members/profile"), so the RSC payload refreshes on its
+ * revalidatePath("/locker"), so the RSC payload refreshes on its
  * own. Local useState here is only for in-progress FORM INPUT, seeded from
  * props on mount.
  */
+/** Sentence-case Space Grotesk labels (redesign rule); admin tools keep their own. */
+const DS_LABEL = "font-heading text-ds-label text-ds-text-dim";
+const FIELD_INPUT = cn(inputClass, "rounded-none min-h-11");
+
+const ROLE_LABELS: Record<string, string> = {
+  TOP: "Top",
+  JUNGLE: "Jungle",
+  MID: "Mid",
+  ADC: "ADC",
+  SUPPORT: "Support",
+  FILL: "Fill",
+};
+
 export function MemberProfileEditor({
   profile,
   riotIds,
@@ -51,7 +64,6 @@ export function MemberProfileEditor({
   const [directoryOptIn, setDirectoryOptIn] = useState(profile.directoryOptIn);
   const [saved, setSaved] = useState(false);
 
-  const canBeListed = profile.directoryCategory !== null;
 
   function toggle(list: string[], value: string, setter: (v: string[]) => void) {
     setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
@@ -73,37 +85,15 @@ export function MemberProfileEditor({
   }
 
   return (
-    <section className="container-wide py-16 md:py-20 space-y-10">
-      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-2">
-          <Link
-            href="/members"
-            className="inline-flex items-center gap-1.5 text-body-sm text-ink-muted hover:text-ink"
-          >
-            <ArrowLeft strokeWidth={1.75} className="h-4 w-4" />
-            Members
-          </Link>
-          <p className="text-label uppercase text-ink-muted">Verified member</p>
-          <h1 className="font-display text-display-sm text-ink leading-none">
-            {profile.displayName}
-          </h1>
-        </div>
-        <form action="/members/logout" method="post">
-          <button
-            type="submit"
-            className="border border-line px-4 py-2 text-body-sm text-ink-muted rounded-sm hover:border-line-strong hover:text-ink"
-          >
-            Sign out
-          </button>
-        </form>
-      </header>
+    <div className="space-y-6">
+      <p className="m-0 font-heading text-ds-label text-ds-text-dim">Edit your card</p>
 
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
       <div className="border border-line bg-surface p-6 space-y-6">
-        <Field label="Bio" hint={`${bio.length}/500`}>
+        <Field labelClassName={DS_LABEL} label="Bio" hint={`${bio.length}/500`}>
           <textarea
-            className={inputClass}
+            className={FIELD_INPUT}
             rows={3}
             maxLength={500}
             value={bio}
@@ -113,7 +103,7 @@ export function MemberProfileEditor({
         </Field>
 
         <fieldset className="flex flex-col gap-1.5">
-          <legend className="text-label uppercase tracking-wider text-ink-muted">
+          <legend className="font-heading text-ds-label text-ds-text-dim">
             Preferred roles
           </legend>
           <div className="flex flex-wrap gap-2">
@@ -122,20 +112,20 @@ export function MemberProfileEditor({
                 key={role}
                 type="button"
                 onClick={() => toggle(preferredRoles, role, setPreferredRoles)}
-                className={`px-3 py-1.5 text-body-sm rounded-sm border ${
+                className={`inline-flex min-h-11 items-center px-4 font-heading text-ds-ui border ${
                   preferredRoles.includes(role)
-                    ? "border-brand-red bg-brand-red-muted text-brand-red-bright"
-                    : "border-line text-ink-secondary hover:border-line-strong"
+                    ? "border-ds-red bg-ds-red text-white"
+                    : "border-ds-line-strong text-ds-text-muted hover:text-white"
                 }`}
               >
-                {role}
+                {ROLE_LABELS[role] ?? role}
               </button>
             ))}
           </div>
         </fieldset>
 
         <fieldset className="flex flex-col gap-1.5">
-          <legend className="text-label uppercase tracking-wider text-ink-muted">
+          <legend className="font-heading text-ds-label text-ds-text-dim">
             Play modes
           </legend>
           <div className="flex flex-wrap gap-2">
@@ -144,10 +134,10 @@ export function MemberProfileEditor({
                 key={mode}
                 type="button"
                 onClick={() => toggle(playModes, mode, setPlayModes)}
-                className={`px-3 py-1.5 text-body-sm rounded-sm border ${
+                className={`inline-flex min-h-11 items-center px-4 font-heading text-ds-ui border ${
                   playModes.includes(mode)
-                    ? "border-brand-red bg-brand-red-muted text-brand-red-bright"
-                    : "border-line text-ink-secondary hover:border-line-strong"
+                    ? "border-ds-red bg-ds-red text-white"
+                    : "border-ds-line-strong text-ds-text-muted hover:text-white"
                 }`}
               >
                 {PLAY_MODE_LABELS[mode]}
@@ -156,9 +146,9 @@ export function MemberProfileEditor({
           </div>
         </fieldset>
 
-        <Field label="Favorite champion">
+        <Field labelClassName={DS_LABEL} label="Favorite champion">
           <select
-            className={inputClass}
+            className={FIELD_INPUT}
             value={favoriteChampion}
             onChange={(e) => setFavoriteChampion(e.target.value)}
           >
@@ -172,7 +162,7 @@ export function MemberProfileEditor({
         </Field>
 
         <fieldset className="flex flex-col gap-1.5">
-          <legend className="text-label uppercase tracking-wider text-ink-muted">
+          <legend className="font-heading text-ds-label text-ds-text-dim">
             Main champions
           </legend>
           <MultiChampionPicker
@@ -185,26 +175,18 @@ export function MemberProfileEditor({
         </fieldset>
 
         <div className="border-t border-line-subtle pt-5 space-y-2">
-          {canBeListed ? (
-            <label className="inline-flex items-start gap-2.5 text-body-sm text-ink-secondary">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={directoryOptIn}
-                onChange={(e) => setDirectoryOptIn(e.target.checked)}
-              />
-              <span>
-                List me on the public <span className="text-ink">/members</span> directory. Your
-                display name, avatar, bio, roles, and favorite champion would be visible to anyone
-                — nothing else on your profile.
-              </span>
-            </label>
-          ) : (
-            <p className="text-caption text-ink-muted">
-              The public directory currently lists Admins and Game Coordinators only. Your account
-              isn&apos;t in either group, so there&apos;s no directory listing to opt into.
-            </p>
-          )}
+          <label className="inline-flex items-start gap-2.5 text-body-sm text-ink-secondary">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={directoryOptIn}
+              onChange={(e) => setDirectoryOptIn(e.target.checked)}
+            />
+            <span>
+              Show me on Members. Your display name, avatar, Riot ID, bio, roles, and favorite
+              champion would be visible to anyone, nothing else on your profile.
+            </span>
+          </label>
         </div>
 
         <div className="flex items-center gap-3">
@@ -212,7 +194,7 @@ export function MemberProfileEditor({
             type="button"
             disabled={pending}
             onClick={save}
-            className="inline-flex items-center gap-2 bg-brand-red text-ink px-5 py-2.5 rounded-md font-semibold hover:bg-brand-red-hover disabled:opacity-50"
+            className="cut-btn inline-flex min-h-11 items-center gap-2 bg-ds-red px-6 font-heading text-ds-ui font-semibold text-white hover:bg-brand-red-hover disabled:opacity-50"
           >
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
             Save profile
@@ -226,7 +208,7 @@ export function MemberProfileEditor({
       </div>
 
       <RiotIdsPanel riotIds={riotIds} riotConfigured={riotConfigured} />
-    </section>
+    </div>
   );
 }
 
@@ -254,7 +236,7 @@ function MultiChampionPicker({
           return (
             <span
               key={id}
-              className="inline-flex items-center gap-1.5 border border-line px-2.5 py-1 text-body-sm text-ink rounded-sm"
+              className="inline-flex items-center gap-1.5 border border-line px-2.5 py-1 text-body-sm text-ink"
             >
               {champ?.name ?? id}
               <button
@@ -272,7 +254,7 @@ function MultiChampionPicker({
       {selected.length < max && (
         <div className="relative">
           <input
-            className={inputClass}
+            className={FIELD_INPUT}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search champions to add…"
@@ -336,7 +318,7 @@ function RiotIdsPanel({
                   {RIOT_PLATFORM_LABELS[r.platform]}
                 </span>
                 {r.isPrimary && (
-                  <span className="ml-2 text-caption text-brand-red-bright inline-flex items-center gap-1">
+                  <span className="ml-2 text-caption text-ds-text inline-flex items-center gap-1">
                     <Star className="h-3 w-3 fill-current" /> Primary
                   </span>
                 )}
@@ -360,7 +342,7 @@ function RiotIdsPanel({
                       }));
                     })
                   }
-                  className="inline-flex items-center gap-1.5 border border-line px-3 py-1.5 text-body-sm text-ink-muted rounded-sm hover:border-line-strong hover:text-ink disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 border border-line px-3 py-1.5 text-body-sm text-ink-muted hover:border-line-strong hover:text-ink disabled:opacity-40"
                 >
                   <RefreshCw strokeWidth={1.75} className="h-3.5 w-3.5" />
                   Resolve
@@ -371,7 +353,7 @@ function RiotIdsPanel({
                   type="button"
                   disabled={pending}
                   onClick={() => run(() => setMyPrimaryRiotId(r.id))}
-                  className="border border-line px-3 py-1.5 text-body-sm text-ink-muted rounded-sm hover:border-line-strong hover:text-ink disabled:opacity-40"
+                  className="border border-line px-3 py-1.5 text-body-sm text-ink-muted hover:border-line-strong hover:text-ink disabled:opacity-40"
                 >
                   Make primary
                 </button>
@@ -380,7 +362,7 @@ function RiotIdsPanel({
                 type="button"
                 disabled={pending}
                 onClick={() => run(() => removeMyRiotId(r.id))}
-                className="border border-line px-2 py-1.5 text-ink-muted rounded-sm hover:border-danger hover:text-danger disabled:opacity-40"
+                className="border border-line px-2 py-1.5 text-ink-muted hover:border-danger hover:text-danger disabled:opacity-40"
                 aria-label={`Remove ${r.gameName}#${r.tagLine}`}
               >
                 <Trash2 strokeWidth={1.75} className="h-4 w-4" />
@@ -403,25 +385,25 @@ function RiotIdsPanel({
             });
           }}
         >
-          <Field label="Riot name">
+          <Field labelClassName={DS_LABEL} label="Riot name">
             <input
-              className={inputClass}
+              className={FIELD_INPUT}
               value={gameName}
               onChange={(e) => setGameName(e.target.value)}
               placeholder="Name"
             />
           </Field>
-          <Field label="Tag">
+          <Field labelClassName={DS_LABEL} label="Tag">
             <input
-              className={inputClass}
+              className={FIELD_INPUT}
               value={tagLine}
               onChange={(e) => setTagLine(e.target.value)}
               placeholder="1234"
             />
           </Field>
-          <Field label="Region">
+          <Field labelClassName={DS_LABEL} label="Region">
             <select
-              className={inputClass}
+              className={FIELD_INPUT}
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
             >
@@ -435,7 +417,7 @@ function RiotIdsPanel({
           <button
             type="submit"
             disabled={pending}
-            className="inline-flex items-center gap-1.5 border border-line-strong px-4 py-2 text-body-sm text-ink rounded-sm hover:border-brand-red disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 border border-line-strong px-4 py-2 text-body-sm text-ink hover:border-ds-text disabled:opacity-40"
           >
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             Add

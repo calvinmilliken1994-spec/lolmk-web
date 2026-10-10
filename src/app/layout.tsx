@@ -1,8 +1,13 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk, Bebas_Neue, Chakra_Petch } from "next/font/google";
 import { Header } from "@/components/layout/header";
 import { ConditionalFooter } from "@/components/layout/conditional-footer";
+import { CountUp } from "@/components/motion/count-up";
+import { NavProgress } from "@/components/motion/nav-progress";
+import { SectionWipe } from "@/components/motion/section-wipe";
 import { getMemberSession } from "@/lib/discord-auth";
+import { rootMetadata } from "@/lib/metadata";
 import "./globals.css";
 
 const inter = Inter({
@@ -35,31 +40,7 @@ const chakraPetch = Chakra_Petch({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: "LoLMK — Home",
-    template: "%s — LoLMK",
-  },
-  description:
-    "The largest English-speaking League of Legends community in Korea. Tournaments, in-houses, meetups, and how-tos for playing on KR.",
-  metadataBase: new URL("https://lolmk.gg"),
-  openGraph: {
-    title: "LoLMK — Home",
-    description:
-      "The largest English-speaking League of Legends community in Korea.",
-    type: "website",
-    locale: "en_US",
-    siteName: "LoLMK",
-    images: [{ url: "/logo.png", width: 1044, height: 1044, alt: "LoLMK logo" }],
-  },
-  twitter: {
-    card: "summary",
-    images: ["/logo.png"],
-  },
-  icons: {
-    icon: "/logo.svg",
-  },
-};
+export const metadata: Metadata = rootMetadata;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const member = await getMemberSession();
@@ -93,7 +74,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               : null
           }
         />
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         <main className="pt-16">{children}</main>
+        <SectionWipe />
+        <CountUp />
         <ConditionalFooter />
       </body>
     </html>

@@ -1,5 +1,13 @@
 # Components
 
+> **2026 redesign (wins for public subpages).** See `docs/redesign-handover.md` and the rules block in `CLAUDE.md`.
+>
+> - **Shapes:** one cut corner is the signature. Plates and panels `cut-plate` (top-right 28px), primary buttons `cut-btn` (bottom-right 10px), status bar `cut-bar` (bottom-right 20px), page tag `cut-tag` (slanted right edge), avatars `cut-avatar`. Art zones use `texture-art`. No border-radius except status dots.
+> - **Copy and layout:** no identical icon + title + blurb + "Read more" card grids, no `▸` bullets, no `→` appended to link text, no gradient blobs, glassmorphism or soft drop shadows.
+> - **Data:** every number shown is real; unknown values are omitted, never "TBA". Empty states show the last result or the next event, plus one action.
+> - **Access:** body contrast at least 4.5:1, visible keyboard focus, touch targets at least 44px.
+> - **Shared components** (Phase 2): `PageHeader`, `StatStrip`, `StatusBar`, `FormatPlate`, `ChampionSplit`, `ResultsTable` in `src/components/ds/`.
+
 Conventions for building UI components on LoLMK. These rules keep the site visually consistent regardless of who (or what) writes the code.
 
 ## Spacing scale
@@ -44,7 +52,7 @@ Used for the most important action on a page or section. **One per visual area.*
 - Background: `brand-red` (`#BA263C`)
 - Text: `text-primary` (`#F5F5F7`)
 - Padding: `space-3` vertical, `space-6` horizontal
-- Radius: `radius-md` (4px)
+- Radius: `radius-md` (4px) on older pages. Redesigned pages: no radius, bottom-right 10px cut (`cut-btn`), min height 44px (52px in bands), Space Grotesk 600.
 - Font: `body-md`, weight 600
 - Hover: background → `brand-red-hover`, no scale, no shadow
 - Active: background → `brand-red-muted`
@@ -201,9 +209,22 @@ Standings tables are a major visual element — they need to feel broadcast-grad
 
 ## Motion
 
-- Default duration: 150ms for color, 200ms for transform, 300ms for opacity fades
-- Default easing: `ease-out` for entrances, `ease-in` for exits, `ease-in-out` rare
-- Reduced motion: respect `prefers-reduced-motion` — disable transforms, keep color transitions
+Redesign rules (handover Phase 6). One easing curve, one signature transition, quiet everything else.
+
+| Token | Tailwind | Value | Use |
+| --- | --- | --- | --- |
+| Easing | `ease-ds` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Everything |
+| Fast | `duration-fast` | 150ms | Hover and press feedback |
+| Base | `duration-base` | 250ms | Reveals, plate lift |
+| Route | `duration-route` | 350ms | Page transitions |
+
+- Route change: 200ms fade with an 8px rise on the page content (`src/app/template.tsx`). Header and footer stay put.
+- Signature: the red angled wipe (`SectionWipe`), only between top-level nav sections.
+- Navigation: 2px red progress bar after 120ms (`NavProgress`), `aria-busy` on `<main>` while pending.
+- Loading: each route's `loading.tsx` renders its static header copy for real and turns data regions into `.ds-skeleton` blocks of the final size (surface-2, 1.4s shimmer). Slow external calls (Discord) stream in behind `<Suspense>`.
+- Small touches: stat values count up once (600ms, tabular-nums, `CountUp`); live dots pulse at 1.6s; format plates lift 4px; `.ds-link` underlines sweep in.
+- Never: scale-up on cards, scroll-triggered fade-ins on every section, smooth-scroll libraries.
+- Reduced motion: nothing animates. `globals.css` ends every animation and transition on its first frame, and the JS effects (wipe, count-up) check the media query.
 
 ## Component file structure
 
@@ -231,7 +252,8 @@ Each component:
 
 ## Things to never do
 
-- Never use `border-radius` higher than `4px` outside of pills/avatars
+- Never use `border-radius` higher than `4px` outside of pills/avatars (redesigned pages: no radius at all except status dots)
+- Never use Discord blurple (`#5865F2`); Discord buttons are brand red with the Discord mark
 - Never use drop shadows on dark backgrounds
 - Never use animated gradients
 - Never use stock photography or AI-generated imagery

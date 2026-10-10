@@ -58,6 +58,35 @@ const config: Config = {
         },
         danger: "#EF4444",
 
+        // Redesign design system (docs/redesign-handover.md, Phase 1). Public
+        // subpages (Tournaments, Members, How-tos, About, Locker) use these.
+        // Namespaced under `ds` so the homepage and /tools, which keep the
+        // older tokens above, don't shift. Ground is the existing `base`
+        // (#0A0E1A), within a shade of the handover's #0B1021, so it's kept.
+        //   bg-ds-ground, bg-ds-surface, bg-ds-surface-2,
+        //   border-ds-line / -line-soft / -line-strong,
+        //   text-ds-text / -text-muted / -text-dim,
+        //   bg-ds-red, bg-ds-blue, text-ds-gold, bg-ds-online
+        ds: {
+          ground: "#0A0E1A",
+          surface: "#121A33",
+          "surface-2": "#172142",
+          line: "#23305A",
+          "line-soft": "#1E2A52",
+          "line-strong": "#3A4C85",
+          text: "#EEF1F8",
+          "text-muted": "#A3ACC6",
+          "text-dim": "#8792B3",
+          red: "#BA263C",
+          blue: "#283D74",
+          gold: "#D9B25F",
+          online: "#3FB57A",
+          // Format plate art-zone tints (Phase 2 FormatPlate).
+          "art-sr": "#2A1426",
+          "art-aram": "#15224A",
+          "art-rb": "#1C1D33",
+        },
+
         // Control Deck v2 (docs/design/control-deck-v2/tokens.md).
         deck: {
           rail: "#0D1222", // phase rail + broadcast column background
@@ -97,6 +126,19 @@ const config: Config = {
         label: ["0.8125rem", { lineHeight: "1.4", letterSpacing: "0.08em", fontWeight: "500" }],
         caption: ["0.75rem", { lineHeight: "1.4", fontWeight: "400" }],
         score: ["3.5rem", { lineHeight: "1", letterSpacing: "0.02em", fontWeight: "400" }],
+
+        // Redesign type scale (handover Phase 1). Bebas sizes pair with
+        // font-display; labels pair with font-heading and are sentence case.
+        "ds-h1": ["clamp(72px, 11vw, 160px)", { lineHeight: "0.86", fontWeight: "400" }],
+        "ds-h2": ["clamp(56px, 7vw, 104px)", { lineHeight: "0.88", fontWeight: "400" }],
+        "ds-plate": ["52px", { lineHeight: "0.95", fontWeight: "400" }],
+        "ds-stat": ["48px", { lineHeight: "1", fontWeight: "400" }],
+        "ds-tag": ["22px", { lineHeight: "1", fontWeight: "400" }],
+        "ds-label": ["13px", { lineHeight: "1.35", fontWeight: "500" }],
+        "ds-ui": ["15px", { lineHeight: "1.3", fontWeight: "500" }],
+        "ds-ui-lg": ["19px", { lineHeight: "1.25", fontWeight: "600" }],
+        "ds-body": ["16px", { lineHeight: "1.55", fontWeight: "400" }],
+        "ds-deck": ["18px", { lineHeight: "1.55", fontWeight: "400" }],
       },
       borderRadius: {
         none: "0",
@@ -107,14 +149,44 @@ const config: Config = {
       maxWidth: {
         content: "80rem",
         wide: "90rem",
+        // Decks and body copy on redesigned pages (56–60ch).
+        deck: "58ch",
       },
       transitionTimingFunction: {
         "out-soft": "cubic-bezier(0.22, 1, 0.36, 1)",
+        // Redesign motion (handover Phase 6): one curve for everything.
+        ds: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+      },
+      transitionDuration: {
+        fast: "150ms",
+        base: "250ms",
+        route: "350ms",
       },
       keyframes: {
+        // Route change: 200ms fade with an 8px rise on the main content.
+        "ds-rise": {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "none" },
+        },
+        // Broadcast wipe between top-level sections: an angled red sweep.
+        "ds-wipe": {
+          "0%": { clipPath: "polygon(0 0, 0 0, -14% 100%, -14% 100%)" },
+          "50%": { clipPath: "polygon(0 0, 114% 0, 100% 100%, -14% 100%)" },
+          "100%": { clipPath: "polygon(114% 0, 114% 0, 100% 100%, 100% 100%)" },
+        },
+        "ds-progress": {
+          "0%": { transform: "scaleX(0)" },
+          "100%": { transform: "scaleX(0.9)" },
+        },
         "pulse-dot": {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.4" },
+        },
+        // Redesign live dot: a white ring that expands and fades (1.6s).
+        "ds-pulse": {
+          "0%": { boxShadow: "0 0 0 0 rgba(255,255,255,0.75)" },
+          "70%": { boxShadow: "0 0 0 10px rgba(255,255,255,0)" },
+          "100%": { boxShadow: "0 0 0 0 rgba(255,255,255,0)" },
         },
         "marquee": {
           from: { transform: "translateX(0)" },
@@ -152,6 +224,10 @@ const config: Config = {
       },
       animation: {
         "pulse-dot": "pulse-dot 1.6s ease-in-out infinite",
+        "ds-pulse": "ds-pulse 1.6s ease-out infinite",
+        "ds-rise": "ds-rise 200ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards",
+        "ds-wipe": "ds-wipe 350ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "ds-progress": "ds-progress 8s cubic-bezier(0.2, 0.8, 0.2, 1) both",
         "marquee": "marquee 40s linear infinite",
         "time-flash": "time-flash 1.1s ease-in-out infinite",
       },

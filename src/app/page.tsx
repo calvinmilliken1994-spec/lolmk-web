@@ -48,7 +48,7 @@ export default async function HomePage() {
 
   const nextEventLabel = nextEvent
     ? `${nextEvent.title} · ${formatKstDate(nextEvent.startsAt)}`
-    : "Next up: TBA";
+    : null;
 
   // An event counts as "live" if Discord reports it active, or if right now
   // (at build / 5-min revalidation time) falls inside its start–end window.

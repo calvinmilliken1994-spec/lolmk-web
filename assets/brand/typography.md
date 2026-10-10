@@ -1,5 +1,19 @@
 # Typography
 
+> **2026 redesign scale (wins for public subpages).** From `docs/redesign-handover.md`. All three fonts load through `next/font` so fallback metrics prevent layout shift.
+>
+> | Role | Font | Size and leading | Tailwind |
+> | --- | --- | --- | --- |
+> | Page H1 | Bebas Neue | `clamp(72px, 11vw, 160px)`, 0.86 | `font-display text-ds-h1` |
+> | Section H2 | Bebas Neue | `clamp(56px, 7vw, 104px)`, 0.88 | `font-display text-ds-h2` |
+> | Card and plate titles | Bebas Neue | 52px, 0.95 | `font-display text-ds-plate` |
+> | Stat values | Bebas Neue | 48px, 1 | `font-display text-ds-stat` |
+> | Labels | Space Grotesk 500 | 13px, sentence case | `font-heading text-ds-label` |
+> | Nav, buttons, data values | Space Grotesk 500–600 | 15–19px | `font-heading text-ds-ui` / `text-ds-ui-lg` |
+> | Body | Inter 400 | 16px, 1.55; decks 18px, max 56–60ch | `text-ds-body`, `text-ds-deck max-w-deck` |
+>
+> Bebas is the only all-caps type.
+
 LoLMK's type system. Confident headlines, clean body, one display moment that echoes the logo's chunky slab-style "KOREA" wordmark. All fonts are free and load via Google Fonts or `next/font`.
 
 ## Font choices
@@ -65,7 +79,7 @@ Mobile-first scale. Display sizes use Bebas Neue or Space Grotesk depending on c
 | `body-lg` | 18px / 1.125rem | 1.6 | 400 | Inter | Lead paragraphs, hero supporting text. |
 | `body-md` | 16px / 1rem | 1.6 | 400 | Inter | Default body. |
 | `body-sm` | 14px / 0.875rem | 1.5 | 400 | Inter | Captions, metadata, secondary info. |
-| `label` | 13px / 0.8125rem | 1.4 | 500 | Inter | Form labels, badge text. Uppercase + tracked. |
+| `label` | 13px / 0.8125rem | 1.4 | 500 | Inter | Form labels, badge text. Older pages: uppercase + tracked. Redesigned pages use `ds-label` (Space Grotesk, sentence case) instead. |
 | `caption` | 12px / 0.75rem | 1.4 | 400 | Inter | Timestamps, footnotes. |
 | `score` | 56px / 3.5rem | 1.0 | 400 | **Bebas Neue** | Tournament scores, match results. Tabular-nums. |
 
@@ -85,7 +99,7 @@ Body sizes stay the same — readability over scale.
 - **Bebas Neue is always uppercase.** It's designed that way. Don't apply `text-transform: lowercase` to it.
 - **Bebas Neue tracking**: open it slightly. At display sizes, `letter-spacing: 0.02em`. At smaller sizes (under 32px), `letter-spacing: 0.05em` for legibility.
 - **Headings (Space Grotesk)**: tight tracking (`-0.02em` on display sizes, `-0.01em` on heading sizes). Makes them feel deliberate.
-- **All-caps labels**: badges, kicker text, tags. Use Inter at 11–13px, weight 500, tracking `0.08em`. Example: `LIVE NOW`, `Q1 2026 TOURNAMENT`, `STREAMER`.
+- **Labels** (superseded by the 2026 redesign): Bebas is the only all-caps type. Labels, badges and kickers are sentence-case Space Grotesk 13px 500 with no letter-spacing, e.g. "Live now", "Last run September 2026". The old tracked all-caps Inter labels remain only on pages not yet redesigned.
 - **Numbers in tables/standings**: use `font-variant-numeric: tabular-nums` so columns align cleanly. For large scores, use Bebas Neue with tabular-nums.
 - **Korean + English pairing**: when shown together, English is primary, Korean is secondary. Korean in `text-secondary` color, slightly smaller. Korean text never uses Bebas Neue (no Korean glyphs) — fall back to Pretendard.
 

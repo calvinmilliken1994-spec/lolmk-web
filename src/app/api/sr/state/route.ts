@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Missing slug." }, { status: 400 });
   }
 
-  const data = await getPublicTournamentBySlug(slug);
+  const data = await getPublicTournamentBySlug(slug, { includeTest: true });
   if (!data) {
     return NextResponse.json(
       { error: "Not found." },

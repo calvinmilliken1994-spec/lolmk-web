@@ -5,7 +5,8 @@ import { DiscordIcon, KakaoTalkIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
 
 interface HeroProps {
-  nextEventLabel: string;
+  /** Null when nothing is scheduled; the badge is omitted rather than saying "TBA". */
+  nextEventLabel: string | null;
   nextEventIsLive: boolean;
   /** Live Discord presence count ("186"), or null / "—" when unknown. */
   discordOnline: string | null;
@@ -44,11 +45,13 @@ export function Hero({ nextEventLabel, nextEventIsLive, discordOnline }: HeroPro
       <div className="container-wide relative z-10 pt-24 pb-32 md:pt-32 md:pb-40">
         <div className="grid lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 space-y-8">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="red" pulse={nextEventIsLive}>
-                {nextEventIsLive ? "Live" : "Next event"} · {nextEventLabel}
-              </Badge>
-            </div>
+            {nextEventLabel && (
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge variant="red" pulse={nextEventIsLive} className="bg-ds-red text-white [&>span]:bg-white">
+                  {nextEventIsLive ? "Live" : "Next event"} · {nextEventLabel}
+                </Badge>
+              </div>
+            )}
 
             <h1 className="font-display text-display-lg md:text-display-xl text-ink leading-[0.95]">
               Global League

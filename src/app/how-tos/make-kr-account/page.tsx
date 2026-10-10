@@ -1,40 +1,24 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CircleX, IdCard, Smartphone } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, CircleX, IdCard, Smartphone } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { DiscordIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
+import { pageMetadata } from "@/lib/metadata";
+import { GuideLayout, GuideFigure } from "@/components/ds/guide-layout";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Make a KR League of Legends Account",
   description:
     "How to make a real, verified Korean server League of Legends account: what a Residence Card (ARC) does, why short-term visitors get stuck, and why buying an account isn't the answer.",
-};
+  path: "/how-tos/make-kr-account",
+});
 
 export default function MakeKrAccountPage() {
   return (
-    <>
-      <section className="container-wide pt-16 pb-16 md:pt-20 border-b border-line-subtle">
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          <Link href="/how-tos" className="text-body-sm text-ink-muted hover:text-ink">
-            How-tos
-          </Link>
-          <span className="text-ink-muted">/</span>
-          <Badge variant="outline">Make a KR account</Badge>
-        </div>
-        <h1 className="font-heading text-display-md text-ink leading-tight max-w-3xl">
-          Making a real Korean server account.
-        </h1>
-        <p className="mt-6 text-body-lg text-ink-secondary max-w-[60ch]">
-          Riot Korea ties every account to a verified Korean identity. This page explains
-          exactly what that means, who can clear it, and who currently can&apos;t. Last
-          checked: September 2026.
-        </p>
-      </section>
-
-      <section className="container-wide py-16 border-b border-line-subtle">
+    <GuideLayout slug="make-kr-account">
+      <section id="dont-buy" className="py-16 border-b border-line-subtle">
         <div className="border border-danger/40 bg-danger/10 p-6 md:p-8 flex flex-col sm:flex-row gap-5">
           <CircleX strokeWidth={1.5} className="h-8 w-8 shrink-0 text-danger" />
           <div className="space-y-2">
@@ -52,7 +36,7 @@ export default function MakeKrAccountPage() {
             </p>
           </div>
         </div>
-        <div className="mt-6 border border-line-subtle bg-white p-2 max-w-[600px]">
+        <GuideFigure caption={<>Riot&apos;s own support article on why buying accounts is a bad idea.</>}>
           <Image
             src="/images/how-tos/riot-dont-buy-accounts-support-page.png"
             alt="Riot Games support article titled 'Don't Buy Accounts!' warning that account trading violates the Terms of Use and puts buyers at risk of losing money or the account."
@@ -60,14 +44,11 @@ export default function MakeKrAccountPage() {
             height={601}
             className="w-full h-auto"
           />
-          <p className="mt-2 text-body-xs text-ink-muted px-1">
-            Riot&apos;s own support article on why buying accounts is a bad idea.
-          </p>
-        </div>
+        </GuideFigure>
       </section>
 
-      <section className="container-wide py-16 border-b border-line-subtle">
-        <p className="text-label uppercase text-ink-muted mb-4">The real obstacle</p>
+      <section id="identity-verification" className="py-16 border-b border-line-subtle">
+        <p className="font-heading text-ds-label text-ds-text-dim mb-4">The real obstacle</p>
         <h2 className="font-heading text-display-sm text-ink mb-6">
           It comes down to one thing: Korean identity verification.
         </h2>
@@ -120,8 +101,8 @@ export default function MakeKrAccountPage() {
         </div>
       </section>
 
-      <section className="container-wide py-16 border-b border-line-subtle">
-        <p className="text-label uppercase text-ink-muted mb-4">If you have an ARC / RC</p>
+      <section id="the-sequence" className="py-16 border-b border-line-subtle">
+        <p className="font-heading text-ds-label text-ds-text-dim mb-4">If you have an ARC / RC</p>
         <h2 className="font-heading text-display-sm text-ink mb-6">
           You can make an account. Here&apos;s the sequence.
         </h2>
@@ -179,8 +160,8 @@ export default function MakeKrAccountPage() {
         </p>
       </section>
 
-      <section className="container-wide py-16 border-b border-line-subtle">
-        <p className="text-label uppercase text-ink-muted mb-4">If you&apos;re a short-term visitor</p>
+      <section id="no-shortcut" className="py-16 border-b border-line-subtle">
+        <p className="font-heading text-ds-label text-ds-text-dim mb-4">If you&apos;re a short-term visitor</p>
         <h2 className="font-heading text-display-sm text-ink mb-6">
           There is no general shortcut. Here&apos;s the honest answer.
         </h2>
@@ -214,7 +195,7 @@ export default function MakeKrAccountPage() {
         </div>
       </section>
 
-      <section className="container-wide py-16">
+      <section className="py-16">
         <div className="border border-line-subtle bg-surface p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 justify-between">
           <div>
             <p className="font-heading text-heading-lg text-ink">
@@ -233,10 +214,9 @@ export default function MakeKrAccountPage() {
           >
             <DiscordIcon className="h-6 w-6" />
             Ask in Discord
-            <ArrowRight strokeWidth={2} className="h-5 w-5" />
           </a>
         </div>
       </section>
-    </>
+    </GuideLayout>
   );
 }
