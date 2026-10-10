@@ -75,7 +75,7 @@ export default async function CaptainLoginPage({
               missing, let everyone in" branch anywhere in this flow.
             */
             <p className="text-body-sm text-warning border border-warning/50 bg-warning/10 px-4 py-2.5 rounded-sm">
-              Captain sign-in isn't live yet. Team registration opens through
+              Captain sign-in isn&apos;t live yet. Team registration opens through
               Discord when the next tournament is announced.
             </p>
           )}

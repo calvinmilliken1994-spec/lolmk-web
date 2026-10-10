@@ -79,7 +79,7 @@ export default function PcBangPage() {
           <li className="flex gap-4">
             <span className="shrink-0 font-mono text-brand-red-bright">04</span>
             <span>
-              At your seat, log into the shop's kiosk software with the PIN, then open the Riot
+              At your seat, log into the shop&apos;s kiosk software with the PIN, then open the Riot
               Client from the desktop and sign into your own Riot account like on any PC. If you
               don&apos;t have a KR account yet, see our{" "}
               <Link href="/how-tos/make-kr-account" className="text-ink underline underline-offset-2 hover:text-brand-red-bright">
@@ -127,7 +127,7 @@ export default function PcBangPage() {
       <section className="container-wide py-16">
         <div className="border border-line-subtle bg-surface p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 justify-between">
           <div>
-            <p className="font-heading text-heading-lg text-ink">Know a PC bang that's good with foreigners?</p>
+            <p className="font-heading text-heading-lg text-ink">Know a PC bang that&apos;s good with foreigners?</p>
             <p className="mt-2 text-body-sm text-ink-secondary max-w-[50ch]">
               Drop the name in Discord so we can add it here for the next person.
             </p>

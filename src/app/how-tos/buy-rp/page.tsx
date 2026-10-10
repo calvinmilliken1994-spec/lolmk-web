@@ -67,7 +67,7 @@ export default function BuyRpPage() {
               discontinued by Riot Korea on January 31, 2023, they no longer work at all.
               General-purpose vouchers like Culture Land (문화상품권) are a different product and
               are still listed as an accepted RP payment method, sold at convenience stores and
-              redeemed by PIN in the client's charge screen. Confirm current acceptance in the
+              redeemed by PIN in the client&apos;s charge screen. Confirm current acceptance in the
               client before relying on this, payment options do change.
             </p>
           </div>
@@ -76,7 +76,7 @@ export default function BuyRpPage() {
             <p className="font-heading text-heading-sm text-ink">Korean phone billing</p>
             <p className="text-body-sm text-ink-secondary">
               RP charged to your Korean mobile carrier bill. Requires a Korean phone plan
-              registered in your name, so it's tied to the same ARC/RC path as account creation.
+              registered in your name, so it&apos;s tied to the same ARC/RC path as account creation.
             </p>
           </div>
         </div>
@@ -112,7 +112,7 @@ export default function BuyRpPage() {
           </li>
         </ol>
         <p className="mt-6 max-w-[70ch] text-body-sm text-ink-muted">
-          If the in-client charge screen errors out, Riot's own support documentation points to
+          If the in-client charge screen errors out, Riot&apos;s own support documentation points to
           the mobile store at lolshop.co.kr as a fallback using the same payment methods.
         </p>
       </section>

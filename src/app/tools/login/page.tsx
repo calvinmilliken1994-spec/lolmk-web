@@ -69,7 +69,7 @@ export default async function ToolsLoginPage({
             </Link>
           ) : (
             <p className="text-body-sm text-warning border border-warning/50 bg-warning/10 px-4 py-2.5 rounded-sm">
-              Admin login isn't configured. Set DISCORD_CLIENT_ID,
+              Admin login isn&apos;t configured. Set DISCORD_CLIENT_ID,
               DISCORD_CLIENT_SECRET, DISCORD_GUILD_ID, and
               DISCORD_ADMIN_ROLE_ID, then restart the server.
             </p>

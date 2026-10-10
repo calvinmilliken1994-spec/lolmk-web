@@ -9,19 +9,19 @@ export function AboutBlurb() {
           <div className="lg:col-span-4">
             <p className="text-label uppercase text-ink-muted mb-4">About</p>
             <h2 className="font-heading text-display-md text-ink">
-              We've been on KR a while.
+              We&apos;ve been on KR a while.
             </h2>
           </div>
           <div className="lg:col-span-8 space-y-6">
             <p className="text-body-lg text-ink-secondary max-w-[65ch]">
               LoLMK started as a Discord for English-speakers playing on the
-              Korean server. Today it's the largest community of its kind: new
+              Korean server. Today it&apos;s the largest community of its kind: new
               expats finding 5-stacks, tourists getting their KR account
               working, and long-timers running community events.
             </p>
             <p className="text-body-md text-ink-secondary max-w-[65ch]">
               No tryouts, no gatekeeping. Iron through Challenger: if you want
-              English voice on KR, you're welcome.
+              English voice on KR, you&apos;re welcome.
             </p>
             <Link
               href="/about"

@@ -174,7 +174,7 @@ export function TimerSetup({
                   className="w-full bg-elevated border border-line rounded-sm px-3 py-2.5 text-body-md"
                 />
                 {!canLaunch && (
-                  <p className="text-body-sm text-danger">Title can't be empty.</p>
+                  <p className="text-body-sm text-danger">Title can&apos;t be empty.</p>
                 )}
               </div>
 
