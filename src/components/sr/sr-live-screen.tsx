@@ -59,6 +59,10 @@ export function SrLiveScreen({
   useEffect(() => {
     let cancelled = false;
     let timer: number;
+    // Venue freshness: was 2s, which cost 1800 DB-backed polls/hour per open
+    // screen against Neon's monthly egress quota. 10s is imperceptible on a
+    // standings stage; the route memoizes 5s on top of that.
+    const POLL_MS = 10000;
 
     async function poll() {
       try {
@@ -79,10 +83,10 @@ export function SrLiveScreen({
       } catch {
         // Network hiccup — keep the last good scene.
       } finally {
-        if (!cancelled) timer = window.setTimeout(poll, 2000);
+        if (!cancelled) timer = window.setTimeout(poll, POLL_MS);
       }
     }
-    timer = window.setTimeout(poll, 2000);
+    timer = window.setTimeout(poll, POLL_MS);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);

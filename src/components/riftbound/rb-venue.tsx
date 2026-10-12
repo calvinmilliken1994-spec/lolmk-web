@@ -16,7 +16,14 @@ import { rbRenderScene, rbVenueOffset, type RbVenueData, type RbVenueScene } fro
 
 const STAGE_W = 1920;
 const STAGE_H = 1080;
-const POLL_MS = 2000;
+/**
+ * Venue freshness. Was 2s, which meant one open screen cost 1800 DB-backed
+ * polls/hour against Neon's monthly egress quota. The venue shows standings
+ * and scenes, not a stopwatch — the countdown clock interpolates client-side
+ * off serverNow — so 10s is imperceptible on stage and cuts reads 5x. The
+ * route memoizes for 5s on top, so multiple screens collapse to one read.
+ */
+const POLL_MS = 10000;
 
 /**
  * Fixed 1920x1080 stage, scaled to fit the window (letterboxed). Inside an

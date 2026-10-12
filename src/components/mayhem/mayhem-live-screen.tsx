@@ -32,6 +32,10 @@ export function MayhemLiveScreen({
   const scene = sceneOverride ?? data.event.scene;
 
   useEffect(() => {
+    // Preview keeps the 1.5s immediacy an admin expects while iterating on
+    // scenes; the public screen drops to 10s — it was costing 2400
+    // DB-backed polls/hour against Neon's monthly egress quota.
+    const POLL_MS = preview ? 1500 : 10000;
     const id = setInterval(async () => {
       try {
         const res = await fetch(`/api/mayhem/state?t=${encodeURIComponent(initial.event.id)}${preview ? "&preview=1" : ""}`, { cache: "no-store" });
@@ -40,7 +44,7 @@ export function MayhemLiveScreen({
       } catch {
         /* transient network hiccup — keep showing the last good state */
       }
-    }, 1500);
+    }, POLL_MS);
     return () => clearInterval(id);
   }, [initial.event.id, preview]);
 

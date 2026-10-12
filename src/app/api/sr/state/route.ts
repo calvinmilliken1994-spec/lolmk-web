@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getPublicTournamentBySlug } from "@/lib/sr-db";
+import { memoizedLoad } from "@/lib/venue-memo";
 
 export const dynamic = "force-dynamic";
+
+/** See rb/state: memoize the public read so open venue screens share DB hits. */
+const MEMO_TTL_MS = 5000;
 
 /**
  * Polled by /srlive/[slug] every ~2s. Public, unauthenticated, read-only.
@@ -26,7 +30,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Missing slug." }, { status: 400 });
   }
 
-  const data = await getPublicTournamentBySlug(slug, { includeTest: true });
+  const data = await memoizedLoad(`sr:state:${slug.toLowerCase()}`, MEMO_TTL_MS, () =>
+    getPublicTournamentBySlug(slug, { includeTest: true }),
+  );
   if (!data) {
     return NextResponse.json(
       { error: "Not found." },

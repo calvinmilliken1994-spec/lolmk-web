@@ -2,8 +2,18 @@ import { NextResponse } from "next/server";
 import { getPublicTournament, getTournamentFull } from "@/lib/rb-db";
 import { rbChampionSummary } from "@/lib/rb-cut";
 import { computeRbStandings } from "@/lib/rb-service";
+import { memoizedLoad } from "@/lib/venue-memo";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Public reads are memoized for a few seconds so N venue screens polling
+ * this route cost one DB read per window instead of N — Neon egress is a
+ * monthly quota and every one of those reads used to meter against it.
+ * Admin desks use /api/rb/admin-state, which is not memoized, so admin
+ * actions stay instant where it matters.
+ */
+const MEMO_TTL_MS = 5000;
 
 /**
  * Polled by the venue screen (/rblive/[slug]) and the public tournament
@@ -27,16 +37,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Missing slug." }, { status: 400 });
   }
 
-  const data = await getPublicTournament(slug);
-  if (!data) {
+  // Both DB reads memoized together under the slug; serverNow stays per-request
+  // so the venue clock never inherits another poll's timestamp.
+  const body = await memoizedLoad(`rb:state:${slug.toLowerCase()}`, MEMO_TTL_MS, async () => {
+    const data = await getPublicTournament(slug);
+    if (!data) return null;
+    const full = await getTournamentFull(slug);
+    const standings = full ? computeRbStandings(full) : [];
+    // The champion's Legend, seed and records are only published once the event is over.
+    const champion = full ? rbChampionSummary(full, standings) : null;
+    return { ...data, standings, champion };
+  });
+
+  if (!body) {
     return NextResponse.json(
       { error: "Not found." },
       { status: 404, headers: { "Cache-Control": "no-store" } },
     );
   }
-  const full = await getTournamentFull(slug);
-  const standings = full ? computeRbStandings(full) : [];
-  // The champion's Legend, seed and records are only published once the event is over.
-  const champion = full ? rbChampionSummary(full, standings) : null;
-  return NextResponse.json({ ...data, standings, champion, serverNow: Date.now() }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ...body, serverNow: Date.now() }, { headers: { "Cache-Control": "no-store" } });
 }
