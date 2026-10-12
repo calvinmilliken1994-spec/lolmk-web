@@ -15,7 +15,11 @@ interface HeroProps {
 export function Hero({ nextEventLabel, nextEventIsLive, discordOnline }: HeroProps) {
   const hasPresence = Boolean(discordOnline && discordOnline !== "—");
   return (
-    <section className="relative overflow-hidden border-b border-line-subtle bg-base">
+    // Fills the viewport below the 64px fixed header at every size, so the
+    // video is the whole first screen on 1080p, 1440p and laptop displays
+    // alike. On desktop (lg+) the type, gaps and logo scale with viewport
+    // height (capped at the 1080p sizes) so the content fits short screens.
+    <section className="relative flex min-h-[calc(100svh-4rem)] flex-col justify-center overflow-hidden border-b border-line-subtle bg-base">
       <Image
         src="/images/hero/hero-league-poster.webp"
         alt=""
@@ -42,9 +46,9 @@ export function Hero({ nextEventLabel, nextEventIsLive, discordOnline }: HeroPro
         aria-hidden
         className="absolute inset-0 grain pointer-events-none"
       />
-      <div className="container-wide relative z-10 pt-24 pb-32 md:pt-32 md:pb-40">
+      <div className="container-wide relative z-10 pt-24 pb-32 md:pt-32 md:pb-40 lg:py-[clamp(2rem,7svh,6rem)]">
         <div className="grid lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-7 space-y-8">
+          <div className="lg:col-span-7 space-y-8 lg:space-y-[clamp(1.25rem,3.4svh,2rem)]">
             {nextEventLabel && (
               <div className="flex flex-wrap items-center gap-3">
                 <Badge variant="red" pulse={nextEventIsLive} className="bg-ds-red text-white [&>span]:bg-white">
@@ -53,7 +57,7 @@ export function Hero({ nextEventLabel, nextEventIsLive, discordOnline }: HeroPro
               </div>
             )}
 
-            <h1 className="font-display text-display-lg md:text-display-xl text-ink leading-[0.95]">
+            <h1 className="font-display text-display-lg md:text-display-xl lg:text-[clamp(3.5rem,10.1svh,6rem)] text-ink leading-[0.95]">
               Global League
               <br />
               of Legends
@@ -99,7 +103,7 @@ export function Hero({ nextEventLabel, nextEventIsLive, discordOnline }: HeroPro
           </div>
 
           <div className="lg:col-span-5">
-            <div className="relative aspect-square max-w-[420px] mx-auto">
+            <div className="relative aspect-square max-w-[420px] lg:max-w-[min(420px,52svh)] mx-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-brand-red/30 via-transparent to-brand-blue/30 blur-2xl" />
               <Image
                 src="/logo.svg"
