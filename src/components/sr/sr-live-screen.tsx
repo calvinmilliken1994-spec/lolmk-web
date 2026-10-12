@@ -11,6 +11,7 @@ import type {
   SrPublicTournamentFull,
 } from "@/types/sr-tournament";
 import { computeBracketGraph } from "@/lib/bracket-layout";
+import { startRevisionPoll } from "@/lib/live-poll";
 
 const BRACKET_LABEL: Record<SrPublicMatch["bracket"], string> = {
   upper: "Upper bracket",
@@ -57,40 +58,19 @@ export function SrLiveScreen({
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    let timer: number;
-    // Venue freshness: was 2s, which cost 1800 DB-backed polls/hour per open
-    // screen against Neon's monthly egress quota. 10s is imperceptible on a
-    // standings stage; the route memoizes 5s on top of that.
-    const POLL_MS = 10000;
-
-    async function poll() {
-      try {
-        const res = await fetch(`/api/sr/state?slug=${encodeURIComponent(slug)}`, {
-          cache: "no-store",
-        });
-        if (res.ok) {
-          const json = await res.json();
-          if (cancelled) return;
-          setData(json);
-        } else if (res.status === 404) {
-          if (cancelled) return;
-          // Authoritative "not live" — a draft tournament or a deleted
-          // slug. Clear immediately rather than freezing a stale scene.
-          setData(null);
-        }
-        // Any other status (5xx, etc.) is transient — keep the last good scene.
-      } catch {
-        // Network hiccup — keep the last good scene.
-      } finally {
-        if (!cancelled) timer = window.setTimeout(poll, POLL_MS);
-      }
-    }
-    timer = window.setTimeout(poll, POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
+    // Checks the revision every 2s (~40 bytes) and downloads the full state
+    // only when an admin has changed something; see `@/lib/live-poll`.
+    // The first check is deferred: the server rendered the initial state.
+    const s = encodeURIComponent(slug);
+    return startRevisionPoll({
+      revUrl: `/api/sr/rev?slug=${s}`,
+      stateUrl: `/api/sr/state?slug=${s}`,
+      intervalMs: 2000,
+      onState: (json) => setData(json as typeof data),
+      // Authoritative "not live" (a draft tournament or a deleted slug):
+      // clear rather than freeze a stale scene. Transient failures keep it.
+      onGone: () => setData(null),
+    });
   }, [slug]);
 
   useEffect(() => {

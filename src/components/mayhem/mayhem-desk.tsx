@@ -85,7 +85,12 @@ export function MayhemDesk({
   stateUrl?: string;
 }) {
   const url = stateUrl ?? `/api/mayhem/admin-state?t=${encodeURIComponent(initial.event.id)}`;
-  const { state, pending, error, setError, run, lastSyncedAt } = useDeckState<MayhemAdminState>({ initial, url });
+  const { state, pending, error, setError, run, lastSyncedAt } = useDeckState<MayhemAdminState>({
+    initial,
+    url,
+    // Mock desks (custom stateUrl) keep the plain poll.
+    revUrl: stateUrl ? null : `/api/mayhem/rev?t=${encodeURIComponent(initial.event.id)}&admin=1`,
+  });
   const actions = useMemo(() => providedActions ?? bindMayhemActions({ eventId: state.event.id, generation: state.event.registration_generation }), [providedActions, state.event.id, state.event.registration_generation]);
   const definition = useMemo(() => makeMayhemDeckDefinition(actions), [actions]);
 

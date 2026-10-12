@@ -42,6 +42,8 @@ export function RbDesk({
   const { state, pending, error, setError, run, lastSyncedAt } = useDeckState<RbDeskState>({
     initial,
     url: stateUrl ?? `/api/rb/admin-state?slug=${encodeURIComponent(slug)}`,
+    // Mock desks (custom stateUrl) keep the plain poll.
+    revUrl: stateUrl ? null : `/api/rb/rev?slug=${encodeURIComponent(slug)}&admin=1`,
   });
   const definition = useMemo(() => makeRbDeckDefinition(actions), [actions]);
   const now = useNow(1000);

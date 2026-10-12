@@ -3,6 +3,7 @@ import { getPublicTournament, getTournamentFull } from "@/lib/rb-db";
 import { rbChampionSummary } from "@/lib/rb-cut";
 import { computeRbStandings } from "@/lib/rb-service";
 import { memoizedLoad } from "@/lib/venue-memo";
+import { rbRevision } from "@/lib/live-revision";
 
 export const dynamic = "force-dynamic";
 
@@ -32,21 +33,27 @@ const MEMO_TTL_MS = 5000;
  * A draft tournament returns 404, identically to one that doesn't exist.
  */
 export async function GET(req: Request) {
-  const slug = (new URL(req.url).searchParams.get("slug") ?? "").trim();
+  const q = new URL(req.url).searchParams;
+  const slug = (q.get("slug") ?? "").trim();
   if (!slug) {
     return NextResponse.json({ error: "Missing slug." }, { status: 400 });
   }
 
   // Both DB reads memoized together under the slug; serverNow stays per-request
   // so the venue clock never inherits another poll's timestamp.
-  const body = await memoizedLoad(`rb:state:${slug.toLowerCase()}`, MEMO_TTL_MS, async () => {
+  // Screens that poll /api/rb/rev pass the revision they saw (`rev`), so a
+  // memoized body is never older than the change that prompted the fetch.
+  // `rev` in the body is read before the data, so it's never newer than it.
+  const seen = q.get("rev") ?? "";
+  const body = await memoizedLoad(`rb:state:${slug.toLowerCase()}:${seen}`, MEMO_TTL_MS, async () => {
+    const rev = await rbRevision(slug, false).catch(() => null);
     const data = await getPublicTournament(slug);
     if (!data) return null;
     const full = await getTournamentFull(slug);
     const standings = full ? computeRbStandings(full) : [];
     // The champion's Legend, seed and records are only published once the event is over.
     const champion = full ? rbChampionSummary(full, standings) : null;
-    return { ...data, standings, champion };
+    return { ...data, standings, champion, rev };
   });
 
   if (!body) {

@@ -59,6 +59,8 @@ export function RbFloor({
   const { state, run, pending, error, setError, refresh, lastSyncedAt } = useDeckState<RbDeskState>({
     initial,
     url: stateUrl ?? `/api/rb/admin-state?slug=${encodeURIComponent(slug)}`,
+    // Mock desks (custom stateUrl) keep the plain poll.
+    revUrl: stateUrl ? null : `/api/rb/rev?slug=${encodeURIComponent(slug)}&admin=1`,
     intervalMs: 2000,
   });
   const subs = useRbSubmissions({ slug, actions, onDelivered: () => void refresh() });

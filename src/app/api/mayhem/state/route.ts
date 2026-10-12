@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isToolsSession } from "@/lib/tools-auth";
-import { getMayhemVenueState } from "@/lib/mayhem-db";
+import { defaultMayhemPublicId, getMayhemVenueState } from "@/lib/mayhem-db";
+import { mayhemRevision } from "@/lib/live-revision";
 import { memoizedLoad } from "@/lib/venue-memo";
 
 export const dynamic = "force-dynamic";
@@ -14,13 +15,17 @@ export async function GET(request: Request) {
   const preview = q.get("preview") === "1";
   if (preview && !await isToolsSession()) return NextResponse.json({ error: "Not authorized." }, { status: 401 });
   const tid = q.get("t") ?? undefined;
-  // Preview stays live (an admin is watching their own edits); the public
-  // screen reads share one DB hit per window.
+  // `rev` is read before the data (see rb/state). Preview stays unmemoized
+  // (an admin is watching their own edits); public screens share one DB hit
+  // per window, keyed by the revision they saw.
+  const load = async () => {
+    const id = tid ?? (await defaultMayhemPublicId());
+    const rev = id ? await mayhemRevision(id, preview).catch(() => null) : null;
+    return { ...(await getMayhemVenueState(id, preview)), rev };
+  };
   const data = preview
-    ? await getMayhemVenueState(tid, preview).catch(() => null)
-    : await memoizedLoad(`mayhem:state:${tid ?? "latest"}`, MEMO_TTL_MS, () =>
-        getMayhemVenueState(tid, preview),
-      ).catch(() => null);
+    ? await load().catch(() => null)
+    : await memoizedLoad(`mayhem:state:${tid ?? "latest"}:${q.get("rev") ?? ""}`, MEMO_TTL_MS, load).catch(() => null);
   if (!data) return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   return NextResponse.json(data, { headers: { "Cache-Control": "no-store" } });
 }

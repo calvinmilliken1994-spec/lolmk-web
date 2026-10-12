@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isToolsSession } from "@/lib/tools-auth";
 import { getMayhemFull, listMayhemAudit } from "@/lib/mayhem-db";
+import { mayhemRevision } from "@/lib/live-revision";
 import type { MayhemAdminState } from "@/types/mayhem";
 
 export const dynamic = "force-dynamic";
@@ -19,9 +20,11 @@ export async function GET(request: Request) {
   if (!signedIn) return NextResponse.json({ error: "Not authorized." }, { status: 401 });
   const t = new URL(request.url).searchParams.get("t");
   if (!t) return NextResponse.json({ error: "Select a tournament." }, { status: 400 });
+  // Read before the data, so the revision is never newer than the payload.
+  const rev = await mayhemRevision(t, true).catch(() => null);
   const full = await getMayhemFull(t).catch(() => null);
   if (!full) return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   const audit = await listMayhemAudit(t);
   const data: MayhemAdminState = { ...full, audit };
-  return NextResponse.json(data, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ...data, rev }, { headers: { "Cache-Control": "no-store" } });
 }

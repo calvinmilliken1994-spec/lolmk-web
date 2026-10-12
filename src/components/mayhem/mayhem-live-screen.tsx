@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { MayhemVenueState } from "@/lib/mayhem-db";
 import type { MayhemMatch, MayhemScene } from "@/types/mayhem";
 import { cn } from "@/lib/utils";
+import { startRevisionPoll } from "@/lib/live-poll";
 
 /**
  * Public, presentation-only venue screen. No admin controls — reads and
@@ -32,20 +33,18 @@ export function MayhemLiveScreen({
   const scene = sceneOverride ?? data.event.scene;
 
   useEffect(() => {
-    // Preview keeps the 1.5s immediacy an admin expects while iterating on
-    // scenes; the public screen drops to 10s — it was costing 2400
-    // DB-backed polls/hour against Neon's monthly egress quota.
-    const POLL_MS = preview ? 1500 : 10000;
-    const id = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/mayhem/state?t=${encodeURIComponent(initial.event.id)}${preview ? "&preview=1" : ""}`, { cache: "no-store" });
-        if (res.ok) { setData(await res.json()); setUnavailable(false); }
-        else if (res.status === 404 || res.status === 401) setUnavailable(true);
-      } catch {
-        /* transient network hiccup — keep showing the last good state */
-      }
-    }, POLL_MS);
-    return () => clearInterval(id);
+    // Checks the revision (~40 bytes) and downloads the full state only when
+    // an admin has changed something; see `@/lib/live-poll`. Preview keeps
+    // the 1.5s immediacy an admin expects while iterating on scenes.
+    const t = encodeURIComponent(initial.event.id);
+    const p = preview ? "&preview=1" : "";
+    return startRevisionPoll({
+      revUrl: `/api/mayhem/rev?t=${t}${p}`,
+      stateUrl: `/api/mayhem/state?t=${t}${p}`,
+      intervalMs: preview ? 1500 : 2000,
+      onState: (json) => { setData(json as MayhemVenueState); setUnavailable(false); },
+      onGone: () => setUnavailable(true),
+    });
   }, [initial.event.id, preview]);
 
   useEffect(() => {

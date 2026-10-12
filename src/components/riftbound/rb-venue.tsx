@@ -13,17 +13,18 @@ import {
   VenueTopCut,
 } from "./rb-venue-scenes";
 import { rbRenderScene, rbVenueOffset, type RbVenueData, type RbVenueScene } from "./rb-venue-model";
+import { startRevisionPoll } from "@/lib/live-poll";
 
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 /**
- * Venue freshness. Was 2s, which meant one open screen cost 1800 DB-backed
- * polls/hour against Neon's monthly egress quota. The venue shows standings
- * and scenes, not a stopwatch — the countdown clock interpolates client-side
- * off serverNow — so 10s is imperceptible on stage and cuts reads 5x. The
- * route memoizes for 5s on top, so multiple screens collapse to one read.
+ * Venue freshness. The screen checks the tournament's revision every 2s
+ * (a ~40-byte response) and downloads the full state only when an admin
+ * has changed something, so desk actions land on stage within ~2s without
+ * the egress of re-downloading the state each tick. See `@/lib/live-poll`.
+ * The countdown interpolates client-side off serverNow.
  */
-const POLL_MS = 10000;
+const POLL_MS = 2000;
 
 /**
  * Fixed 1920x1080 stage, scaled to fit the window (letterboxed). Inside an
@@ -79,33 +80,21 @@ export function RbVenueScreen({ slug, options }: { slug: string; options: RbVenu
   const offset = useRef(0);
 
   useEffect(() => {
-    let cancelled = false;
-    let timer: number;
-    async function poll() {
-      try {
-        const res = await fetch(`/api/rb/state?slug=${encodeURIComponent(slug)}`, { cache: "no-store" });
-        if (res.ok) {
-          const json = (await res.json()) as RbVenueData;
-          if (cancelled) return;
-          offset.current = rbVenueOffset(json.serverNow, Date.now());
-          setData(json);
-        } else if (res.status === 404) {
-          if (cancelled) return;
-          // Authoritative "not live": a draft tournament or a bad slug.
-          setData(null);
-        }
-        // Any other status is transient: keep the last good scene.
-      } catch {
-        // Network hiccup: keep the last good scene.
-      } finally {
-        if (!cancelled) timer = window.setTimeout(poll, POLL_MS);
-      }
-    }
-    poll();
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
+    const s = encodeURIComponent(slug);
+    return startRevisionPoll({
+      revUrl: `/api/rb/rev?slug=${s}`,
+      stateUrl: `/api/rb/state?slug=${s}`,
+      intervalMs: POLL_MS,
+      immediate: true,
+      onState: (raw) => {
+        const json = raw as RbVenueData;
+        offset.current = rbVenueOffset(json.serverNow, Date.now());
+        setData(json);
+      },
+      // Authoritative "not live": a draft tournament or a bad slug.
+      // Transient failures keep the last good scene.
+      onGone: () => setData(null),
+    });
   }, [slug]);
 
   useEffect(() => {

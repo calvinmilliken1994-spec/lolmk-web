@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPublicTournamentBySlug } from "@/lib/sr-db";
 import { memoizedLoad } from "@/lib/venue-memo";
+import { srRevision } from "@/lib/live-revision";
 
 export const dynamic = "force-dynamic";
 
@@ -25,14 +26,20 @@ const MEMO_TTL_MS = 5000;
  * error — and a stranger guessing slugs learns nothing either way.
  */
 export async function GET(req: Request) {
-  const slug = (new URL(req.url).searchParams.get("slug") ?? "").trim();
+  const q = new URL(req.url).searchParams;
+  const slug = (q.get("slug") ?? "").trim();
   if (!slug) {
     return NextResponse.json({ error: "Missing slug." }, { status: 400 });
   }
 
-  const data = await memoizedLoad(`sr:state:${slug.toLowerCase()}`, MEMO_TTL_MS, () =>
-    getPublicTournamentBySlug(slug, { includeTest: true }),
-  );
+  // See rb/state: memo keyed by the revision the screen saw; `rev` in the
+  // body is read before the data.
+  const seen = q.get("rev") ?? "";
+  const data = await memoizedLoad(`sr:state:${slug.toLowerCase()}:${seen}`, MEMO_TTL_MS, async () => {
+    const rev = await srRevision({ slug }, false).catch(() => null);
+    const full = await getPublicTournamentBySlug(slug, { includeTest: true });
+    return full ? { ...full, rev } : null;
+  });
   if (!data) {
     return NextResponse.json(
       { error: "Not found." },

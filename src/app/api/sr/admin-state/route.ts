@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isToolsSession } from "@/lib/tools-auth";
 import { getTournamentFull, listAudit, listTournamentApplications } from "@/lib/sr-db";
+import { srRevision } from "@/lib/live-revision";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,8 @@ export async function GET(req: Request) {
   const tournamentId = (new URL(req.url).searchParams.get("t") ?? "").trim();
   if (!tournamentId) return NextResponse.json({ error: "Missing tournament id." }, { status: 400 });
 
+  // Read before the data, so the revision is never newer than the payload.
+  const rev = await srRevision({ id: tournamentId }, true).catch(() => null);
   const full = await getTournamentFull(tournamentId);
   if (!full) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
@@ -35,7 +38,7 @@ export async function GET(req: Request) {
   ]);
 
   return NextResponse.json(
-    { ...full, audit, applications },
+    { ...full, audit, applications, rev },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

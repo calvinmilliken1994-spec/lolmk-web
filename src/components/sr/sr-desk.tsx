@@ -90,7 +90,12 @@ export function SrDesk({
   stateUrl?: string | null;
 }) {
   const url = stateUrl === undefined ? `/api/sr/admin-state?t=${encodeURIComponent(initial.tournament.id)}` : stateUrl;
-  const { state, pending, error, setError, run, refresh, lastSyncedAt } = useDeckState<SrAdminState>({ initial, url });
+  const { state, pending, error, setError, run, refresh, lastSyncedAt } = useDeckState<SrAdminState>({
+    initial,
+    url,
+    // Mock desks (custom stateUrl) keep the plain poll.
+    revUrl: stateUrl === undefined ? `/api/sr/rev?t=${encodeURIComponent(initial.tournament.id)}&admin=1` : null,
+  });
   const definition = useMemo(() => makeSrDeckDefinition(actions), [actions]);
 
   // View the phase the operator picked; follow the event when it moves on.

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isToolsSession } from "@/lib/tools-auth";
 import { getTournamentFull, listAudit } from "@/lib/rb-db";
 import { computeRbStandings } from "@/lib/rb-service";
+import { rbRevision } from "@/lib/live-revision";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +27,14 @@ export async function GET(req: Request) {
   const slug = (new URL(req.url).searchParams.get("slug") ?? "").trim();
   if (!slug) return NextResponse.json({ error: "Missing slug." }, { status: 400 });
 
+  // Read before the data, so the revision is never newer than the payload.
+  const rev = await rbRevision(slug, true).catch(() => null);
   const full = await getTournamentFull(slug);
   if (!full) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
   const audit = await listAudit(full.tournament.id, AUDIT_LIMIT);
   return NextResponse.json(
-    { ...full, standings: computeRbStandings(full), audit, serverNow: Date.now() },
+    { ...full, standings: computeRbStandings(full), audit, rev, serverNow: Date.now() },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
